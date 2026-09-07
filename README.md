@@ -24,13 +24,12 @@ Pengembangan ReinDev Studio berfungsi sebagai studi kasus validasi empiris metod
 4. **R - Critical Re-evaluation:** Pengujian mandiri lokal (*Micro Loop*) via linter, compiler, dan test runner.
 5. **V - Multi-Layered Validation Gate:** Evaluasi final tingkat makro (*Global Correctness*) di bawah otoritas tunggal *Intent Architect*.
 
-Seluruh artefak penelitian dan log kumulatif dicatat secara ketat di direktori:
-dokumentasi-pengembangan/
+Seluruh artefak penelitian dan log kumulatif dicatat secara ketat di direktori `dokumentasi-pengembangan/`.
 
 ---
 
 ## 🛠️ Struktur Repositori
-`	ext
+```text
 reindev_studio/
 ├── .gitignore
 ├── README.md
@@ -59,4 +58,5 @@ reindev_studio/
     ├── error_log.md
     ├── interactive_test_log.md
     └── screenshots/
-`
+```
+
