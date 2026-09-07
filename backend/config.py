@@ -14,6 +14,18 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
             return FakeListChatModel(responses=[
                 "# Spesifikasi Sistem\n## User Stories\n- Sebagai pengguna, saya ingin modul kalkulator vektor matematika.\n## Acceptance Criteria\n- Menghitung dot product dua vektor dengan benar.\n- Menghitung magnitude vektor."
             ])
+        elif role == "architect":
+            return FakeListChatModel(responses=[
+                "# Rencana Arsitektur\n## File Tree:\n- vector_math.py: Modul utama operasi vektor\n## Interface Contract:\n- dot_product(v1: list[float], v2: list[float]) -> float\n- magnitude(v: list[float]) -> float"
+            ])
+        elif role == "tester":
+            return FakeListChatModel(responses=[
+                "=== FILE: test_vector_math.py ===\nimport pytest\nfrom vector_math import dot_product, magnitude\n\ndef test_dot_product():\n    assert dot_product([1.0, 2.0], [3.0, 4.0]) == 11.0\n\ndef test_magnitude():\n    assert magnitude([3.0, 4.0]) == 5.0\n=== END FILE ==="
+            ])
+        elif role == "reviewer":
+            return FakeListChatModel(responses=[
+                "# Laporan Review Kode\n- Status: APPROVED\n- Analisis: Kode modular, penanganan error dimensi vektor telah dipasang, pengujian lulus 100%."
+            ])
         else:
             return FakeListChatModel(responses=[
                 "=== FILE: vector_math.py ===\nimport math\n\ndef dot_product(v1: list[float], v2: list[float]) -> float:\n    if len(v1) != len(v2):\n        raise ValueError('Dimensi tidak sama')\n    return sum(a * b for a, b in zip(v1, v2))\n\ndef magnitude(v: list[float]) -> float:\n    return math.sqrt(sum(a * a for a in v))\n=== END FILE ==="

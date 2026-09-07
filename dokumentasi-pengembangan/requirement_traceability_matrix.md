@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Iterasi 1a Selesai (REQ-001 s.d. REQ-005: ✅ Selesai)  
+**Status Saat Ini:** Iterasi 1b Selesai (REQ-001 s.d. REQ-010: ✅ Selesai)  
 **Terakhir Diperbarui:** 2026-09-07
 
 ---
@@ -12,11 +12,11 @@
 | **REQ-003** | LLM Factory provider-agnostic yang mendukung Ollama (VRAM 6GB Resident) dan OpenRouter Cloud | 1a | ✅ Selesai | backend/config.py |
 | **REQ-004** | Product Manager Agent Node: memecah prompt bebas menjadi user story dan acceptance criteria | 1a | ✅ Selesai | backend/agents/pm.py |
 | **REQ-005** | Developer Agent Node: menghasilkan implementasi kode modular tanpa placeholder/TODO | 1a | ✅ Selesai | backend/agents/developer.py |
-| **REQ-006** | System Architect Agent Node: merancang peta struktur file (*file tree*) dan spesifikasi modul | 1b | [ ] Belum Dimulai | backend/agents/architect.py |
-| **REQ-007** | QA / Tester Agent Node: menyusun test suite otomatis (pytest / flutter test) | 1b | [ ] Belum Dimulai | backend/agents/tester.py |
-| **REQ-008** | Subprocess Sandbox Test Runner: eksekusi langsung test runner di lingkungan subproses lokal | 1b | [ ] Belum Dimulai | backend/executor.py |
-| **REQ-009** | Cyclic Feedback Edge (Self-Healing Loop): routing otomatis log error dari QA kembali ke Dev (max 3x) | 1b | [ ] Belum Dimulai | backend/graph.py |
-| **REQ-010** | Code Reviewer Agent Node: audit kepatuhan kode, keamanan dasar, dan pemberian status persetujuan rilis | 1b | [ ] Belum Dimulai | backend/agents/reviewer.py |
+| **REQ-006** | System Architect Agent Node: merancang peta struktur file (*file tree*) dan spesifikasi modul | 1b | ✅ Selesai | backend/agents/architect.py |
+| **REQ-007** | QA / Tester Agent Node: menyusun test suite otomatis (pytest / flutter test) | 1b | ✅ Selesai | backend/agents/tester.py |
+| **REQ-008** | Subprocess Sandbox Test Runner: eksekusi langsung test runner di lingkungan subproses lokal | 1b | ✅ Selesai | backend/executor.py |
+| **REQ-009** | Cyclic Feedback Edge (Self-Healing Loop): routing otomatis log error dari QA kembali ke Dev (max 3x) | 1b | ✅ Selesai | backend/graph.py |
+| **REQ-010** | Code Reviewer Agent Node: audit kepatuhan kode, keamanan dasar, dan pemberian status persetujuan rilis | 1b | ✅ Selesai | backend/agents/reviewer.py |
 | **REQ-011** | FastAPI server initialization dengan middleware CORS dan endpoint health-check | 2 | [ ] Belum Dimulai | backend/server.py |
 | **REQ-012** | WebSocket Hub & Connection Manager untuk streaming real-time ke client (/ws/squad) | 2 | [ ] Belum Dimulai | backend/server.py |
 | **REQ-013** | Standarisasi JSON Event Protocol (agent_state, agent_thought, code_update, test_log, complete) | 2 | [ ] Belum Dimulai | backend/server.py |

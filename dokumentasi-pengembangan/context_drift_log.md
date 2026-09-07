@@ -27,3 +27,28 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Minor** — Seluruh perubahan memperkuat keandalan kode tanpa mengubah fungsi dasar State, PM, dan Developer.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 1b — 2026-09-07 19:10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penambahan auto-scaffold `__init__.py` dan konfigurasi dinamis `PYTHONPATH` di sandbox | Positif (Menjamin seluruh subpackage Python dapat diimpor tanpa error) | Agen (Micro Loop) |
+| Mode streaming real-time per node pada eksekusi StateGraph | Positif (Memungkinkan pemantauan log seketika tanpa penundaan buffering) | Agen |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Menerapkan parameter `errors='replace'` dan `sys.stdout.reconfigure(encoding='utf-8')` untuk mencegah crash `cp1252` pada terminal Windows saat mencetak karakter Unicode/emoji log status.
+- **B2 (Keputusan Teknis):**
+  - Mengintegrasikan masukan `architecture_plan` secara langsung ke dalam prompt `developer_agent` agar kode yang dihasilkan selalu mematuhi modul dan kontrak interface dari System Architect.
+
+### Ringkasan Distribusi Sumber Drift Iterasi 1b:
+- **Intent Architect:** 0.0%
+- **Agen:** 100.0% (Resolusi impor modul sandbox, streaming logging, pencegahan crash terminal Windows)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor** — Peningkatan robustitas eksekutor dan logging tanpa mengubah arsitektur 5 agen squad.

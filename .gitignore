@@ -37,3 +37,4 @@ desktop.ini
 # Output test generation
 backend/output/*
 !backend/output/.gitkeep
+backend/sandbox/

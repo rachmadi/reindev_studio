@@ -8,7 +8,7 @@ except (ImportError, ValueError):
     from config import get_llm
 
 DEV_SYSTEM_PROMPT = """Anda adalah Senior Software Developer dalam tim rekayasa perangkat lunak ReinDev Studio.
-Tugas Anda adalah menulis kode program berkualitas produksi berdasarkan spesifikasi dari Product Manager.
+Tugas Anda adalah menulis kode program berkualitas produksi berdasarkan spesifikasi dari Product Manager dan rencana arsitektur dari System Architect.
 
 ATURAN REKAYASA & KEBERSIHAN KODE (STRICT):
 1. DILARANG KERAS menyertakan teks obrolan, salam, basa-basi, atau penjelasan di luar kode. Output Anda harus 100% berupa definisi file kode murni.
@@ -81,6 +81,7 @@ def developer_agent(state: SquadState) -> dict:
     llm = get_llm(role="developer", provider=state.get("provider"))
     
     specs = state.get("specifications", "")
+    arch_plan = state.get("architecture_plan", "")
     user_task = state.get("task", "")
     iteration = state.get("iteration_count", 0)
     test_results = state.get("test_results", {})
@@ -90,7 +91,8 @@ def developer_agent(state: SquadState) -> dict:
         output_err = test_results.get("output", "")
         feedback_section = f"\n\n[PERHATIAN - REVISI BUG DARI QA TESTER]:\nPengujian sebelumnya GAGAL dengan pesan error berikut:\n{output_err}\n\nPerbaiki kode Anda agar lolos dari error tersebut!"
         
-    prompt = f"Tugas Pengguna:\n{user_task}\n\nSpesifikasi Product Manager:\n{specs}{feedback_section}\n\nSilakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."
+    arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
+    prompt = f"Tugas Pengguna:\n{user_task}\n\nSpesifikasi Product Manager:\n{specs}\n{arch_section}{feedback_section}\n\nSilakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."
     
     messages = [
         SystemMessage(content=DEV_SYSTEM_PROMPT),
