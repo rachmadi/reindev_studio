@@ -1,17 +1,17 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Pra-Iterasi (Seluruh kebutuhan berstatus awal: Belum Dimulai)  
+**Status Saat Ini:** Iterasi 1a Selesai (REQ-001 s.d. REQ-005: ✅ Selesai)  
 **Terakhir Diperbarui:** 2026-09-07
 
 ---
 
 | ID Req | Deskripsi Kebutuhan | Iterasi | Status | File / Modul Implementasi |
 |---|---|---|---|---|
-| **REQ-001** | Inisialisasi struktur backend Python, venv, dan dependensi (LangGraph, FastAPI, Ollama/OpenAI SDK) | 1a | [ ] Belum Dimulai | backend/requirements.txt |
-| **REQ-002** | Perancangan Schema State LangGraph (SquadState) untuk pelacakan konteks terpadu | 1a | [ ] Belum Dimulai | backend/state.py |
-| **REQ-003** | LLM Factory provider-agnostic yang mendukung Ollama (VRAM 6GB Resident) dan OpenRouter Cloud | 1a | [ ] Belum Dimulai | backend/config.py |
-| **REQ-004** | Product Manager Agent Node: memecah prompt bebas menjadi user story dan acceptance criteria | 1a | [ ] Belum Dimulai | backend/agents/pm.py |
-| **REQ-005** | Developer Agent Node: menghasilkan implementasi kode modular tanpa placeholder/TODO | 1a | [ ] Belum Dimulai | backend/agents/developer.py |
+| **REQ-001** | Inisialisasi struktur backend Python, venv, dan dependensi (LangGraph, FastAPI, Ollama/OpenAI SDK) | 1a | ✅ Selesai | backend/requirements.txt |
+| **REQ-002** | Perancangan Schema State LangGraph (SquadState) untuk pelacakan konteks terpadu | 1a | ✅ Selesai | backend/state.py |
+| **REQ-003** | LLM Factory provider-agnostic yang mendukung Ollama (VRAM 6GB Resident) dan OpenRouter Cloud | 1a | ✅ Selesai | backend/config.py |
+| **REQ-004** | Product Manager Agent Node: memecah prompt bebas menjadi user story dan acceptance criteria | 1a | ✅ Selesai | backend/agents/pm.py |
+| **REQ-005** | Developer Agent Node: menghasilkan implementasi kode modular tanpa placeholder/TODO | 1a | ✅ Selesai | backend/agents/developer.py |
 | **REQ-006** | System Architect Agent Node: merancang peta struktur file (*file tree*) dan spesifikasi modul | 1b | [ ] Belum Dimulai | backend/agents/architect.py |
 | **REQ-007** | QA / Tester Agent Node: menyusun test suite otomatis (pytest / flutter test) | 1b | [ ] Belum Dimulai | backend/agents/tester.py |
 | **REQ-008** | Subprocess Sandbox Test Runner: eksekusi langsung test runner di lingkungan subproses lokal | 1b | [ ] Belum Dimulai | backend/executor.py |
