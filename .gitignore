@@ -1,0 +1,39 @@
+# Environment & Secret variables
+.env
+.env.local
+
+# Python
+backend/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+
+# IDE & Editor files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Output test generation
+backend/output/*
+!backend/output/.gitkeep
