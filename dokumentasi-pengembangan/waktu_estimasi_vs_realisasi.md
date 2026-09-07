@@ -17,12 +17,6 @@ Perbandingan kuantitatif antara estimasi awal di estimasi_waktu.md dengan waktu 
 | Developer Agent node & sanitizer (developer.py) | 1.5 | 0.04 | 2.7 m | -1.46 | Termasuk penambahan sanitasi clean_code_content |
 | **Total Iterasi 1a** | **6.5** | **0.13** | **8.0 m** | **-6.37** | **48.8x lebih cepat** |
 
-*Rincian Formula Iterasi 1a:*
-- Pengembangan Awal: 3.87 m (0.06 jam)
-- Pengujian & Uji Ulang: 2.18 m (0.04 jam)
-- Perbaikan: 1.90 m (0.03 jam)
-- **Total Realisasi Iterasi 1a: 7.95 menit (~0.13 jam)** (Rentang sesi interaksi: 29.0 menit / 0.48 jam)
-
 ---
 
 ## ═══════════════════════════════════════════════════════════════════════════
@@ -39,13 +33,27 @@ Perbandingan kuantitatif antara estimasi awal di estimasi_waktu.md dengan waktu 
 eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan |
 | **Total Iterasi 1b** | **7.5** | **0.53** | **32.1 m** | **-6.97** | **14.2x lebih cepat** |
 
-*Rincian Formula Iterasi 1b (Sesuai Timestamp Riil 18:38:56 s.d. 19:11:01 WIB):*
-1. **Waktu Pengembangan (Development Time):** 2 menit 58 detik (0.05 jam)
-2. **Total Waktu Pengujian & Uji Ulang (Testing & Re-testing Time):** 26 menit 11 detik (0.44 jam)  
-   *(Mencakup eksekusi unit test pytest, live verification run 1 dengan multi-turn background looping, dan live verification run 2 streaming)*
-3. **Total Waktu Perbaikan (Fixing / Rework Time):** 2 menit 56 detik (0.05 jam)  
-   *(Mencakup resolusi fixture discovery pytest, auto-scaffold package init, dan UTF-8 console fix)*
-- **TOTAL WAKTU REALISASI ITERASI 1b:** **32 menit 05 detik (~32.1 menit / 0.53 jam)**
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2: FastAPI Server & WebSocket Protocol — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen (dari estimasi_waktu.md) | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Faktor Penyebab |
+|---|---|---|---|---|---|
+| FastAPI server scaffold & CORS (server.py) | 1.0 | 0.02 | 1.0 m | -0.98 | Setup cepat FastAPI, CORS, dan health check |
+| WebSocket Hub & Connection Manager (/ws/squad) | 1.5 | 0.02 | 1.2 m | -1.48 | Implementasi ConnectionManager & heartbeat ping-pong |
+| JSON Event Protocol & Dispatcher | 1.5 | 0.02 | 1.1 m | -1.48 | Standarisasi 7 event payload dan stream serialization |
+| REST Endpoints (config & projects) | 1.0 | 0.01 | 0.8 m | -0.99 | Endpoint CRUD config & peramban folder output |
+| Testing: Unit Test Suite + Live E2E Streaming Ollama | 1.0 | 0.12 | 7.1 m | -0.88 | Termasuk live streaming WebSocket 418.78s |
+| **Total Iterasi 2** | **6.0** | **0.19** | **11.2 m** | **-5.81** | **31.6x lebih cepat** |
+
+*Rincian Formula Iterasi 2 (Timestamp 19:16:31 s.d. 19:41:16 WIB):*
+- Waktu Pengembangan: 109 detik (1.82 menit / 0.03 jam)
+- Waktu Pengujian & Uji Ulang: 488.78 detik (8.15 menit / 0.14 jam)
+- Waktu Perbaikan: 73 detik (1.22 menit / 0.02 jam)
+- **TOTAL WAKTU REALISASI ITERASI 2:** **670.78 detik (~11.18 menit / 0.19 jam)**
+- Rentang Sesi Aktual: **24 menit 45 detik (0.41 jam)**
 
 ---
 
@@ -57,10 +65,10 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 |---|---|---|---|---|---|---|
 | **1a** | Core Multi-Agent State & Agents (PM, Dev) | 6.5 | 0.13 | 8.0 m | -6.37 | 48.8x |
 | **1b** | Squad Pipeline & Self-Healing Cyclic Loop | 7.5 | 0.53 | 32.1 m | -6.97 | 14.2x |
-| 2 | FastAPI Server & WebSocket Protocol | 6.0 | — | — | — | — |
+| **2** | FastAPI Server & WebSocket Protocol | 6.0 | 0.19 | 11.2 m | -5.81 | 31.6x |
 | 3 | Flutter UI Shell & MD3 Theming | 6.5 | — | — | — | — |
 | 4 | Mission Control Hub & Engine Switcher | 5.5 | — | — | — | — |
 | 5 | Agent Pipeline Visualization & Stream | 7.0 | — | — | — | — |
 | 6 | Code Explorer & Sandbox Terminal | 7.0 | — | — | — | — |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
-| **TOTAL** | **Kumulatif Selesai (1a + 1b)** | **14.0** | **0.66** | **40.1 m** | **-13.34** | **21.2x lebih cepat** |
+| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2)** | **20.0** | **0.85** | **51.3 m** | **-19.15** | **23.5x lebih cepat** |

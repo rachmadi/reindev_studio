@@ -27,3 +27,19 @@ Dokumen ini mencatat setiap koreksi, klarifikasi, atau intervensi langsung dari 
 | 8 | 18:36 | Menetapkan formula baku perhitungan waktu realisasi: Pengembangan + Total Pengujian & Uji Ulang + Total Perbaikan. | Metodologi & Pengukuran Empiris | Agen merevisi total waktu realisasi di seluruh berkas dokumentasi sesuai formula IIDD. |
 | 9 | 18:38 | Menginstruksikan eksekusi resmi Iterasi 1b (*Squad Pipeline & Self-Healing Loop*). | Alur Kerja / Task Authorization | Agen mengimplementasikan modul Architect, Tester, Sandbox Executor, Reviewer, dan Graph. |
 | 10 | 19:03 | Menanyakan status penyelesaian eksekusi iterasi ("Belum selesai?"). | Monitoring / Query Progres | Agen melakukan investigasi mendalam, mengidentifikasi akar masalah sandbox package import, dan menerapkan perbaikan. |
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2 — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+| No | Waktu | Bentuk Intervensi Intent Architect | Klasifikasi Masalah | Dampak & Tindakan Agen |
+|---|---|---|---|---|
+| 11 | 19:16 | Memberikan status PASS resmi untuk Iterasi 1b dan menginstruksikan eksekusi Iterasi 2. | Alur Kerja / Task Authorization | Agen mengunci commit Iterasi 1b ke GitHub dan langsung memulai eksekusi Iterasi 2. |
+| 12 | 19:21 | Mengajukan pertanyaan verifikasi mendalam ('Sebentar. Kamu sudah menyelesaikan iterasi 2? Kamu yakin?') terkait kelengkapan bukti eksekusi real-time. | Verification Probe / Quality Assurance | Agen mengidentifikasi kebutuhan pembuktian pengujian live streaming E2E WebSocket dengan inferensi nyata Ollama, bukan sekadar unit test simulasi. |
+| 13 | 19:27 | Menanyakan progres eksekusi ('Belum selesai?') saat inferensi multi-agent pipeline sedang berjalan di backend. | Monitoring / Liveness Query | Agen memverifikasi log proses LangGraph dan memastikan proses live streaming WebSocket berjalan aktif. |
+| 14 | 19:32 | Mengingatkan durasi eksekusi ('Sudah lebih dari 4 menit') yang melampaui durasi respons instan awal. | SLA & Duration Awareness | Agen menjelaskan bahwa beban komputasi LLM lokal 7B dengan inferensi multi-turn dan self-healing loop membutuhkan komputasi lebih intensif dibanding unit test cepat. |
+| 15 | 19:35 | Memberikan instruksi metodologis untuk memantau perulangan: 'Karena sering terjadi looping, cek dengan timer sesuai waktu estimasi yang dibuat agen'. | Governance & Safety Guardrail | Agen mengadopsi mekanisme watchdog timer terpadu untuk memantau siklus eksekusi agar tidak terjadi unmonitored loop dan menjaga batas waktu toleransi. |

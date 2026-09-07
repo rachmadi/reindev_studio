@@ -12,7 +12,7 @@ Tugas Anda adalah menulis kode program berkualitas produksi berdasarkan spesifik
 
 ATURAN REKAYASA & KEBERSIHAN KODE (STRICT):
 1. DILARANG KERAS menyertakan teks obrolan, salam, basa-basi, atau penjelasan di luar kode. Output Anda harus 100% berupa definisi file kode murni.
-2. Tulis kode yang lengkap, modular, dengan penanganan kesalahan dan type annotation.
+2. Tulis kode yang lengkap, modular, dengan penanganan kesalahan dan type annotation sesuai target bahasa pemrograman.
 3. JANGAN PERNAH menyertakan placeholder seperti '# TODO', '# implement later', atau '...'.
 4. Format setiap file kode menggunakan blok penanda khusus persis seperti ini:
 === FILE: [nama_file] ===
@@ -83,6 +83,7 @@ def developer_agent(state: SquadState) -> dict:
     specs = state.get("specifications", "")
     arch_plan = state.get("architecture_plan", "")
     user_task = state.get("task", "")
+    target_lang = state.get("target_language", "python").lower()
     iteration = state.get("iteration_count", 0)
     test_results = state.get("test_results", {})
     
@@ -92,7 +93,20 @@ def developer_agent(state: SquadState) -> dict:
         feedback_section = f"\n\n[PERHATIAN - REVISI BUG DARI QA TESTER]:\nPengujian sebelumnya GAGAL dengan pesan error berikut:\n{output_err}\n\nPerbaiki kode Anda agar lolos dari error tersebut!"
         
     arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
-    prompt = f"Tugas Pengguna:\n{user_task}\n\nSpesifikasi Product Manager:\n{specs}\n{arch_section}{feedback_section}\n\nSilakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."
+    prompt = f"""TARGET BAHASA PEMROGRAMAN: {target_lang.upper()}
+
+Tugas Pengguna:
+{user_task}
+
+Spesifikasi Product Manager:
+{specs}
+{arch_section}{feedback_section}
+
+ATURAN KETAT:
+Tulis seluruh implementasi file kode HANYA dalam bahasa {target_lang.upper()} (.py untuk Python).
+Jangan gunakan bahasa pemrograman lain!
+
+Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."""
     
     messages = [
         SystemMessage(content=DEV_SYSTEM_PROMPT),
@@ -104,7 +118,7 @@ def developer_agent(state: SquadState) -> dict:
     code_files = parse_code_blocks(raw_output)
     
     file_list_str = ", ".join(code_files.keys()) if code_files else "(tidak ada file)"
-    new_log = f"[Developer]: Berhasil menghasilkan {len(code_files)} file kode bersih: {file_list_str}."
+    new_log = f"[Developer]: Berhasil menghasilkan {len(code_files)} file kode bersih ({target_lang.upper()}): {file_list_str}."
     current_logs = state.get("logs", [])
     
     return {

@@ -38,3 +38,18 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
 | D-006 | Penyuntikan Rencana Arsitektur ke Prompt Developer | Hanya memberikan spesifikasi PM ke Developer | Menjaga konsistensi struktur folder dan kontrak interface antar modul yang telah ditetapkan Architect | Tidak |
 | D-007 | Batas Maksimal Self-Healing Loop: 3 Putaran | Loop tanpa batas (infinite loop) / 1 kali loop | 3 putaran memberikan kesempatan cukup bagi LLM untuk memperbaiki bug tanpa risiko kehabisan kuota/VRAM tak berujung | Tidak |
 | D-008 | Logging Streaming per Node pada StateGraph | Menunggu seluruh graph selesai (`invoke`) | Memberikan transparansi real-time atas progres tiap agen dan memudahkan debugging jika salah satu agen mengalami kendala | Tidak |
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2 — 2026-09-07 19:41
+## ═══════════════════════════════════════════════════════════════════════════
+
+| ID | Keputusan | Alternatif yang Dipertimbangkan | Alasan Dipilih | Diubah? |
+|---|---|---|---|---|
+| D-009 | Arsitektur Decoupled FastAPI + WebSocket Hub | Long-polling HTTP / Server-Sent Events (SSE) | WebSocket bersifat dua arah (full-duplex) sehingga klien Flutter dapat mengirim interupsi/perintah dan menerima streaming event dalam koneksi tunggal | Tidak |
+| D-010 | Asynchronous Thread Executor untuk StateGraph Stream | Menjalankan stream langsung secara sinkron di event loop | Mencegah event loop asyncio terblokir saat LangGraph melakukan inferensi LLM atau eksekusi sandbox | Tidak |
+| D-011 | Penyimpanan Output Proyek Berbasis Timestamp Slug (output/project_YYYYMMDD_HHMMSS) | Menimpa folder output tunggal | Menjaga riwayat hasil generate proyek agar tidak hilang dan dapat diinspeksi kembali di File Explorer | Tidak |
+| D-012 | Protokol Watchdog Timer untuk Monitoring Inferensi & Loop Multi-Agent | Membiarkan eksekusi berjalan tanpa timer eksternal | Menghindari kondisi loop tak terpantau (unmonitored looping) dan memastikan agen memberikan laporan berkala sesuai batas estimasi | Tidak |

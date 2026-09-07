@@ -62,7 +62,7 @@ def run_sandbox_tests(code_files: Dict[str, str], test_files: Dict[str, str], ta
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join([str(SANDBOX_DIR.resolve())] + subdirs)
     
-    cmd = [sys.executable, "-m", "pytest", "-v", "--color=no"]
+    cmd = [sys.executable, "-m", "pytest", "-v", "--color=no", "-o", "python_files=test_*.py *_test.py"]
     
     try:
         proc = subprocess.run(

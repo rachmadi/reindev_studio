@@ -21,8 +21,28 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Total File Ditambahkan:** 20 berkas baru (backend + dokumentasi)
 - **Kepatuhan Protokol IIDD:** 100% patuh tata kelola rilis (commit dan push dilakukan hanya setelah status PASS diberikan oleh IA).
 ---
+---
 
-## Status Commit Iterasi 1b
-- **Status:** BELUM DI-COMMIT (Uncommitted).
-- **Rencana Pesan Commit:** `iterasi 1b: squad pipeline architect, tester, executor sandbox, reviewer & self-healing loop — kode + dokumentasi`
-- **Kepatuhan Tata Kelola IIDD:** Seluruh file backend dan 11 dokumen log ditahan di lingkungan lokal menunggu status validasi resmi `PASS` atau `PASS WITH NOTES` dari Intent Architect.
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 1b — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Commit Iterasi 1b
+- **Commit Hash:** 5b35e07
+- **Pesan Commit:** iterasi 1b: squad pipeline architect, tester, executor sandbox, reviewer & self-healing loop — kode + dokumentasi
+- **Waktu Commit:** 2026-09-07 19:17 WIB
+- **Status Validasi IA:** ✅ PASS (Disetujui oleh Intent Architect)
+- **Cakupan:** Architect, Tester, Sandbox Executor, Reviewer, cyclic graph, unit tests, dan pembaruan 11 log IIDD.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2 — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Commit Iterasi 2
+- **Status:** SIAP DI-COMMIT (Pending Commit Execution pasca status PASS)
+- **Pesan Commit:** iterasi 2: fastapi server, websocket hub, json event protocol & rest endpoints — kode + dokumentasi
+- **Waktu Validasi IA:** 2026-09-07 19:51 WIB
+- **Status Validasi IA:** ✅ PASS (Disetujui penuh oleh Intent Architect)
+- **Kepatuhan Protokol IIDD:** 100% patuh tata kelola rilis (commit atomik dieksekusi tepat setelah status PASS diberikan oleh IA).

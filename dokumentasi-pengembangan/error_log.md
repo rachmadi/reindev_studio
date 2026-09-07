@@ -65,3 +65,29 @@ Dokumen ini mencatat seluruh galat teknis yang terjadi selama fase Execution dan
 ### Ringkasan Rasio Penanganan Galat Iterasi 1b:
 - **Diselesaikan Mandiri oleh Agen:** 3 kasus (100.0%)
 - **Diselesaikan atas Intervensi IA:** 0 kasus (0.0%)
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2 — 2026-09-07 19:41
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Kasus E-005: Pytest Collection Collision pada Direktori Output & Sandbox
+- **Waktu:** 19:39 WIB
+- **Tingkat Keparahan:** Low / Moderate
+- **Gejala:** Perintah pytest dari root direktori gagal saat pengumpulan tes dengan pesan import file mismatch: imported module 'test_c_to_f' has this __file__ attribute ... which is not the same as the test file we want to collect.
+- **Akar Masalah:** File generator LLM di folder ackend/output/project_YYYYMMDD_HHMMSS/ dan ackend/sandbox/ memiliki nama file modul yang sama (	est_c_to_f.py), memicu bentrokan namespace internal pytest saat melakukan penjelajahan direktori rekursif.
+- **Tindakan Korektif:**
+  1. Membuat konfigurasi pytest.ini di root proyek dengan klausul 
+orecursedirs = backend/output backend/sandbox .venv build .git.
+  2. Menambahkan argumen -o python_files=test_*.py *_test.py pada invocation pytest subprocess di dalam ackend/executor.py agar sandbox test runner tetap independen.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved). Seluruh 16 unit test cases lulus 100%.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Iterasi 2:
+- **Diselesaikan Mandiri oleh Agen:** 1 kasus (100.0%)
+- **Diselesaikan atas Intervensi IA:** 0 kasus (0.0%)

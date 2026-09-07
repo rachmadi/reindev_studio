@@ -52,3 +52,34 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Minor** — Peningkatan robustitas eksekutor dan logging tanpa mengubah arsitektur 5 agen squad.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2 — 2026-09-07 19:41
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penambahan REST Endpoint GET /api/projects/{name} untuk membaca konten file proyek | Positif (Memudahkan File Explorer frontend membaca isi file tanpa akses disk langsung) | Agen |
+| Dukungan aksi ping-pong pada protokol WebSocket | Positif (Menjaga liveness heartbeat koneksi antara Flutter dan FastAPI) | Agen |
+| Konfigurasi root pytest.ini untuk mengisolasi folder sandbox dan output | Positif (Mencegah collision modul saat running full test suite) | Agen |
+| Protokol Watchdog Timer untuk pemantauan looping inferensi multi-agent | Positif (Mencegah unmonitored execution loop sesuai batas estimasi agen) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Menyimpan metadata proyek hasil eksekusi dalam format project_meta.json di setiap folder output untuk riwayat histori.
+- **B2 (Keputusan Teknis):**
+  - Menggunakan syncio.get_event_loop().run_in_executor untuk generator stream LangGraph agar loop asinkron WebSocket tidak terblokir selama komputasi LLM.
+  - Menambahkan argumen isolasi -o python_files=test_*.py *_test.py pada invocation subprocess sandbox test runner.
+
+### Ringkasan Distribusi Sumber Drift Iterasi 2:
+- **Intent Architect:** 25.0% (Arahan watchdog timer untuk monitoring looping)
+- **Agen:** 75.0% (Peningkatan kapabilitas REST, heartbeat websocket, non-blocking stream executor, isolasi pytest)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor** — Penguatan reliabilitas server web, pengujian end-to-end terisolasi, dan guardrail runtime tanpa mengubah arsitektur inti.

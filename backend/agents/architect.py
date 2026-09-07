@@ -10,7 +10,7 @@ ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dala
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
 
 Format luaran yang WAJIB Anda hasilkan:
-1. Peta Struktur File Proyek (File Tree Structure)
+1. Peta Struktur File Proyek (File Tree Structure) sesuai target bahasa pemrograman yang diminta
 2. Tanggung Jawab Komponen / Modul
 3. Kontrak Interface & Type Annotation (Nama fungsi, parameter, return type)
 4. Panduan Implementasi untuk Developer Agent
@@ -23,9 +23,22 @@ def architect_agent(state: SquadState) -> dict:
     
     user_task = state.get("task", "")
     specs = state.get("specifications", "")
+    target_lang = state.get("target_language", "python").lower()
     
-    prompt = f"Deskripsi Tugas:\n{user_task}\n\nSpesifikasi Product Manager:\n{specs}\n\nSilakan rancang rencana arsitektur perangkat lunak, struktur file tree, dan kontrak interface modular."
-    
+    prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
+
+Deskripsi Tugas Pengguna:
+{user_task}
+
+Spesifikasi Product Manager:
+{specs}
+
+ATURAN KETAT:
+Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {target_lang.upper()} (contoh: ekstensi file .py untuk Python, .dart untuk Dart).
+DILARANG KERAS merancang file tree atau struktur dalam bahasa selain {target_lang.upper()}!
+
+Silakan rancang rencana arsitektur perangkat lunak, struktur file tree, dan kontrak interface modular."""
+
     messages = [
         SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
         HumanMessage(content=prompt)
@@ -34,7 +47,7 @@ def architect_agent(state: SquadState) -> dict:
     response = llm.invoke(messages)
     arch_plan = response.content if hasattr(response, "content") else str(response)
     
-    new_log = f"[System Architect]: Rencana arsitektur dan struktur file tree selesai dirancang ({len(arch_plan)} karakter)."
+    new_log = f"[System Architect]: Rencana arsitektur dan struktur file tree ({target_lang.upper()}) selesai dirancang ({len(arch_plan)} karakter)."
     current_logs = state.get("logs", [])
     
     return {

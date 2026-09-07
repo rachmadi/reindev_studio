@@ -78,3 +78,45 @@ Dokumen ini melacak durasi riil pengerjaan setiap aktivitas pengembangan berdasa
 - **Waktu Selesai Verifikasi Lengkap:** 2026-09-07 19:11:01 WIB
 - **Total Rentang Waktu Aktual:** **32 menit 05 detik (0.53 jam)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan rentang timestamp riil.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 2: FastAPI Server & WebSocket Protocol — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Penambahan dependensi web (FastAPI, Uvicorn, websockets, httpx) & install | 19:17:30 | 19:18:31 | 61 s | 1.02 m (0.02 j) |
+| 2 | Pembuatan ackend/server.py (CORS, REST, WebSocket Hub, Protocol, Persistence) | 19:18:31 | 19:18:58 | 27 s | 0.45 m (0.01 j) |
+| 3 | Pembuatan script interactive WebSocket client 	est_ws_client.py | 19:19:35 | 19:19:46 | 11 s | 0.18 m (0.00 j) |
+| 4 | Hardening runner sandbox pytest isolation (-o python_files) | 19:41:00 | 19:41:10 | 10 s | 0.17 m (0.00 j) |
+| | **Subtotal Waktu Pengembangan** | | | **109 s** | **1.82 m (0.03 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Penyusunan dan eksekusi awal test suite Pytest 	est_iterasi_2.py | 19:18:58 | 19:19:20 | 22 s | 0.37 m (0.01 j) |
+| 2 | Eksekusi regresi penuh seluruh 16 test cases (1a, 1b, 2) | 19:19:25 | 19:19:35 | 10 s | 0.17 m (0.00 j) |
+| 3 | Eksekusi live daemon Uvicorn, pengujian REST health, config, dan WS ping | 19:19:57 | 19:20:30 | 33 s | 0.55 m (0.01 j) |
+| 4 | Pengujian Ulang E2E Live WebSocket Streaming dengan model riil Ollama 7B (5 agen + 3 self-healing loop) | 19:31:05 | 19:38:04 | 418.78 s | 6.98 m (0.12 j) |
+| 5 | Eksekusi verifikasi akhir seluruh regression suite (16 passed) | 19:41:11 | 19:41:16 | 5 s | 0.08 m (0.00 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **488.78 s** | **8.15 m (0.14 jam)** |
+
+### Komponen 3: Waktu Perbaikan & Adaptasi (Fixing / Rework Time)
+| No | Aktivitas Perbaikan & Tindakan Korektif | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi pytest duplicate module discovery & konfigurasi pytest.ini (
+orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
+| | **Subtotal Waktu Perbaikan** | | | **73 s** | **1.22 m (0.02 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Iterasi 2:
+\mathbf{\text{Total Waktu Realisasi} = 109\text{ s (Dev)} + 488.78\text{ s (Test)} + 73\text{ s (Fix)} = 670.78\text{ detik} \approx 11\text{ menit } 11\text{ detik} (0.19\text{ jam})}
+- **Waktu Mulai Eksekusi Iterasi 2:** 2026-09-07 19:16:31 WIB
+- **Waktu Selesai Verifikasi Lengkap:** 2026-09-07 19:41:16 WIB
+- **Total Rentang Waktu Sesi Aktual:** **24 menit 45 detik (0.41 jam)**

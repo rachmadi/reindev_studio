@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Iterasi 1b Selesai (REQ-001 s.d. REQ-010: ✅ Selesai)  
+**Status Saat Ini:** Iterasi 2 Selesai (REQ-001 s.d. REQ-014: ✅ Selesai)  
 **Terakhir Diperbarui:** 2026-09-07
 
 ---
@@ -17,10 +17,10 @@
 | **REQ-008** | Subprocess Sandbox Test Runner: eksekusi langsung test runner di lingkungan subproses lokal | 1b | ✅ Selesai | backend/executor.py |
 | **REQ-009** | Cyclic Feedback Edge (Self-Healing Loop): routing otomatis log error dari QA kembali ke Dev (max 3x) | 1b | ✅ Selesai | backend/graph.py |
 | **REQ-010** | Code Reviewer Agent Node: audit kepatuhan kode, keamanan dasar, dan pemberian status persetujuan rilis | 1b | ✅ Selesai | backend/agents/reviewer.py |
-| **REQ-011** | FastAPI server initialization dengan middleware CORS dan endpoint health-check | 2 | [ ] Belum Dimulai | backend/server.py |
-| **REQ-012** | WebSocket Hub & Connection Manager untuk streaming real-time ke client (/ws/squad) | 2 | [ ] Belum Dimulai | backend/server.py |
-| **REQ-013** | Standarisasi JSON Event Protocol (agent_state, agent_thought, code_update, test_log, complete) | 2 | [ ] Belum Dimulai | backend/server.py |
-| **REQ-014** | REST Endpoints untuk membaca/mengubah konfigurasi engine dan daftar project output | 2 | [ ] Belum Dimulai | backend/server.py |
+| **REQ-011** | FastAPI server initialization dengan middleware CORS dan endpoint health-check | 2 | ✅ Selesai | backend/server.py |
+| **REQ-012** | WebSocket Hub & Connection Manager untuk streaming real-time ke client (/ws/squad) | 2 | ✅ Selesai | backend/server.py |
+| **REQ-013** | Standarisasi JSON Event Protocol (agent_state, agent_thought, code_update, test_log, complete) | 2 | ✅ Selesai | backend/server.py |
+| **REQ-014** | REST Endpoints untuk membaca/mengubah konfigurasi engine dan daftar project output | 2 | ✅ Selesai | backend/server.py |
 | **REQ-015** | Inisialisasi proyek Flutter (Desktop Windows & Web) dengan arsitektur Riverpod | 3 | [ ] Belum Dimulai | frontend/pubspec.yaml |
 | **REQ-016** | Konfigurasi ThemeData Material Design 3 (MD3) dengan dukungan Light & Dark Mode | 3 | [ ] Belum Dimulai | frontend/lib/theme/app_theme.dart |
 | **REQ-017** | Layout Scaffold Studio 3-Panel Responsif (Control Hub, Workspace Canvas, Header Bar) | 3 | [ ] Belum Dimulai | frontend/lib/views/studio_screen.dart |
