@@ -47,6 +47,11 @@ Eksekusi
 
 [PENGGUNA - 18:30]
 Tolong cek jumlah dokumentasi yang harus dihasilkan. Seingatku semua ada 11. Cek di spek contoh FDM
+[PENGGUNA - 18:36]
+Ada tambahan. Waktu realisasi bukan hanya waktu pengembangan melainkan waktu pengembangan + total waktu pengujian dan pengujian ulang + total waktu perbaikan
+
+[ANTIGRAVITY - 18:37]
+Prinsip metodologis diterima dan diterapkan ke seluruh dokumen pelacakan waktu. Memperbarui durasi_per_fitur.md, waktu_estimasi_vs_realisasi.md, decision_log.md, dan commit_history.md dengan 3 komponen inti formula IIDD (Pengembangan + Pengujian & Uji Ulang + Perbaikan).
 ---
 
 ## Statistik Sesi Iterasi 1a

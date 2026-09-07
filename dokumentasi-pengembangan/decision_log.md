@@ -21,3 +21,8 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
    - *Konteks:* Model LLM lokal sering kali menyertakan teks obrolan pembuka atau penutup di luar blok kode markdown.
    - *Keputusan:* Mewajibkan Developer Agent membungkus setiap file dalam format blok penanda `=== FILE: ... ===` dan memproses output melalui `clean_code_content` untuk membuang segala teks percakapan.
    - *Rasional:* Menjamin keandalan ekstraksi file kode ke dalam dictionary secara deterministik dan bersih dari teks pengganggu.
+4. **Standardisasi Formula Perhitungan Waktu Realisasi IIDD:**
+   - *Konteks:* Dalam metodologi IIDD, waktu realisasi sering kali keliru disederhanakan hanya sebagai waktu penulisan kode awal (coding time).
+   - *Keputusan:* Menetapkan formula baku perhitungan waktu realisasi:
+     \\text{Total Waktu Realisasi} = \\text{Waktu Pengembangan} + \\text{Total Waktu Pengujian \\& Uji Ulang} + \\text{Total Waktu Perbaikan} + \\text{Waktu Dokumentasi}
+   - *Rasional:* Mencerminkan beban kerja rekayasa perangkat lunak yang komprehensif dan akurat untuk studi empiris IIDD.
