@@ -83,3 +83,29 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Minor** — Penguatan reliabilitas server web, pengujian end-to-end terisolasi, dan guardrail runtime tanpa mengubah arsitektur inti.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 3 — 2026-09-07 20:08
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penambahan 5 Kartu Topologi Agen pada Workspace Tab Timeline | Positif (Memberikan representasi visual instan atas struktur squad multi-agent sebelum Iterasi 5) | Agen |
+| Peluncuran browser headed Chrome interaktif dan build Windows Desktop bersamaan | Positif (Memenuhi arahan IA bahwa pengujian headed harus tampak di layar pengguna) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Menyediakan bottom status bar pada workspace untuk menampilkan status squad loop dan siklus IIDD saat ini.
+- **B2 (Keputusan Teknis):**
+  - Mengadopsi pola Riverpod 3 Notifier dan NotifierProvider secara menyeluruh untuk kompatibilitas jangka panjang.
+
+### Ringkasan Distribusi Sumber Drift Iterasi 3:
+- **Intent Architect:** 50.0% (Penegasan pengujian headed tampak langsung di layar IA)
+- **Agen:** 50.0% (Topologi kartu agen visual, bottom status bar, migrasi Riverpod 3)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor** — Pengayaan antarmuka visual dan kepatuhan pengujian visual tanpa mengubah kontrak sistem.

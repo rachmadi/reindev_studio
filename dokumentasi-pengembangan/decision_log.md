@@ -53,3 +53,16 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
 | D-010 | Asynchronous Thread Executor untuk StateGraph Stream | Menjalankan stream langsung secara sinkron di event loop | Mencegah event loop asyncio terblokir saat LangGraph melakukan inferensi LLM atau eksekusi sandbox | Tidak |
 | D-011 | Penyimpanan Output Proyek Berbasis Timestamp Slug (output/project_YYYYMMDD_HHMMSS) | Menimpa folder output tunggal | Menjaga riwayat hasil generate proyek agar tidak hilang dan dapat diinspeksi kembali di File Explorer | Tidak |
 | D-012 | Protokol Watchdog Timer untuk Monitoring Inferensi & Loop Multi-Agent | Membiarkan eksekusi berjalan tanpa timer eksternal | Menghindari kondisi loop tak terpantau (unmonitored looping) dan memastikan agen memberikan laporan berkala sesuai batas estimasi | Tidak |
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 3 — 2026-09-07 20:08
+## ═══════════════════════════════════════════════════════════════════════════
+
+| ID | Keputusan | Alternatif yang Dipertimbangkan | Alasan Dipilih | Diubah? |
+|---|---|---|---|---|
+| D-013 | Penerapan Riverpod 3 dengan Pola Notifier & NotifierProvider | StateProvider (legacy/deprecated di Riverpod 3) atau ChangeNotifier | Notifier adalah standar resmi Riverpod 3 yang menawarkan *type-safety*, manajemen siklus hidup objek yang lebih bersih, dan performa reaktif optimal | Tidak |
+| D-014 | Layout Scaffold Studio 3-Panel Responsif (330px Left Hub + Flexible Workspace) | Tata letak satu kolom / wizard step-by-step | Memberikan visibilitas terpadu bagi software engineer untuk mengontrol parameter di kiri sambil memantau timeline dan hasil kode di kanvas utama | Tidak |
+| D-015 | Desain Tema Ganda Material Design 3 (Slate Dark #0B0F19 & Slate Light #F8FAFC) | Tema tunggal tanpa opsi toggle | Mengakomodasi preferensi visual developer dalam sesi coding panjang sekaligus memenuhi standar aksesibilitas kontras MD3 | Tidak |
+| D-016 | Protokol Headed Interactive Testing Langsung di Layar Desktop Pengguna | Pengujian headless murni di background | Memastikan Intent Architect dapat menginspeksi secara visual, berinteraksi langsung (klik tombol, toggle tema), dan menguji responsivitas antarmuka di layar riil | Tidak |

@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Iterasi 2 Selesai (REQ-001 s.d. REQ-014: ✅ Selesai)  
+**Status Saat Ini:** Iterasi 3 SELESAI & LULUS VALIDASI IA (REQ-015 s.d. REQ-018: ✅ Selesai)  
 **Terakhir Diperbarui:** 2026-09-07
 
 ---
@@ -21,10 +21,10 @@
 | **REQ-012** | WebSocket Hub & Connection Manager untuk streaming real-time ke client (/ws/squad) | 2 | ✅ Selesai | backend/server.py |
 | **REQ-013** | Standarisasi JSON Event Protocol (agent_state, agent_thought, code_update, test_log, complete) | 2 | ✅ Selesai | backend/server.py |
 | **REQ-014** | REST Endpoints untuk membaca/mengubah konfigurasi engine dan daftar project output | 2 | ✅ Selesai | backend/server.py |
-| **REQ-015** | Inisialisasi proyek Flutter (Desktop Windows & Web) dengan arsitektur Riverpod | 3 | [ ] Belum Dimulai | frontend/pubspec.yaml |
-| **REQ-016** | Konfigurasi ThemeData Material Design 3 (MD3) dengan dukungan Light & Dark Mode | 3 | [ ] Belum Dimulai | frontend/lib/theme/app_theme.dart |
-| **REQ-017** | Layout Scaffold Studio 3-Panel Responsif (Control Hub, Workspace Canvas, Header Bar) | 3 | [ ] Belum Dimulai | frontend/lib/views/studio_screen.dart |
-| **REQ-018** | Global Status Bar, Engine Indicator, dan Tombol Toggle Tema (Dark/Light) | 3 | [ ] Belum Dimulai | frontend/lib/views/widgets/app_header.dart |
+| **REQ-015** | Inisialisasi proyek Flutter (Desktop Windows & Web) dengan arsitektur Riverpod | 3 | ✅ Selesai | frontend/pubspec.yaml |
+| **REQ-016** | Konfigurasi ThemeData Material Design 3 (MD3) dengan dukungan Light & Dark Mode | 3 | ✅ Selesai | frontend/lib/theme/app_theme.dart |
+| **REQ-017** | Layout Scaffold Studio 3-Panel Responsif (Control Hub, Workspace Canvas, Header Bar) | 3 | ✅ Selesai | frontend/lib/views/studio_screen.dart |
+| **REQ-018** | Global Status Bar, Engine Indicator, dan Tombol Toggle Tema (Dark/Light) | 3 | ✅ Selesai | frontend/lib/views/widgets/app_header.dart |
 | **REQ-019** | Mission Request Input Form dengan auto-expanding text field dan validasi input | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/control_panel.dart |
 | **REQ-020** | Engine Switcher Dropdown (Ollama Local 6GB Resident vs OpenRouter Cloud) | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/engine_selector.dart |
 | **REQ-021** | Kontrol tuning squad (slider max QA loop, selector target bahasa: Dart/Python) | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/control_panel.dart |

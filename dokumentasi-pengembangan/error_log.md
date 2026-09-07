@@ -91,3 +91,42 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 ### Ringkasan Rasio Penanganan Galat Iterasi 2:
 - **Diselesaikan Mandiri oleh Agen:** 1 kasus (100.0%)
 - **Diselesaikan atas Intervensi IA:** 0 kasus (0.0%)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 3 — 2026-09-07 20:08
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Kasus E-006: Deprecasi StateProvider pada Riverpod 3.4+
+- **Waktu:** 19:59 WIB
+- **Tingkat Keparahan:** Medium
+- **Gejala:** lutter analyze melaporkan The function 'StateProvider' isn't defined pada berkas lib/providers/app_providers.dart.
+- **Akar Masalah:** Package lutter_riverpod versi 3.4.3 telah menghapus API StateProvider versi lama dan mewajibkan pola arsitektur Notifier dan NotifierProvider.
+- **Tindakan Korektif:** Melakukan migrasi seluruh state global (	hemeModeProvider, ackendStatusProvider, ctiveWorkspaceTabProvider) ke kelas turunan Notifier<T> dengan metode mutasi eksplisit (	oggle(), setStatus(), setTab()).
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved).
+
+### Kasus E-007: Perubahan Tipe Parameter Theme pada Flutter SDK 3.47
+- **Waktu:** 19:59 WIB
+- **Tingkat Keparahan:** Low
+- **Gejala:** lutter analyze melaporkan The argument type 'CardTheme' can't be assigned to parameter type 'CardThemeData?' dan TabBarTheme vs TabBarThemeData?.
+- **Akar Masalah:** Flutter SDK 3.47 memperbarui nama data class tema menjadi CardThemeData dan TabBarThemeData.
+- **Tindakan Korektif:** Mengubah instansiasi menjadi CardThemeData(...) dan TabBarThemeData(...) pada rontend/lib/theme/app_theme.dart.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved).
+
+### Kasus E-008: RenderFlex Overflow pada Batasan Lebar Komponen UI
+- **Waktu:** 20:00 WIB
+- **Tingkat Keparahan:** Medium
+- **Gejala:** Widget test mendeteksi kegagalan layout A RenderFlex overflowed by 274 pixels on the right pada workspace_panel.dart, pp_header.dart, dan control_panel_placeholder.dart.
+- **Akar Masalah:** Penggunaan widget Row dengan teks panjang tanpa pembungkus fleksibel (Expanded / Flexible) menyebabkan teks terdorong melampaui batasan lebar kontainer saat dirender dengan ukuran font fallback.
+- **Tindakan Korektif:** Membungkus seluruh label judul dan baris tuning menggunakan Expanded atau Flexible serta menambahkan atribut overflow: TextOverflow.ellipsis.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved). lutter test lulus 100%.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Iterasi 3:
+- **Diselesaikan Mandiri oleh Agen:** 3 kasus (100.0%)
+- **Diselesaikan atas Intervensi IA:** 0 kasus (0.0%)

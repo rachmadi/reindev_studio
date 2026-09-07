@@ -48,12 +48,26 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | Testing: Unit Test Suite + Live E2E Streaming Ollama | 1.0 | 0.12 | 7.1 m | -0.88 | Termasuk live streaming WebSocket 418.78s |
 | **Total Iterasi 2** | **6.0** | **0.19** | **11.2 m** | **-5.81** | **31.6x lebih cepat** |
 
-*Rincian Formula Iterasi 2 (Timestamp 19:16:31 s.d. 19:41:16 WIB):*
-- Waktu Pengembangan: 109 detik (1.82 menit / 0.03 jam)
-- Waktu Pengujian & Uji Ulang: 488.78 detik (8.15 menit / 0.14 jam)
-- Waktu Perbaikan: 73 detik (1.22 menit / 0.02 jam)
-- **TOTAL WAKTU REALISASI ITERASI 2:** **670.78 detik (~11.18 menit / 0.19 jam)**
-- Rentang Sesi Aktual: **24 menit 45 detik (0.41 jam)**
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 3: Flutter UI Shell, MD3 Theming & Responsive Layout — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen (dari estimasi_waktu.md) | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Faktor Penyebab |
+|---|---|---|---|---|---|
+| Inisialisasi Flutter project + Riverpod (main.dart, pubspec.yaml) | 1.5 | 0.02 | 1.4 m | -1.48 | Scaffolding flutter create & pub add instan |
+| Konfigurasi Material Design 3 ThemeData (pp_theme.dart) | 1.5 | 0.02 | 1.2 m | -1.48 | ColorScheme seed deep slate & clean slate |
+| Three-Panel Studio Layout Scaffold (studio_screen.dart) | 2.0 | 0.03 | 1.8 m | -1.97 | LayoutBuilder responsif 330px Hub + flexible canvas |
+| Top Navbar, Global Status Badge & Theme Switcher (pp_header.dart) | 1.5 | 0.04 | 2.3 m | -1.46 | Termasuk penanganan headless/headed interactive test |
+| **Total Iterasi 3** | **6.5** | **0.12** | **7.3 m** | **-6.38** | **53.3x lebih cepat** |
+
+*Rincian Formula Iterasi 3 (Timestamp 19:56:30 s.d. 20:08:00 WIB):*
+- Waktu Pengembangan: 53 detik (0.88 menit / 0.01 jam)
+- Waktu Pengujian & Uji Ulang: 296 detik (4.93 menit / 0.08 jam)
+- Waktu Perbaikan: 52 detik (0.87 menit / 0.01 jam)
+- **TOTAL WAKTU REALISASI ITERASI 3:** **401 detik (~6.68 menit / 0.11 jam)**
+- Rentang Sesi Aktual: **11 menit 30 detik (0.19 jam)**
 
 ---
 
@@ -66,9 +80,9 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **1a** | Core Multi-Agent State & Agents (PM, Dev) | 6.5 | 0.13 | 8.0 m | -6.37 | 48.8x |
 | **1b** | Squad Pipeline & Self-Healing Cyclic Loop | 7.5 | 0.53 | 32.1 m | -6.97 | 14.2x |
 | **2** | FastAPI Server & WebSocket Protocol | 6.0 | 0.19 | 11.2 m | -5.81 | 31.6x |
-| 3 | Flutter UI Shell & MD3 Theming | 6.5 | — | — | — | — |
+| **3** | Flutter UI Shell & MD3 Theming | 6.5 | 0.12 | 7.3 m | -6.38 | 53.3x |
 | 4 | Mission Control Hub & Engine Switcher | 5.5 | — | — | — | — |
 | 5 | Agent Pipeline Visualization & Stream | 7.0 | — | — | — | — |
 | 6 | Code Explorer & Sandbox Terminal | 7.0 | — | — | — | — |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
-| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2)** | **20.0** | **0.85** | **51.3 m** | **-19.15** | **23.5x lebih cepat** |
+| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2 + 3)** | **26.5** | **0.97** | **58.6 m** | **-25.53** | **27.3x lebih cepat** |

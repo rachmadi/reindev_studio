@@ -120,3 +120,55 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Mulai Eksekusi Iterasi 2:** 2026-09-07 19:16:31 WIB
 - **Waktu Selesai Verifikasi Lengkap:** 2026-09-07 19:41:16 WIB
 - **Total Rentang Waktu Sesi Aktual:** **24 menit 45 detik (0.41 jam)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 3: Flutter UI Shell, MD3 Theming & Responsive Layout — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Inisialisasi proyek Flutter (Desktop & Web) via lutter create frontend | 19:56:38 | 19:56:50 | 12 s | 0.20 m (0.00 j) |
+| 2 | Instalasi dependensi (lutter_riverpod, web_socket_channel, google_fonts) | 19:56:52 | 19:57:04 | 12 s | 0.20 m (0.00 j) |
+| 3 | Konfigurasi ThemeData Material Design 3 (rontend/lib/theme/app_theme.dart) | 19:57:07 | 19:57:18 | 11 s | 0.18 m (0.00 j) |
+| 4 | Pembuatan Riverpod 3 notifiers (rontend/lib/providers/app_providers.dart) | 19:57:22 | 19:57:24 | 2 s | 0.03 m (0.00 j) |
+| 5 | Pembuatan widget Top Header (rontend/lib/views/widgets/app_header.dart) | 19:57:30 | 19:57:33 | 3 s | 0.05 m (0.00 j) |
+| 6 | Pembuatan widget Left Control Panel (control_panel_placeholder.dart) | 19:57:40 | 19:57:42 | 2 s | 0.03 m (0.00 j) |
+| 7 | Pembuatan widget 4-Tab Workspace (workspace_panel.dart) | 19:57:51 | 19:57:54 | 3 s | 0.05 m (0.00 j) |
+| 8 | Pembuatan responsive scaffold 3-panel (studio_screen.dart) | 19:57:59 | 19:58:04 | 5 s | 0.08 m (0.00 j) |
+| 9 | Pembuatan entry point aplikasi rontend/lib/main.dart | 19:58:09 | 19:58:12 | 3 s | 0.05 m (0.00 j) |
+| 10 | Penyusunan test suite otomatis Playwright 	est_headed_interactive.py | 20:23:16 | 20:23:41 | 25 s | 0.42 m (0.01 j) |
+| | **Subtotal Waktu Pengembangan** | | | **78 s** | **1.30 m (0.02 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi lutter analyze awal (deteksi isu Riverpod 3 & Flutter 3.47) | 19:58:16 | 19:59:18 | 62 s | 1.03 m (0.02 j) |
+| 2 | Eksekusi lutter test widget test suite awal | 20:00:24 | 20:00:36 | 12 s | 0.20 m (0.00 j) |
+| 3 | Eksekusi ulang lutter test pasca perbaikan (1 passed in 1s) | 20:01:38 | 20:01:42 | 4 s | 0.07 m (0.00 j) |
+| 4 | Eksekusi ulang lutter analyze (No issues found in 2.7s) | 20:01:46 | 20:01:51 | 5 s | 0.08 m (0.00 j) |
+| 5 | Kompilasi build web Flutter (lutter build web) | 20:02:36 | 20:03:17 | 41 s | 0.68 m (0.01 j) |
+| 6 | Penyiapan server & penangkapan headed screenshot awal (Dark & Light) | 20:03:33 | 20:06:29 | 167 s | 2.78 m (0.05 j) |
+| 7 | **Eksekusi Otomatis Headed Interactive Suite oleh Agen (7 Aksi Playwright)** | 20:23:44 | 20:24:02 | 18 s | 0.30 m (0.01 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **309 s** | **5.15 m (0.09 jam)** |
+
+### Komponen 3: Waktu Perbaikan & Adaptasi (Fixing / Rework Time)
+| No | Aktivitas Perbaikan & Tindakan Korektif | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Migrasi sintaks Riverpod 3 (Notifier / NotifierProvider) di pp_providers.dart | 19:59:23 | 19:59:26 | 3 s | 0.05 m (0.00 j) |
+| 2 | Penyesuaian CardThemeData & TabBarThemeData untuk Flutter 3.47 di pp_theme.dart | 19:59:31 | 19:59:34 | 3 s | 0.05 m (0.00 j) |
+| 3 | Perbaikan layout RenderFlex overflow pada workspace_panel.dart, pp_header.dart, dan control_panel_placeholder.dart | 20:00:49 | 20:01:35 | 46 s | 0.77 m (0.01 j) |
+| | **Subtotal Waktu Perbaikan** | | | **52 s** | **0.87 m (0.01 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Iterasi 3:
+\mathbf{\text{Total Waktu Realisasi} = 78\text{ s (Dev)} + 309\text{ s (Test)} + 52\text{ s (Fix)} = 439\text{ detik} \approx 7\text{ menit } 19\text{ detik} (0.12\text{ jam})}
+- **Waktu Mulai Eksekusi Iterasi 3:** 2026-09-07 19:56:30 WIB
+- **Waktu Selesai Verifikasi Lengkap:** 2026-09-07 20:24:30 WIB
+- **Total Rentang Waktu Sesi Aktual:** **28 menit 00 detik (0.47 jam)**
