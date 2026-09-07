@@ -64,6 +64,15 @@ reindev_studio/
 
 Setiap iterasi mengikuti siklus baku: **Intent** -> **Context** -> **Execution (Instruksi untuk Antigravity)** -> **Re-Evaluation (Micro Loop Agen)** -> **Handoff Validation Gate (Macro Loop Intent Architect)**.
 
+### 📌 Protokol Pengujian Pra-Handoff & Headed Interactive Testing
+1. **Pengujian Mandiri Agen (Sebelum Handoff):**
+   - Agen wajib merancang skenario *Test Cases* formal untuk fitur yang dibangun pada iterasi tersebut.
+   - Untuk modul backend/logika: Agen mengeksekusi test suite secara riil di lingkungan terminal/subproses lokal.
+   - Untuk modul antarmuka pengguna (UI/Flutter): Agen menjalankan aplikasi secara **headed interactive testing** (pada Chrome atau Windows Desktop), mengambil tangkapan layar (**screenshot**), menganalisis screenshot tersebut secara visual, dan mendokumentasikan analisisnya di dokumentasi-pengembangan/interactive_test_log.md serta menyimpan gambarnya di folder dokumentasi-pengembangan/screenshots/iterasi_[N]/.
+2. **Penyediaan Test Case untuk Intent Architect (Saat Handoff):**
+   - Saat handoff, agen tidak hanya melaporkan bahwa kode telah selesai, melainkan **wajib menyusun daftar skenario Test Cases terstruktur langkah-demi-langkah bagi Intent Architect**.
+   - Intent Architect menjalankan skenario tersebut untuk mengevaluasi *Global Correctness* dan memberikan putusan resmi: **PASS**, **PASS WITH NOTES**, atau **FAIL**.
+
 ---
 
 ### Iterasi 1a — Backend Foundation: State & Core Agents (LangGraph, PM, Dev)
