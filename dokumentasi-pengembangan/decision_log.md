@@ -66,3 +66,19 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
 | D-014 | Layout Scaffold Studio 3-Panel Responsif (330px Left Hub + Flexible Workspace) | Tata letak satu kolom / wizard step-by-step | Memberikan visibilitas terpadu bagi software engineer untuk mengontrol parameter di kiri sambil memantau timeline dan hasil kode di kanvas utama | Tidak |
 | D-015 | Desain Tema Ganda Material Design 3 (Slate Dark #0B0F19 & Slate Light #F8FAFC) | Tema tunggal tanpa opsi toggle | Mengakomodasi preferensi visual developer dalam sesi coding panjang sekaligus memenuhi standar aksesibilitas kontras MD3 | Tidak |
 | D-016 | Protokol Headed Interactive Testing Langsung di Layar Desktop Pengguna | Pengujian headless murni di background | Memastikan Intent Architect dapat menginspeksi secara visual, berinteraksi langsung (klik tombol, toggle tema), dan menguji responsivitas antarmuka di layar riil | Tidak |
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4 — 2026-09-07 21:19
+## ═══════════════════════════════════════════════════════════════════════════
+
+| ID | Keputusan | Alternatif yang Dipertimbangkan | Alasan Dipilih | Diubah? |
+|---|---|---|---|---|
+| D-017 | Multiline TextField dengan Live Character Counter & Validasi Visual Bersih | Pop-up modal dialog alert saat string kosong | Validasi teks merah inline di bawah field lebih bersahabat (*developer-friendly*), tidak menginterupsi alur kerja, dan memberikan kejelasan batasan konteks LLM (0–1000 karakter) | Tidak |
+| D-018 | Dynamic Badge 'LOCAL RESIDENT' (Emerald) vs 'CLOUD OPENROUTER' (Indigo) pada Engine Selector Card | Dropdown polos tanpa indikator visual | Memberikan penegasan visual instan kepada Intent Architect mengenai lingkungan inferensi yang sedang aktif (efisiensi VRAM 6GB lokal vs latensi cloud) | Tidak |
+| D-019 | Penggunaan ChoiceChips untuk Bahasa Target & Slider untuk Max QA Loops | Dropdown teks konvensional / input angka teks bebas | ChoiceChips dan Slider memberikan feedback taktil cepat, mencegah input di luar rentang (1–5 loop), dan mengeliminasi kesalahan pengetikan nama bahasa | Tidak |
+| D-020 | Otomasi Sistem Izin Terfokus via PreToolUse Lifecycle Hook (`.agents/hooks.json`) | Mengandalkan dialog izin berulang default Antigravity / menonaktifkan seluruh izin | Mengeliminasi dialog izin yang berulang untuk aksi yang telah disetujui sebelumnya (git, flutter, python, inspeksi) khusus pada workspace ReinDev Studio tanpa mengorbankan keamanan sistem global | Tidak |
+| D-021 | Tombol Clear Prompt Ganda (SuffixIcon 'x' di TextField & Tombol '✕ Hapus' di Header) | Hanya mengandalkan seleksi teks manual / backspace | Fleksibilitas interaksi tingkat tinggi; merespon intervensi IA No. 28 (TC-IA-03) agar pengguna dapat mereset teks prompt panjang dan counter karakter kembali ke 0 dalam satu klik | Tidak |
+| D-022 | Injeksi Anti-Cache Script di `web/index.html` & Peluncuran Profil Bersih `--disable-cache` | Meminta pengguna membersihkan cache browser secara manual setiap rilis baru | Menghilangkan friksi penyerahan build web yang diakibatkan CacheStorage Service Worker Flutter Web yang agresif; memastikan layar monitor fisik IA selalu menerima kompilasi teraktual | Tidak |
+

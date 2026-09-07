@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Iterasi 3 SELESAI & LULUS VALIDASI IA (REQ-015 s.d. REQ-018: ✅ Selesai)  
+**Status Saat Ini:** Iterasi 4 SELESAI (✅ VALIDATED BY IA — REQ-019 s.d. REQ-022: ✅ Selesai)  
 **Terakhir Diperbarui:** 2026-09-07
 
 ---
@@ -25,10 +25,10 @@
 | **REQ-016** | Konfigurasi ThemeData Material Design 3 (MD3) dengan dukungan Light & Dark Mode | 3 | ✅ Selesai | frontend/lib/theme/app_theme.dart |
 | **REQ-017** | Layout Scaffold Studio 3-Panel Responsif (Control Hub, Workspace Canvas, Header Bar) | 3 | ✅ Selesai | frontend/lib/views/studio_screen.dart |
 | **REQ-018** | Global Status Bar, Engine Indicator, dan Tombol Toggle Tema (Dark/Light) | 3 | ✅ Selesai | frontend/lib/views/widgets/app_header.dart |
-| **REQ-019** | Mission Request Input Form dengan auto-expanding text field dan validasi input | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/control_panel.dart |
-| **REQ-020** | Engine Switcher Dropdown (Ollama Local 6GB Resident vs OpenRouter Cloud) | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/engine_selector.dart |
-| **REQ-021** | Kontrol tuning squad (slider max QA loop, selector target bahasa: Dart/Python) | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/control_panel.dart |
-| **REQ-022** | Tombol Preset Cepat (FastAPI CRUD, Flutter Module, CLI Tool) & Tombol Deploy Squad | 4 | [ ] Belum Dimulai | frontend/lib/views/widgets/control_panel.dart |
+| **REQ-019** | Mission Request Input Form dengan auto-expanding text field dan validasi input | 4 | ✅ Selesai | frontend/lib/views/widgets/control_panel.dart |
+| **REQ-020** | Engine Switcher Dropdown (Ollama Local 6GB Resident vs OpenRouter Cloud) | 4 | ✅ Selesai | frontend/lib/views/widgets/engine_selector.dart |
+| **REQ-021** | Kontrol tuning squad (slider max QA loop, selector target bahasa: Dart/Python) | 4 | ✅ Selesai | frontend/lib/views/widgets/control_panel.dart |
+| **REQ-022** | Tombol Preset Cepat (FastAPI CRUD, Flutter Module, CLI Tool) & Tombol Deploy Squad | 4 | ✅ Selesai | frontend/lib/views/widgets/control_panel.dart |
 | **REQ-023** | 5 Kartu Status Agent Interaktif (PM, Architect, Dev, QA, Reviewer) dengan status badge dinamis | 5 | [ ] Belum Dimulai | frontend/lib/views/widgets/agent_cards.dart |
 | **REQ-024** | WebSocket Client Service (web_socket_channel) dengan Riverpod StreamProvider | 5 | [ ] Belum Dimulai | frontend/lib/services/websocket_service.dart |
 | **REQ-025** | Live Auto-scrolling Agent Thought & Discussion Stream Viewer | 5 | [ ] Belum Dimulai | frontend/lib/views/widgets/thought_stream.dart |

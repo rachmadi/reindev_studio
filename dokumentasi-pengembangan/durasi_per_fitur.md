@@ -172,3 +172,55 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Mulai Eksekusi Iterasi 3:** 2026-09-07 19:56:30 WIB
 - **Waktu Selesai Verifikasi Lengkap:** 2026-09-07 20:24:30 WIB
 - **Total Rentang Waktu Sesi Aktual:** **28 menit 00 detik (0.47 jam)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4: Mission Control Hub & Engine Switcher — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Penambahan Riverpod state providers (`promptInput`, `maxQaLoops`, `targetLanguage`, `isDeploying`) | 21:05:00 | 21:05:15 | 15 s | 0.25 m (0.00 j) |
+| 2 | Pembuatan widget AI Engine Selector Card & Dropdown (`engine_selector.dart`) | 21:05:15 | 21:05:55 | 40 s | 0.67 m (0.01 j) |
+| 3 | Pembuatan widget Control Panel lengkap (`control_panel.dart`) dengan multiline TextField, character counter, clear button, preset quick chips, squad tuning slider & chips, deploy button | 21:05:55 | 21:07:25 | 90 s | 1.50 m (0.03 j) |
+| 4 | Pengintegrasian ControlPanel ke `studio_screen.dart` & penghapusan aman placeholder lama | 21:07:25 | 21:07:43 | 18 s | 0.30 m (0.01 j) |
+| 5 | Pembuatan suite pengujian headless widget test (`test/widget_test.dart`) | 21:07:43 | 21:08:03 | 20 s | 0.33 m (0.01 j) |
+| | **Subtotal Waktu Pengembangan** | | | **183 s** | **3.05 m (0.05 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi `flutter analyze` awal (deteksi isu border parameter) | 21:08:05 | 21:08:20 | 15 s | 0.25 m (0.00 j) |
+| 2 | Eksekusi ulang `flutter analyze` pasca perbaikan (0 issues in 1.3s) | 21:08:35 | 21:08:42 | 7 s | 0.12 m (0.00 j) |
+| 3 | Eksekusi `flutter test` awal (deteksi timer pending) | 21:08:45 | 21:08:58 | 13 s | 0.22 m (0.00 j) |
+| 4 | Eksekusi ulang `flutter test` pasca perbaikan pump (100% PASS in 1.4s) | 21:09:15 | 21:09:23 | 8 s | 0.13 m (0.00 j) |
+| 5 | Kompilasi build web Flutter (`flutter build web`) | 21:09:30 | 21:10:14 | 44 s | 0.73 m (0.01 j) |
+| 6 | Penyiapan script & koneksi Chrome CDP Playwright `test_headed_iterasi_4.py` | 21:18:20 | 21:18:50 | 30 s | 0.50 m (0.01 j) |
+| 7 | Eksekusi awal Headed Interactive Suite oleh Agen (7 Aksi di Layar IA) | 21:18:54 | 21:19:12 | 18 s | 0.30 m (0.01 j) |
+| 8 | Eksekusi ulang `flutter analyze` & `flutter test` pasca penambahan tombol 'x' dan chip penjelas | 21:40:18 | 21:40:50 | 15 s | 0.25 m (0.00 j) |
+| 9 | Kompilasi ulang release bundle web (`flutter build web --release`) | 21:40:53 | 21:41:39 | 40 s | 0.67 m (0.01 j) |
+| 10 | Eksekusi Ulang Headed Interactive Suite oleh Agen di Layar IA (7 Aksi) | 21:41:50 | 21:42:27 | 12 s | 0.20 m (0.00 j) |
+| 11 | Kompilasi build web final & eksekusi headed test dengan profile bebas-cache pasca evaluasi IA | 21:50:32 | 21:52:18 | 106 s | 1.77 m (0.03 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **308 s** | **5.13 m (0.09 jam)** |
+
+### Komponen 3: Waktu Perbaikan & Adaptasi (Fixing / Rework Time)
+| No | Aktivitas Perbaikan & Tindakan Korektif | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Koreksi parameter `borderSide` ke `side` pada `RoundedRectangleBorder` Flutter 3.47 di `engine_selector.dart` | 21:08:20 | 21:08:35 | 15 s | 0.25 m (0.00 j) |
+| 2 | Penambahan `await tester.pump(const Duration(seconds: 2))` pada `widget_test.dart` untuk mengosongkan timer asynchronous Future.delayed | 21:09:00 | 21:09:15 | 15 s | 0.25 m (0.00 j) |
+| 3 | Implementasi `suffixIcon` tombol 'x' (`Icons.close_rounded`) pada TextField dan header di `control_panel.dart` pasca evaluasi IA (TC-IA-03) | 21:39:55 | 21:40:15 | 20 s | 0.33 m (0.01 j) |
+| 4 | Implementasi widget Container chip penjelas status performa engine di bawah dropdown pada `engine_selector.dart` pasca evaluasi IA (TC-IA-04) | 21:40:15 | 21:40:35 | 20 s | 0.33 m (0.01 j) |
+| 5 | Injeksi anti-cache script di `index.html` & penambahan badge `⚡ Fast` / `✨ High Accuracy` pada kartu engine | 21:49:40 | 21:50:20 | 40 s | 0.67 m (0.01 j) |
+| | **Subtotal Waktu Perbaikan** | | | **110 s** | **1.83 m (0.03 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Iterasi 4:
+\mathbf{\text{Total Waktu Realisasi} = 183\text{ s (Dev)} + 308\text{ s (Test)} + 110\text{ s (Fix)} = 601\text{ detik} \approx 10\text{ menit } 01\text{ detik} (0.17\text{ jam})}
+- **Waktu Mulai Eksekusi Iterasi 4:** 2026-09-07 21:05:00 WIB
+- **Waktu Selesai Verifikasi Lengkap & Validasi IA (PASS):** 2026-09-07 21:53:41 WIB
+- **Total Rentang Waktu Sesi Aktual:** **48 menit 41 detik (0.81 jam)**
+
+

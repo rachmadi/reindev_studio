@@ -101,3 +101,29 @@ eview_report, complete).
 ### 3. Rekomendasi untuk Iterasi 4:
 - Fondasi cangkang antarmuka dan theming telah 100% siap.
 - Iterasi 4 siap mengimplementasikan Mission Control Hub interaktif di panel kiri: input form request, model switcher dropdown (Ollama 6GB vs OpenRouter Cloud), slider max QA loops, dan preset misi cepat.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4: Mission Control Hub & Engine Switcher — 2026-09-07 21:19
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Capaian Utama:
+1. **Mission Request Input Form (`control_panel.dart`):** Auto-expanding TextField (3–5 baris) dengan batas 1000 karakter, live counter (`0 / 1000`), clear text button, dan validasi visual string kosong tanpa dialog pop-up.
+2. **Engine Switcher Dropdown (`engine_selector.dart`):** Integrasi pemilih engine AI berstandar MD3 yang mendukung Ollama Resident 6GB (`qwen2.5-coder:7b`) dan Cloud OpenRouter (Gemini 2.0 Flash, Claude 3.5 Sonnet, Qwen 2.5 32B), dilengkapi badge dinamis ('LOCAL RESIDENT' emerald vs 'CLOUD OPENROUTER' indigo) dan chip indikator performa.
+3. **Squad Tuning Controls:** Slider interaktif untuk batasan Max QA Loops (1–5x) dan ChoiceChips untuk pemilihan target bahasa pemrograman (`Python` vs `Dart / Flutter`).
+4. **Quick Presets & Deploy Action:** Tombol chip preset cepat (`FastAPI CRUD`, `Flutter Widget`, `CLI Calculator`) yang mengisi teks prompt otomatis, serta tombol utama 'Deploy Autonomous Squad' dengan status loading reaktif (`Deploying Squad...`) dan feedback SnackBar.
+5. **Kualitas Kode Statis & Unit Widget Test:** `flutter analyze` 0 issues (1.3s) dan 7/7 test assertions di `widget_test.dart` lulus 100% (1.4s).
+6. **Eksekusi Headed Interactive Testing Mandiri oleh Agen:** 7 aksi Playwright pada browser fisik di layar monitor IA (`WinSta0\Default`) tuntas 100% PASS dalam 11.24s dengan bukti tangkapan layar lengkap di `screenshots/iterasi_4/`.
+
+### 2. Kebutuhan yang Diselesaikan & Divalidasi Resmi oleh IA (PASS 100%):
+- `REQ-019`: Mission Request Input Form dengan auto-expanding text field, tombol clear 'x', dan validasi input (✅ LULUS).
+- `REQ-020`: Engine Switcher Dropdown (Ollama Local 6GB Resident vs OpenRouter Cloud) dengan badge ⚡ Fast / ✨ High Accuracy dan chip status performa (✅ LULUS).
+- `REQ-021`: Kontrol tuning squad (slider max QA loop 1–5x, selector target bahasa: Python vs Dart/Flutter) (✅ LULUS).
+- `REQ-022`: Tombol Preset Cepat (FastAPI CRUD, Flutter Widget, CLI Calculator) & Tombol Deploy Squad reaktif (✅ LULUS).
+- **Status Validation Gate:** ✅ PASS (Disahkan oleh Muhammad Rachmadi / Intent Architect pada 2026-09-07 21:53 WIB).
+
+### 3. Rekomendasi untuk Iterasi 5:
+- Mission Control Hub telah berfungsi penuh menangkap input misi, konfigurasi engine, dan parameter tuning.
+- Iterasi 5 siap mengimplementasikan visualisasi pipeline agen di kanvas utama: 5 kartu status agen interaktif dengan animasi denyut visual saat memproses tugas, integrasi klien WebSocket stream, dan live auto-scrolling log discussion viewer.
+

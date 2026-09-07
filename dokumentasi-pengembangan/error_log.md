@@ -130,3 +130,53 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 ### Ringkasan Rasio Penanganan Galat Iterasi 3:
 - **Diselesaikan Mandiri oleh Agen:** 3 kasus (100.0%)
 - **Diselesaikan atas Intervensi IA:** 0 kasus (0.0%)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4 — 2026-09-07 21:19
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Kasus E-009: Parameter BorderSide pada RoundedRectangleBorder di Flutter 3.47
+- **Waktu:** 21:08 WIB
+- **Tingkat Keparahan:** Low
+- **Gejala:** `flutter analyze` melaporkan `The named parameter 'borderSide' isn't defined` pada `engine_selector.dart`.
+- **Akar Masalah:** Flutter SDK 3.47 menggunakan parameter bernama `side` (bukan `borderSide`) pada konstruktor `RoundedRectangleBorder`.
+- **Tindakan Korektif:** Mengubah sintaks instansiasi menjadi `shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(...))` di `engine_selector.dart`.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved). `flutter analyze` menghasilkan 0 error dan 0 warning.
+
+### Kasus E-010: TimerPending Exception pada Widget Test Handler Deploy Asinkron
+- **Waktu:** 21:08 WIB
+- **Tingkat Keparahan:** Low
+- **Gejala:** `flutter test` gagal dengan assertion error `A Timer is still pending even after the widget tree was disposed`.
+- **Akar Masalah:** Simulasi deploy pada `control_panel.dart` menggunakan `Future.delayed(const Duration(seconds: 2))` untuk mereset status loading kembali ke idle, yang meninggalkan pending timer aktif di dalam lingkungan uji widget.
+- **Tindakan Korektif:** Menambahkan `await tester.pump(const Duration(seconds: 2));` pada skenario uji `widget_test.dart` untuk memajukan virtual clock dan menyelesaikan timer sebelum tree di-dispose.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved). `flutter test` lulus 100% (7/7 test cases passed).
+
+### Kasus E-011: Diskrepansi UI Tombol Clear 'x' (TC-IA-03) & Chip Penjelas Engine (TC-IA-04)
+- **Waktu:** 21:39 WIB
+- **Tingkat Keparahan:** Medium
+- **Gejala:** Intent Architect mengidentifikasi ketiadaan tombol 'x' pada form input prompt (`TC-IA-03`) dan ketiadaan chip penjelas performa engine (`TC-IA-04`) saat pengujian mandiri di Validation Gate.
+- **Akar Masalah:** Desain awal hanya mengandalkan seleksi teks manual / tombol reset eksternal dan badge dropdown umum tanpa chip penjelas eksplisit.
+- **Tindakan Korektif:** Menambahkan `suffixIcon` tombol 'x' (`Icons.close_rounded`) pada `TextField`, tombol '✕ Hapus' pada header prompt, dan widget Container chip penjelas performa di bawah dropdown engine pada `engine_selector.dart`.
+- **Sumber Solusi:** IA (Ditemukan pada Validation Gate Macro Loop) & AGEN (Diimplementasikan tuntas).
+- **Status:** Tuntas (Resolved).
+
+### Kasus E-012: Flutter Web Service Worker Caching Menyajikan Bundle JavaScript Usang
+- **Waktu:** 21:49 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Browser pada monitor IA masih menyajikan tampilan build lama tanpa badge/chip baru meskipun kompilasi telah diperbarui, memicu feedback IA 'Tidak ada tulisan fast dan high accuracy'.
+- **Akar Masalah:** Arsitektur default Flutter Web (`flutter_bootstrap.js`) mendaftarkan Service Worker (`flutter_service_worker.js`) yang meng-cache aset script di browser CacheStorage sehingga hard refresh biasa tidak serta-merta mengambil build terbaru.
+- **Tindakan Korektif:** Menyuntikkan skrip pembersih cache (`caches.delete()`) dan unregister service worker di `<head>` berkas `frontend/web/index.html`, menambahkan badge `⚡ Fast` / `✨ High Accuracy` langsung di baris atas kartu engine, mengompilasi ulang bundle web release, dan meluncurkan Playwright Chrome dengan opsi `--disable-cache --disk-cache-size=0` serta profil segar terisolasi.
+- **Sumber Solusi:** AGEN (Dianalisis dan diselesaikan mandiri oleh Agen).
+- **Status:** Tuntas (Resolved). Tampilan baru terverifikasi 100% pada layar fisik IA dan disahkan PASS.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Iterasi 4:
+- **Diselesaikan Mandiri oleh Agen:** 3 kasus (75.0% - E-009, E-010, E-012)
+- **Diselesaikan atas Intervensi IA:** 1 kasus (25.0% - E-011)
+
+

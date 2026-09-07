@@ -158,3 +158,63 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 | **TC-IA-04** | Navigasi 4 Tab Workspace Canvas (REQ-018) | Klik berurutan Tab 2 (Code Canvas), Tab 3 (Sandbox Terminal), dan Tab 4 (Quality & Review Report). | Kanvas merespons instan menampilkan placeholder area kerja terkait; indikator tab aktif berwarna Indigo; tidak ada freeze UI. | [ ] PASS / [ ] FAIL |
 | **TC-IA-05** | Integritas Topologi 5 Agen (REQ-018) | Klik kembali ke Tab 1 (Agent Squad Timeline). | Kanvas menampilkan kembali 5 kartu agen lengkap (Architect, Developer, QA Tester, Code Reviewer, Product Manager) dengan badge status IDLE dan preview stream log di bawahnya. | [ ] PASS / [ ] FAIL |
 | **TC-IA-06** | Responsivitas & Pencegahan Overflow (REQ-016) | Lakukan resize atau perkecil lebar jendela browser/layar. | Left Hub mempertahankan batas minimum 330px; judul header menggunakan pemotongan rapi (ellipsis); zero *RenderFlex overflow* error. | [ ] PASS / [ ] FAIL |
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4 — 2026-09-07 21:19
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Skenario Pengujian Unit Widget Otomatis (Flutter Test)
+Pengujian regresi widget frontend dijalankan pada berkas `frontend/test/widget_test.dart`:
+- **Test Case 1 (`Branding & Studio Layout`):** Verifikasi judul `ReinDev Studio`, badge deskripsi studio, engine Ollama, dan panel kontrol kiri. $\rightarrow$ ✅ PASSED
+- **Test Case 2 (`Validation Form Prompt Kosong`):** Verifikasi kemunculan pesan error merah `'Deskripsi misi tidak boleh kosong.'` saat tombol deploy diklik tanpa input. $\rightarrow$ ✅ PASSED
+- **Test Case 3 (`Preset Cepat FastAPI CRUD`):** Verifikasi penekanan preset chip mengisi prompt form secara otomatis dan menghapus error validasi. $\rightarrow$ ✅ PASSED
+- **Test Case 4 (`Preset Cepat Flutter Widget`):** Verifikasi penekanan preset chip kedua memperbarui teks prompt dengan spesifikasi Flutter. $\rightarrow$ ✅ PASSED
+- **Test Case 5 (`Engine Selector Dropdown`):** Verifikasi pemilihan engine cloud memperbarui state `selectedEngineProvider` dan mengubah badge menjadi `CLOUD OPENROUTER`. $\rightarrow$ ✅ PASSED
+- **Test Case 6 (`Squad Tuning Controls`):** Verifikasi slider Max QA Loops (1–5x) dan ChoiceChips bahasa target (`Python` vs `Dart / Flutter`). $\rightarrow$ ✅ PASSED
+- **Test Case 7 (`Deploy Loading State & SnackBar`):** Verifikasi tombol deploy bertransisi menjadi spinner `Deploying Squad...` dan SnackBar notifikasi muncul. $\rightarrow$ ✅ PASSED
+
+Ringkasan Uji Unit Widget: **7 test assertions passed in 1.4s (100% PASS)**.  
+Hasil `flutter analyze`: **0 issues found in 1.3s (Zero Error, Zero Warning)**.
+
+---
+
+### 2. Skenario Pengujian Headed Interactive Testing (Eksekusi Mandiri oleh Agen)
+Sesuai metodologi IIDD (Siklus I-CERV), pengujian interaktif antarmuka headed dilakukan secara otomatis oleh **Agen Antigravity** menggunakan driver Playwright yang dihubungkan langsung ke layar fisik desktop **Intent Architect (IA)** (`WinSta0\Default`) melalui Chrome DevTools Protocol (CDP):
+
+| No | Aksi Pengujian oleh Agen | Target Elemen | Respons Antarmuka Visual | Durasi | Status | Bukti Tangkapan Layar |
+|---|---|---|---|---|---|---|
+| **1** | Navigasi & Verifikasi Layout Hub Awal | Control Hub (REQ-019) | Panel kiri 330px menampilkan input prompt, presets, engine card, tuning, dan deploy button | 3.89s | ✅ PASS | `headed_step1_hub_initial.png` |
+| **2** | Agen Klik 'Deploy Squad' saat Prompt Kosong | Tombol Deploy (REQ-019) | Banner error merah `'Deskripsi misi tidak boleh kosong.'` muncul seketika di bawah input field | 1.21s | ✅ PASS | `headed_step2_validation_error.png` |
+| **3** | Agen Klik Preset 'FastAPI CRUD' & Uji Tombol Clear 'x' | Preset Chip 1 & SuffixIcon (REQ-022, REQ-019) | Form prompt terisi otomatis, tombol 'x' berhasil menghapus teks prompt, dan preset kembali diterapkan | 2.83s | ✅ PASS | `headed_step3_preset_fastapi.png` |
+| **4** | Agen Klik Preset 'Flutter Widget' | Preset Chip 2 (REQ-022) | Form prompt berganti teks spesifikasi Material Design 3 Flutter widget | 1.20s | ✅ PASS | `headed_step4_preset_flutter.png` |
+| **5** | Agen Beralih Engine AI ke OpenRouter & Verifikasi Chip Penjelas | Dropdown Engine & Info Chip (REQ-020) | Model berganti ke Cloud, badge berganti 'CLOUD OPENROUTER' warna Indigo, dan chip penjelas menampilkan 'High Accuracy • Cloud API (OpenRouter)' | 2.01s | ✅ PASS | `headed_step5_engine_switch.png` |
+| **6** | Agen Menyesuaikan Tuning Bahasa ke Dart | ChoiceChip Dart (REQ-021) | Chip Dart aktif dengan warna aksen; slider loop berada di nilai 3x | 1.21s | ✅ PASS | `headed_step6_tuning.png` |
+| **7** | Agen Klik 'Deploy Squad' dengan Input Valid | Tombol Deploy (REQ-022) | Tombol berubah menjadi 'Deploying Squad...' dengan CircularProgressIndicator dan SnackBar sukses muncul | 0.51s | ✅ PASS | `headed_step7_deploy_active.png` |
+
+- **Total Durasi Eksekusi Headed Suite:** **11.95 detik**
+- **Tingkat Keberhasilan:** **7 / 7 Aksi Lulus 100% (Zero Defect, Zero Overflow)**
+- **Kondisi Layar Fisik:** Jendela Google Chrome (PID 28128) tetap dibiarkan aktif di monitor IA untuk inspeksi visual langsung.
+
+---
+
+### 3. Skenario Test Case Validasi Intent Architect (Validation Gate Macro Loop)
+Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctness*), Intent Architect (IA) melakukan validasi langsung pada aplikasi yang berjalan menggunakan matriks uji berikut:
+
+| ID Uji | Fitur Terkait | Prosedur Pengujian IA | Hasil yang Diharapkan (Expected Result) | Status IA |
+|---|---|---|---|---|
+| **TC-IA-01** | Validasi Input Prompt Kosong (REQ-019) | Pastikan kolom teks prompt kosong, lalu klik tombol **Deploy Autonomous Squad**. | Tombol tidak memicu deploy; muncul teks error merah `'Deskripsi misi tidak boleh kosong.'` di bawah form; counter karakter menampilkan `0 / 1000`. | ✅ PASS |
+| **TC-IA-02** | Preset Cepat 'FastAPI CRUD' (REQ-022) | Klik chip preset bertuliskan **FastAPI CRUD**. | Kolom prompt seketika terisi deskripsi proyek CRUD modular, error validasi hilang, dan counter karakter ter-update otomatis. | ✅ PASS |
+| **TC-IA-03** | Preset Cepat 'Flutter Widget' & 'CLI Tool' (REQ-022) | Klik chip preset **Flutter Widget** atau **CLI Calculator**. | Teks prompt ter-update sesuai preset yang dipilih tanpa merusak format antarmuka. Tombol Clear (ikon 'x') menghapus teks dan mengembalikan counter ke 0. | ✅ PASS |
+| **TC-IA-04** | Engine Switcher Ollama vs OpenRouter (REQ-020) | Buka dropdown Engine AI di kartu AI Engine, lalu pilih salah satu model OpenRouter (misal: Gemini 2.0 Flash / Qwen 2.5 32B). | Badge status berubah dari 'LOCAL RESIDENT' (hijau emerald) & '⚡ Fast' menjadi 'CLOUD OPENROUTER' & '✨ High Accuracy'; info chip 'Fast • Resident 6GB' berganti menjadi 'High Accuracy • Cloud API'. | ✅ PASS |
+| **TC-IA-05** | Squad Tuning Controls (REQ-021) | Geser Slider **Max QA Loops** (1 s.d. 5x) dan klik ChoiceChip bahasa target (**Python** vs **Dart / Flutter**). | Nilai slider ter-update secara reaktif (`1x` s.d. `5x`); chip bahasa target berganti status aktif dengan efek visual highlight yang tegas. | ✅ PASS |
+| **TC-IA-06** | Pemicu Deploy Autonomous Squad (REQ-022) | Dengan prompt terisi, klik tombol **Deploy Autonomous Squad**. | Tombol menampilkan status loading (`Deploying Squad...`) dengan spinner animasi; SnackBar konfirmasi muncul di bagian bawah layar; parameter prompt dan engine tersimpan di Riverpod. | ✅ PASS |
+
+---
+
+### 4. Putusan Akhir Validation Gate Iterasi 4
+- **Putusan Resmi:** **✅ PASS (Disetujui Penuh oleh Intent Architect)**
+- **Waktu Putusan:** 2026-09-07 21:53 WIB
+- **Validator:** Muhammad Rachmadi (Intent Architect)
+- **Kesimpulan:** Seluruh kriteria penerimaan REQ-019 s.d. REQ-022 telah teruji secara objektif di layar monitor fisik IA dan melalui unit widget testing. Tombol clear prompt 'x' dan badge/chip penjelas performa engine terkonfirmasi berfungsi optimal. Gerbang rilis Iterasi 4 resmi dibuka untuk commit dan push ke repositori remote `main`.

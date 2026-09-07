@@ -72,6 +72,27 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 ---
 
 ## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 4: Mission Control Hub & Engine Switcher — 2026-09-07
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen (dari estimasi_waktu.md) | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Faktor Penyebab |
+|---|---|---|---|---|---|
+| Mission Request Input Form & validasi (control_panel.dart) | 1.5 | 0.04 | 2.4 m | -1.46 | TextField multiline + live counter + tombol 'x' |
+| Engine Switcher Card & Dropdown (engine_selector.dart) | 1.5 | 0.05 | 3.0 m | -1.45 | Dropdown MD3, dynamic badge & chip penjelas |
+| Squad Tuning Controls (Slider & ChoiceChips) | 1.0 | 0.03 | 1.8 m | -0.97 | Slider Material & Riverpod state |
+| Quick Preset Chips & Deploy Squad Button | 1.5 | 0.05 | 2.8 m | -1.45 | Action chips & reactive loading indicator |
+| **Total Iterasi 4** | **5.5** | **0.17** | **10.0 m** | **-5.33** | **32.4x lebih cepat** |
+
+*Rincian Formula Iterasi 4 (Timestamp 21:05:00 s.d. 21:53:41 WIB):*
+- Waktu Pengembangan: 183 detik (3.05 menit / 0.05 jam)
+- Waktu Pengujian & Uji Ulang: 308 detik (5.13 menit / 0.09 jam)
+- Waktu Perbaikan: 110 detik (1.83 menit / 0.03 jam)
+- **TOTAL WAKTU REALISASI ITERASI 4:** **601 detik (~10.02 menit / 0.17 jam)**
+- Rentang Sesi Aktual: **48 menit 41 detik (0.81 jam)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
 ## Ringkasan Kumulatif Proyek
 ## ═══════════════════════════════════════════════════════════════════════════
 
@@ -81,8 +102,8 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **1b** | Squad Pipeline & Self-Healing Cyclic Loop | 7.5 | 0.53 | 32.1 m | -6.97 | 14.2x |
 | **2** | FastAPI Server & WebSocket Protocol | 6.0 | 0.19 | 11.2 m | -5.81 | 31.6x |
 | **3** | Flutter UI Shell & MD3 Theming | 6.5 | 0.12 | 7.3 m | -6.38 | 53.3x |
-| 4 | Mission Control Hub & Engine Switcher | 5.5 | — | — | — | — |
+| **4** | Mission Control Hub & Engine Switcher | 5.5 | 0.17 | 10.0 m | -5.33 | 32.4x |
 | 5 | Agent Pipeline Visualization & Stream | 7.0 | — | — | — | — |
 | 6 | Code Explorer & Sandbox Terminal | 7.0 | — | — | — | — |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
-| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2 + 3)** | **26.5** | **0.97** | **58.6 m** | **-25.53** | **27.3x lebih cepat** |
+| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2 + 3 + 4)** | **32.0** | **1.14** | **68.6 m** | **-30.86** | **28.1x lebih cepat** |

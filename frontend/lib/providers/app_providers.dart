@@ -57,3 +57,45 @@ class SquadStatusNotifier extends Notifier<String> {
 
 final squadStatusProvider =
     NotifierProvider<SquadStatusNotifier, String>(SquadStatusNotifier.new);
+
+class PromptInputNotifier extends Notifier<String> {
+  @override
+  String build() => "";
+
+  void setPrompt(String prompt) => state = prompt;
+  void clear() => state = "";
+}
+
+final promptInputProvider =
+    NotifierProvider<PromptInputNotifier, String>(PromptInputNotifier.new);
+
+class MaxQaLoopsNotifier extends Notifier<int> {
+  @override
+  int build() => 3;
+
+  void setLoops(int loops) => state = loops;
+}
+
+final maxQaLoopsProvider =
+    NotifierProvider<MaxQaLoopsNotifier, int>(MaxQaLoopsNotifier.new);
+
+class TargetLanguageNotifier extends Notifier<String> {
+  @override
+  String build() => "Python";
+
+  void setLanguage(String lang) => state = lang;
+}
+
+final targetLanguageProvider =
+    NotifierProvider<TargetLanguageNotifier, String>(
+        TargetLanguageNotifier.new);
+
+class IsDeployingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setDeploying(bool deploying) => state = deploying;
+}
+
+final isDeployingProvider =
+    NotifierProvider<IsDeployingNotifier, bool>(IsDeployingNotifier.new);

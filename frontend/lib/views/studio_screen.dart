@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/app_header.dart';
-import 'widgets/control_panel_placeholder.dart';
+import 'widgets/control_panel.dart';
 import 'widgets/workspace_panel.dart';
 
 class StudioScreen extends ConsumerWidget {
@@ -28,7 +28,7 @@ class StudioScreen extends ConsumerWidget {
           return const Row(
             children: [
               // Left Control Hub Panel (330px)
-              ControlPanelPlaceholder(),
+              ControlPanel(),
 
               // Center & Right Main Workspace (Flexible)
               Expanded(
