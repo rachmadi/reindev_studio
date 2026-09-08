@@ -539,7 +539,46 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Iterasi 6 (Revisi):
-- **Diselesaikan Mandiri oleh Agen:** 14 kasus (87.5% — E-024, E-025, E-026, E-027, E-028, E-030, E-031, E-032, E-034, E-035, E-036, E-037, E-038, E-039)
-- **Diselesaikan atas Intervensi IA:** 1 kasus (6.25% — E-029: stateful test ordering)
-- **Inisiatif Strategis IA + Implementasi Agen:** 1 kasus (6.25% — E-033: Environment Grounding)
+### Kasus E-040: Diskrepansi Kode Kanvas UI (Code Canvas) dan Sandbox Execution — Shielding Auto-Healing Memicu False Positive Release
+- **Waktu:** 2026-09-08 ~17:53 WIB (Sesi `backend/output/project_20260908_175258/`)
+- **Tingkat Keparahan:** Critical (Architectural Integrity & Audit Transparency)
+- **Gejala:** Kode `main.py` yang ditampilkan di Code Canvas frontend tidak memuat `status_code=201`, menggunakan mutasi referensi in-memory `products = [...]` yang merusak import pada `test_main.py`, dan tidak memiliki endpoint `GET`. Namun, pengujian sandbox melaporkan 2/2 PASS dan Reviewer memberikan status `[APPROVED]` sehingga sistem merilis produk secara keliru (*false positive*).
+- **Akar Masalah:**
+  1. *Shielding Transformasi Executor:* Sebelum kode ditulis ke sandbox, `backend/executor.py` secara agresif mengubah kode di memori: menambahkan regex `status_code=201`, mengubah penugasan menjadi in-place mutation `products[:] = [...]`, dan menyuntikkan endpoint `GET /products/`. Di saat yang sama, executor merelaksasi assertion `test_main.py` dari `== 201` menjadi `in (200, 201, 400)` dan me-relax perbandingan JSON ID.
+  2. *Protokol Sinkronisasi UI Terputus:* Frontend Flutter (`squad_pipeline_provider.dart`) hanya memperbarui state `codeFilesProvider` saat event `code_update` diterima (yang hanya disiarkan oleh node `developer` dan `tester`). Node `executor` tidak pernah menyiarkan event `code_update`. Akibatnya, kanvas UI menampilkan kode mentah Developer yang cacat, sementara sandbox mengeksekusi dan meloloskan kode hasil transformasi Executor yang tertulis di disk.
+- **Tindakan Korektif (Terencana):** Menyelaraskan hasil transformasi executor kembali ke state kanvas secara transparan atau memindahkan koreksi sintaksis ke lapisan prompt/linter mandiri agar tidak menyamarkan cacat kode mentah.
+- **Sumber Solusi:** INTERVENSI IA (Ditemukan melalui evaluasi visual kritis Intent Architect No. 53 & 55).
+- **Status:** Teridentifikasi & Terdokumentasi (Pending Implementation).
+
+---
+
+### Kasus E-041: Dead Code pada Riverpod State Management & Pengabaian Material Design 3
+- **Waktu:** 2026-09-08 ~18:12 WIB (Sesi `backend/output/project_20260908_181146/`)
+- **Tingkat Keparahan:** High
+- **Gejala:** Widget Flutter `CardMetric` mendeklarasikan `final metricDataProvider = Provider<MetricData>(...)`, namun di dalam method `build(BuildContext context, WidgetRef ref)`, parameter `ref` sama sekali tidak pernah digunakan (`ref.watch`/`ref.read` tidak ada). Data dibaca murni dari parameter konstruktor `final MetricData data`. Selain itu, properti visual menggunakan styling statis kaku (`Colors.white`, `elevation: 2.0`) tanpa mengonsumsi token `Theme.of(context).colorScheme` M3.
+- **Akar Masalah:** Model 7B mendeklarasikan provider Riverpod hanya untuk memenuhi kepatuhan kata kunci prompt, namun gagal mengintegrasikan konsumsi state ke dalam pohon widget (*architectural reasoning gap*). QA Tester memperparah keadaan dengan hanya menguji passing parameter konstruktor, sementara regex executor di `executor.py` menghapus assertion teks nilai asli `'75%'` (`// relaxed formatted text`), sehingga widget yang cacat arsitektur tetap lolos uji di sandbox (1/1 PASS).
+- **Tindakan Korektif (Terencana):** Pengetatan kontrak arsitektur Developer untuk mewajibkan pemanggilan `ref.watch()` pada ConsumerWidget dan pengetatan QA Tester untuk memverifikasi nilai dari ProviderContainer / Riverpod provider.
+- **Sumber Solusi:** INTERVENSI IA (Intervensi No. 55).
+- **Status:** Teridentifikasi & Terdokumentasi (Pending Implementation).
+
+---
+
+### Kasus E-042: Kesalahan Matematika Aljabar Linear pada Test Suite QA Tester ($2\times 2 \times 2\times 3$) Mengunci Siklus Self-Healing
+- **Waktu:** 2026-09-08 ~18:21 WIB (Sesi `backend/output/project_20260908_182017/`)
+- **Tingkat Keparahan:** Critical
+- **Gejala:** Preset CLI Calculator gagal setelah melalui 3 putaran self-healing penuh (`iterations: 3`, status `needs_revision`), dengan 3 kegagalan deterministik: `test_parse_matrix_invalid_dimensions`, `test_add_matrices_invalid_dimensions`, dan `test_multiply_matrices_invalid_dimensions`.
+- **Akar Masalah:**
+  1. *Kesalahan Evaluasi Dimensi:* QA Tester mengharapkan `ValueError` untuk matriks input 3 baris (`1 2\n3 4\n5 6`), padahal fungsi `parse_matrix` mengizinkan 2 atau 3 baris (`len(raw_lines) in (2, 3)`), sehingga tidak melempar exception.
+  2. *Kesalahan Aljabar Linear pada Tester:* Pada `test_multiply_matrices_invalid_dimensions`, Tester menguji perkalian matriks $A (2\times 2)$ dengan $B (2\times 3)$ dan meng-assert `with pytest.raises(ValueError)`. Secara kaidah matematika aljabar linear, operasi ini **sepenuhnya sah dan valid** karena kolom $A$ (2) sama dengan baris $B$ (2), menghasilkan matriks $2\times 3$.
+  3. *Jebakan Self-Healing Tanpa Ujung:* Karena graph routing mempertahankan test suite acuan tanpa regenerasi pada Loop > 0, Developer dihadapkan pada tuntutan assertion yang kontradiktif (memaksa kalkulasi matematika yang benar untuk melempar error). Developer tidak pernah bisa memuaskan tuntutan ini hingga batas 3 loop habis.
+- **Tindakan Korektif (Terencana):** Penyempurnaan prompt QA Tester dengan panduan aturan aljabar linear eksplisit dan validasi assertion exception yang ketat.
+- **Sumber Solusi:** INTERVENSI IA (Intervensi No. 55).
+- **Status:** Teridentifikasi & Terdokumentasi (Pending Implementation).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Iterasi 6 (Revisi Pasca-Investigasi E2E):
+- **Diselesaikan Mandiri oleh Agen:** 14 kasus (82.35% — E-024, E-025, E-026, E-027, E-028, E-030, E-031, E-032, E-034, E-035, E-036, E-037, E-038, E-039)
+- **Diselesaikan atas Intervensi IA:** 2 kasus (11.76% — E-029: stateful test ordering, E-040: UI vs Sandbox shielding discrepancy)
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 3 kasus (17.65% — E-033: Environment Grounding, E-041: Riverpod dead code, E-042: QA matrix math contradiction)
+- **Total Galat Terdokumentasi:** 42 kasus (E-001 s/d E-042)
