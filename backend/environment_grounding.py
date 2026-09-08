@@ -159,12 +159,13 @@ def _get_flutter_version() -> Optional[str]:
 # Fact Card Generator
 # ---------------------------------------------------------------------------
 
-def generate_python_fact_card() -> str:
+def generate_python_fact_card(task: str = "") -> str:
     """
     Hasilkan Environment Fact Card untuk stack Python.
     Berisi versi package kritis dan aturan API yang harus dipatuhi Developer.
     """
     pkgs = _get_installed_packages()
+    is_fastapi = any(k in task.lower() for k in ["fastapi", "rest", "api", "crud", "endpoint", "inventaris"]) if task else True
 
     fastapi_v = _pkg_version("fastapi")
     pydantic_v = _pkg_version("pydantic")
@@ -179,40 +180,39 @@ def generate_python_fact_card() -> str:
     lines = ["[ENVIRONMENT FACTS — PYTHON STACK]"]
     lines.append(f"Python runtime: {sys.version.split()[0]}")
 
-    if fastapi_v:
+    if is_fastapi and fastapi_v:
         lines.append(f"fastapi=={fastapi_v}")
-    if pydantic_v:
+    if is_fastapi and pydantic_v:
         lines.append(f"pydantic=={pydantic_v}")
     if pytest_v:
         lines.append(f"pytest=={pytest_v}")
-    if uvicorn_v:
+    if is_fastapi and uvicorn_v:
         lines.append(f"uvicorn=={uvicorn_v}")
-    if httpx_v:
+    if is_fastapi and httpx_v:
         lines.append(f"httpx=={httpx_v}")
 
     lines.append("")
     lines.append("ATURAN API BERDASARKAN VERSI TERDETEKSI:")
 
     # --- Pydantic rules ---
-    if pydantic_major == 2:
-        lines += [
-            "• pydantic v2 AKTIF:",
-            "  - Field id WAJIB optional: `id: int | None = None` (bukan `id: int`)",
-            "  - Validator: gunakan `@field_validator` (bukan `@validator`)",
-            "  - Config: gunakan `model_config = ConfigDict(...)` (bukan class Config)",
-            "  - `orm_mode` diganti `from_attributes = True`",
-        ]
-    elif pydantic_major == 1:
-        lines += [
-            "• pydantic v1 AKTIF:",
-            "  - Validator: gunakan `@validator` (bukan `@field_validator`)",
-            "  - Config: gunakan inner `class Config: orm_mode = True`",
-        ]
-    else:
-        lines.append("• pydantic: versi tidak terdeteksi — asumsikan v2, gunakan aturan v2")
+    if is_fastapi:
+        if pydantic_major == 2:
+            lines += [
+                "• pydantic v2 AKTIF:",
+                "  - Field id WAJIB optional: `id: int | None = None` (bukan `id: int`)",
+                "  - Validator: gunakan `@field_validator` (bukan `@validator`)",
+                "  - Config: gunakan `model_config = ConfigDict(...)` (bukan class Config)",
+                "  - `orm_mode` diganti `from_attributes = True`",
+            ]
+        elif pydantic_major == 1:
+            lines += [
+                "• pydantic v1 AKTIF:",
+                "  - Validator: gunakan `@validator` (bukan `@field_validator`)",
+                "  - Config: gunakan inner `class Config: orm_mode = True`",
+            ]
 
     # --- FastAPI rules ---
-    if fastapi_v:
+    if is_fastapi and fastapi_v:
         lines += [
             f"• fastapi=={fastapi_v} AKTIF:",
             "  - POST endpoint WAJIB: `@app.post('/path/', status_code=201)`",
@@ -226,8 +226,11 @@ def generate_python_fact_card() -> str:
         lines += [
             f"• pytest=={pytest_v} AKTIF:",
             "  - Gunakan `pytest.raises(ExceptionType)` untuk test exception",
-            "  - DILARANG: `app.test_client()` (Flask) — gunakan TestClient FastAPI",
         ]
+        if is_fastapi:
+            lines.append("  - DILARANG: `app.test_client()` (Flask) — gunakan TestClient FastAPI")
+
+    return "\n".join(lines)
 
     return "\n".join(lines)
 
@@ -292,13 +295,14 @@ def generate_dart_fact_card() -> str:
     return "\n".join(lines)
 
 
-def generate_fact_card(target_language: str) -> str:
+def generate_fact_card(target_language: str, task: str = "") -> str:
     """
     Entry point utama.
-    Hasilkan fact card yang sesuai berdasarkan target_language.
+    Hasilkan fact card yang sesuai berdasarkan target_language dan context task.
 
     Args:
         target_language: "python", "dart", "flutter", dll.
+        task: String deskripsi tugas pengguna (opsional).
 
     Returns:
         String fact card siap suntik ke prompt Developer.
@@ -307,4 +311,4 @@ def generate_fact_card(target_language: str) -> str:
     if "dart" in lang or "flutter" in lang:
         return generate_dart_fact_card()
     else:
-        return generate_python_fact_card()
+        return generate_python_fact_card(task=task)

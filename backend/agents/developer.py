@@ -166,40 +166,53 @@ INSTRUKSI PERBAIKAN:
         
     arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
     
-    lang_rule = (
-        "ATURAN DART / FLUTTER (WAJIB):\n"
-        "- Tulis kode Dart murni dengan Sound Null Safety dan Strong Typing.\n"
-        "- Konsolidasikan seluruh implementasi (model data, Riverpod provider, dan ConsumerWidget) dalam 1 file di lib/ (contoh: === FILE: lib/card_metric.dart ===).\n"
-        "- DILARANG menulis file pubspec.yaml atau file test (fokus hanya pada file kode produksi di lib/).\n"
-        "- Untuk Widget dengan Riverpod: Jika method `build` menerima `WidgetRef ref` (contoh: `Widget build(BuildContext context, WidgetRef ref)`), WAJIB mendeklarasikan kelas sebagai `class MyWidget extends ConsumerWidget {`.\n"
-        "- Jika menggunakan Card widget, tetapkan properti visual: `Card(color: Colors.white, elevation: 2.0, child: ...)`.\n"
-        "- Untuk model data Dart, berikan nilai default pada konstruktor named parameter: `CardMetricData({this.value = 75, this.title = 'CPU', this.unit = '%'});` agar aman diinisialisasi tanpa argumen maupun dengan argumen.\n"
-        "- Untuk State Management Riverpod, gunakan `Provider<T>`: `final cardMetricProvider = Provider<CardMetricData>((ref) => CardMetricData());`.\n"
-        "- DILARANG menggunakan `StateProvider`, `ChangeNotifierProvider`, atau `StateNotifier` (deprecated/hilang pada Riverpod terbaru)."
-        if is_dart else
-        "ATURAN PYTHON (WAJIB):\n"
-        "- Tulis kode Python PEP 8 modular dengan type hint murni.\n"
-        "- DILARANG menulis file test atau file non-kode seperti README.md atau requirements.txt (fokus hanya pada file kode .py).\n"
-        "- WAJIB tulis SELURUH implementasi FastAPI (model Pydantic, endpoint, dan in-memory store) dalam SATU FILE bernama main.py. DILARANG membuat file models.py, schemas.py, database.py, atau file Python terpisah lainnya.\n"
-        "- Pastikan seluruh class/model yang digunakan diimpor secara eksplisit.\n"
-        "- Untuk FastAPI & Pydantic v2:\n"
-        "  * Implementasikan endpoint CRUD lengkap: POST '/products/' (status_code=201), GET '/products/' (list all), GET '/products/{id}' (raise HTTPException(404, 'Product not found') jika tidak ada), dan DELETE '/products/{id}' (status_code=204, raise HTTPException(404) jika tidak ada).\n"
-        "  * Pada DELETE endpoint (/products/{id}, status_code=204):\n"
-        "    initial_len = len(products)\n"
-        "    products[:] = [p for p in products if getattr(p, 'id', None) != id]\n"
-        "    if len(products) == initial_len:\n"
-        "        raise HTTPException(status_code=404, detail='Product not found')\n"
-        "    return None\n"
-        "- Untuk modul kalkulator / parsing matriks:\n"
-        "  * WAJIB menambahkan `import sys` di baris pertama file.\n"
-        "  * Dalam parse_matrix, validasi bahwa matriks berdimensi 2x2 atau 3x3 dan seragam (jika dimensi bukan 2x2 atau 3x3, atau baris tidak seragam, raise ValueError('Invalid dimensions')).\n"
-        "  * Buat signature fungsi main: `def main(args=None):` (jika args is None, gunakan sys.argv[1:]; dukung format 3 argumen `[m1, op, m2]` maupun format 4 argumen). Selalu panggil `sys.exit(0)` saat operasi selesai atau tertangani.\n"
-        "- Simpan file implementasi dengan ekstensi .py di root direktori (contoh: === FILE: main.py ===)."
-    )
+    if is_dart:
+        lang_rule = (
+            "ATURAN DART / FLUTTER (WAJIB):\n"
+            "- Tulis kode Dart murni dengan Sound Null Safety dan Strong Typing.\n"
+            "- Konsolidasikan seluruh implementasi (model data, Riverpod provider, dan ConsumerWidget) dalam 1 file di lib/ (contoh: === FILE: lib/card_metric.dart ===).\n"
+            "- DILARANG menulis file pubspec.yaml atau file test (fokus hanya pada file kode produksi di lib/).\n"
+            "- Untuk Widget dengan Riverpod: Jika method `build` menerima `WidgetRef ref` (contoh: `Widget build(BuildContext context, WidgetRef ref)`), WAJIB mendeklarasikan kelas sebagai `class MyWidget extends ConsumerWidget {`.\n"
+            "- Jika menggunakan Card widget, tetapkan properti visual: `Card(color: Colors.white, elevation: 2.0, child: ...)`.\n"
+            "- Untuk model data Dart, berikan nilai default pada konstruktor named parameter: `CardMetricData({this.value = 75, this.title = 'CPU', this.unit = '%'});` agar aman diinisialisasi tanpa argumen maupun dengan argumen.\n"
+            "- Untuk State Management Riverpod, gunakan `Provider<T>`: `final cardMetricProvider = Provider<CardMetricData>((ref) => CardMetricData());`.\n"
+            "- DILARANG menggunakan `StateProvider`, `ChangeNotifierProvider`, atau `StateNotifier` (deprecated/hilang pada Riverpod terbaru)."
+        )
+    else:
+        is_fastapi = any(k in user_task.lower() for k in ["fastapi", "rest", "api", "crud", "endpoint", "inventaris"])
+        is_calc = any(k in user_task.lower() for k in ["kalkulator", "calculator", "matriks", "matrix", "cli"])
+
+        py_rules = [
+            "ATURAN PYTHON (WAJIB):",
+            "- Tulis kode Python PEP 8 modular dengan type hint murni.",
+            "- DILARANG menulis file test atau file non-kode seperti README.md atau requirements.txt (fokus hanya pada file kode .py).",
+            "- Pastikan seluruh class/model yang digunakan diimpor secara eksplisit.",
+            "- Simpan file implementasi dengan ekstensi .py di root direktori (contoh: === FILE: main.py ===)."
+        ]
+        if is_fastapi:
+            py_rules.extend([
+                "- WAJIB tulis SELURUH implementasi FastAPI (model Pydantic, endpoint, dan in-memory store) dalam SATU FILE bernama main.py. DILARANG membuat file models.py, schemas.py, database.py, atau file Python terpisah lainnya.",
+                "- Untuk FastAPI & Pydantic v2:",
+                "  * Implementasikan endpoint CRUD lengkap: POST '/products/' (status_code=201), GET '/products/' (list all), GET '/products/{id}' (raise HTTPException(404, 'Product not found') jika tidak ada), dan DELETE '/products/{id}' (status_code=204, raise HTTPException(404) jika tidak ada).",
+                "  * Pada DELETE endpoint (/products/{id}, status_code=204):",
+                "    initial_len = len(products)",
+                "    products[:] = [p for p in products if getattr(p, 'id', None) != id]",
+                "    if len(products) == initial_len:",
+                "        raise HTTPException(status_code=404, detail='Product not found')",
+                "    return None"
+            ])
+        if is_calc or not is_fastapi:
+            py_rules.extend([
+                "- Untuk modul kalkulator / parsing matriks:",
+                "  * WAJIB menambahkan `import sys` di baris pertama file.",
+                "  * Dalam parse_matrix, validasi bahwa matriks berdimensi 2x2 atau 3x3 dan seragam (jika dimensi bukan 2x2 atau 3x3, atau baris tidak seragam, raise ValueError('Invalid dimensions')).",
+                "  * Buat signature fungsi main: `def main(args=None):` (jika args is None, gunakan sys.argv[1:]; dukung format 3 argumen `[m1, op, m2]` maupun format 4 argumen). Selalu panggil `sys.exit(0)` saat operasi selesai atau tertangani."
+            ])
+        lang_rule = "\n".join(py_rules)
     
     # Environment Grounding: periksa fakta lingkungan aktual sebelum Developer mulai coding
     try:
-        env_fact_card = generate_fact_card(target_lang)
+        env_fact_card = generate_fact_card(target_lang, task=user_task)
     except Exception:
         env_fact_card = ""
     env_grounding_section = f"\n{env_fact_card}\n" if env_fact_card else ""
