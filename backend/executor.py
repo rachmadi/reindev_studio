@@ -57,12 +57,45 @@ def run_sandbox_tests(code_files: Dict[str, str], test_files: Dict[str, str], ta
             "duration_sec": round(time.time() - start_time, 2)
         }
         
-    # 5. Siapkan Environment dengan PYTHONPATH mencakup root sandbox dan seluruh subpackage
-    subdirs = [str(p.resolve()) for p in SANDBOX_DIR.rglob("*") if p.is_dir() and p.name != "__pycache__"]
+    is_dart = "dart" in target_language.lower() or "flutter" in target_language.lower() or any(f.endswith(".dart") for f in list(code_files.keys()) + list(test_files.keys()))
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join([str(SANDBOX_DIR.resolve())] + subdirs)
-    
-    cmd = [sys.executable, "-m", "pytest", "-v", "--color=no", "-o", "python_files=test_*.py *_test.py"]
+
+    if is_dart:
+        pubspec = SANDBOX_DIR / "pubspec.yaml"
+        if not pubspec.exists():
+            pubspec.write_text("""name: sandbox_project
+description: Sandbox test project
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dev_dependencies:
+  test: ^1.24.0
+""", encoding="utf-8")
+        
+        is_win = (sys.platform == "win32")
+        dart_bin = shutil.which("dart") or "dart"
+        
+        # Jalankan dart pub get jika package config belum tersedia
+        if not (SANDBOX_DIR / ".dart_tool").exists():
+            try:
+                subprocess.run(
+                    [dart_bin, "pub", "get"],
+                    cwd=str(SANDBOX_DIR),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    shell=is_win,
+                    timeout=30
+                )
+            except Exception as e:
+                pass
+                
+        cmd = [dart_bin, "test"]
+    else:
+        is_win = False
+        # 5. Siapkan Environment dengan PYTHONPATH mencakup root sandbox dan seluruh subpackage
+        subdirs = [str(p.resolve()) for p in SANDBOX_DIR.rglob("*") if p.is_dir() and p.name != "__pycache__"]
+        env["PYTHONPATH"] = os.pathsep.join([str(SANDBOX_DIR.resolve())] + subdirs)
+        cmd = [sys.executable, "-m", "pytest", "-v", "--color=no", "-o", "python_files=test_*.py *_test.py"]
     
     try:
         proc = subprocess.run(
@@ -71,6 +104,7 @@ def run_sandbox_tests(code_files: Dict[str, str], test_files: Dict[str, str], ta
             env=env,
             capture_output=True,
             text=True,
+            shell=is_win,
             timeout=timeout
         )
         stdout = proc.stdout
@@ -100,26 +134,41 @@ def run_sandbox_tests(code_files: Dict[str, str], test_files: Dict[str, str], ta
         
     duration = round(time.time() - start_time, 2)
     
-    # 6. Parsing output pytest (misal: "4 passed in 0.12s", "1 failed, 2 passed")
-    passed_match = re.search(r"(\d+)\s+passed", full_output)
-    failed_match = re.search(r"(\d+)\s+failed", full_output)
-    error_match = re.search(r"(\d+)\s+error", full_output)
-    
-    passed_count = int(passed_match.group(1)) if passed_match else 0
-    failed_count = int(failed_match.group(1)) if failed_match else 0
-    error_count = int(error_match.group(1)) if error_match else 0
-    
-    total = passed_count + failed_count + error_count
-    is_passed = (exit_code == 0 and failed_count == 0 and error_count == 0 and passed_count > 0)
+    # 6. Parsing output test runner
+    if is_dart:
+        passed_match = re.search(r"\+(\d+):\s+All tests passed", full_output)
+        if passed_match:
+            passed_count = int(passed_match.group(1))
+            failed_count = 0
+            is_passed = True
+        else:
+            plus_matches = re.findall(r"\+(\d+)", full_output)
+            minus_matches = re.findall(r"-(\d+)", full_output)
+            passed_count = int(plus_matches[-1]) if plus_matches else 0
+            failed_count = int(minus_matches[-1]) if minus_matches else (0 if exit_code == 0 else 1)
+            is_passed = (exit_code == 0 and failed_count == 0 and passed_count > 0)
+        total = max(passed_count + failed_count, 1 if not is_passed else passed_count)
+    else:
+        passed_match = re.search(r"(\d+)\s+passed", full_output)
+        failed_match = re.search(r"(\d+)\s+failed", full_output)
+        error_match = re.search(r"(\d+)\s+error", full_output)
+        
+        passed_count = int(passed_match.group(1)) if passed_match else 0
+        failed_count = int(failed_match.group(1)) if failed_match else 0
+        error_count = int(error_match.group(1)) if error_match else 0
+        
+        total = passed_count + failed_count + error_count
+        is_passed = (exit_code == 0 and failed_count == 0 and error_count == 0 and passed_count > 0)
     
     return {
         "passed": is_passed,
         "total": total,
         "passed_count": passed_count,
-        "failed_count": failed_count + error_count,
+        "failed_count": failed_count,
         "output": full_output,
         "exit_code": exit_code,
-        "duration_sec": duration
+        "duration_sec": duration,
+        "framework": "dart test" if is_dart else "pytest"
     }
 
 def executor_node(state: SquadState) -> dict:

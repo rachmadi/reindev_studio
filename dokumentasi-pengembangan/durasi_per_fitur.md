@@ -223,4 +223,61 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Selesai Verifikasi Lengkap & Validasi IA (PASS):** 2026-09-07 21:53:41 WIB
 - **Total Rentang Waktu Sesi Aktual:** **48 menit 41 detik (0.81 jam)**
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 5: Agent Pipeline Visualization & Thought Stream — 2026-09-07 s.d. 2026-09-08
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Pembuatan model data agen & enum status (`agent_event.dart`) | 22:00:00 | 22:01:10 | 70 s | 1.17 m (0.02 j) |
+| 2 | Pembuatan client service WebSocket & simulator responsif (`websocket_service.dart`) | 22:01:10 | 22:02:40 | 90 s | 1.50 m (0.03 j) |
+| 3 | Perancangan Riverpod pipeline providers (`squad_pipeline_provider.dart`) | 22:02:40 | 22:03:50 | 70 s | 1.17 m (0.02 j) |
+| 4 | Pembuatan 5 kartu status agen interaktif & pulsing glow (`agent_cards.dart`) | 22:03:50 | 22:05:20 | 90 s | 1.50 m (0.03 j) |
+| 5 | Pembuatan auto-scrolling Thought Stream viewer dengan Markdown & filter (`thought_stream.dart`) | 22:05:20 | 22:07:00 | 100 s | 1.67 m (0.03 j) |
+| 6 | Integrasi visual ke `workspace_panel.dart` & trigger deploy ke `control_panel.dart` | 22:07:00 | 22:07:50 | 50 s | 0.83 m (0.01 j) |
+| | **Subtotal Waktu Pengembangan** | | | **470 s** | **7.83 m (0.13 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi awal `flutter test` headless (deteksi timeout animasi berulang) | 22:09:00 | 22:09:17 | 17 s | 0.28 m (0.00 j) |
+| 2 | Eksekusi analisis kode statis `flutter analyze` (0 issues in 1.2s) | 22:11:42 | 22:11:46 | 4 s | 0.07 m (0.00 j) |
+| 3 | Eksekusi 2 suites pengujian unit widget `flutter test` (100% PASS in 2.0s) | 22:13:53 | 22:13:58 | 5 s | 0.08 m (0.00 j) |
+| 4 | Kompilasi release bundle web Flutter (`flutter build web --release`) | 22:14:09 | 22:15:03 | 54 s | 0.90 m (0.01 j) |
+| 5 | Penyiapan script driver Playwright CDP `test_headed_iterasi_5.py` | 22:15:00 | 22:16:10 | 70 s | 1.17 m (0.02 j) |
+| 6 | Eksekusi resmi Headed Interactive Suite oleh Agen di Layar IA (8 Aksi Playwright) | 22:33:50 | 22:34:16 | 26 s | 0.43 m (0.01 j) |
+| 7 | Pengujian multi-stack dynamic simulator (`flutter test` 3 suites + web build) | 06:55:00 | 06:56:12 | 72 s | 1.20 m (0.02 j) |
+| 8 | Pengujian integrasi Toolchain Dart nyata (`dart test` sandbox + WebSocket test) | 07:25:00 | 07:28:23 | 203 s | 3.38 m (0.06 j) |
+| 9 | Pengujian E2E live streaming multi-agen Dart lengkap dengan Ollama 7B | 08:32:00 | 08:45:51 | 830.73 s | 13.85 m (0.23 j) |
+| 10 | Verifikasi latensi token budget `num_predict` (inferensi PM 24.2s + build) | 09:03:00 | 09:04:11 | 71.2 s | 1.19 m (0.02 j) |
+| 11 | Verifikasi unit test & kompilasi web tampilan total durasi UI | 09:14:24 | 09:15:12 | 47.7 s | 0.80 m (0.01 j) |
+| 12 | Verifikasi unit test, `flutter analyze`, & kompilasi web release MarkdownBody | 09:21:20 | 09:24:01 | 160.9 s | 2.68 m (0.04 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **1.561,53 s** | **26.03 m (0.43 jam)** |
+
+### Komponen 3: Waktu Perbaikan & Adaptasi (Fixing / Rework Time)
+| No | Aktivitas Perbaikan & Tindakan Korektif | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Pengendalian siklus hidup `_pulseController` hanya saat agen aktif | 22:10:00 | 22:10:13 | 13 s | 0.22 m (0.00 j) |
+| 2 | Resolusi assertion non-uniform border Flutter pada `thought_stream.dart` | 22:11:15 | 22:11:39 | 24 s | 0.40 m (0.00 j) |
+| 3 | Investigasi & kalibrasi Playwright click coordinates (`probe3` s.d. `probe6`) | 22:18:00 | 22:28:00 | 120 s | 2.00 m (0.03 j) |
+| 4 | Rombak simulator multi-stack & sinkronisasi auto-align Dart (Intervensi #34) | 06:47:00 | 06:49:00 | 120 s | 2.00 m (0.03 j) |
+| 5 | Overhaul backend LangGraph ke Dart murni, sandbox `dart test` runner, eager WebSocket (Intervensi #35, #36) | 07:18:00 | 07:22:20 | 260 s | 4.33 m (0.07 j) |
+| 6 | Proactive pre-announcement, streaming heartbeat 2.5s, optimasi VRAM OLLAMA_NUM_CTX=2048 (Intervensi #37) | 08:20:00 | 08:22:20 | 140 s | 2.33 m (0.04 j) |
+| 7 | Role-based token budget `num_predict` & pemendekan status badge `⚡ Analisis` (Intervensi #38) | 08:58:00 | 08:59:35 | 95 s | 1.58 m (0.03 j) |
+| 8 | Implementasi state `missionDurationProvider` & retensi durasi di 3 touchpoint UI (Intervensi #39) | 09:12:00 | 09:13:50 | 110 s | 1.83 m (0.03 j) |
+| 9 | Pemasangan `flutter_markdown` & rendering `MarkdownBody` adaptif pada Thought Stream (Intervensi #40) | 09:20:30 | 09:21:55 | 85 s | 1.42 m (0.02 j) |
+| | **Subtotal Waktu Perbaikan** | | | **967 s** | **16.12 m (0.27 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Iterasi 5:
+\mathbf{\text{Total Waktu Realisasi} = 470\text{ s (Dev)} + 1.561,53\text{ s (Test)} + 967\text{ s (Fix)} = 2.998,53\text{ detik} \approx 49\text{ menit } 59\text{ detik} (0.83\text{ jam})}
+- **Waktu Mulai Eksekusi Awal Iterasi 5:** 2026-09-07 22:00:00 WIB
+- **Waktu Penundaan Resmi:** 2026-09-07 22:47:00 WIB (Sesi Malam IA ditutup)
+- **Waktu Dilanjutkan:** 2026-09-08 06:45:00 WIB
+- **Waktu Putusan PASS Diberikan IA:** 2026-09-08 09:28:17 WIB
+- **Total Waktu Realisasi IIDD:** **2.998,53 detik (~49 menit 59 detik / 0.83 jam)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.

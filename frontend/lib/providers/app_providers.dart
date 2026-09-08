@@ -18,7 +18,7 @@ final themeModeProvider =
 
 class BackendStatusNotifier extends Notifier<BackendStatus> {
   @override
-  BackendStatus build() => BackendStatus.connected;
+  BackendStatus build() => BackendStatus.connecting;
 
   void setStatus(BackendStatus status) => state = status;
 }

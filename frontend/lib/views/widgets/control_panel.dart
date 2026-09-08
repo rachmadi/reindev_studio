@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/squad_pipeline_provider.dart';
 import 'engine_selector.dart';
 
 class ControlPanel extends ConsumerStatefulWidget {
@@ -38,15 +39,20 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
     super.dispose();
   }
 
-  void _applyPreset(String text) {
+  void _applyPreset(String label, String text) {
     setState(() {
       _promptController.text = text;
       _errorMessage = null;
     });
     ref.read(promptInputProvider.notifier).setPrompt(text);
+    if (label.contains("Flutter")) {
+      ref.read(targetLanguageProvider.notifier).setLanguage("Dart / Flutter");
+    } else {
+      ref.read(targetLanguageProvider.notifier).setLanguage("Python");
+    }
   }
 
-  void _handleDeploy() async {
+  void _handleDeploy() {
     final text = _promptController.text.trim();
     if (text.isEmpty) {
       setState(() {
@@ -63,23 +69,48 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
     ref.read(isDeployingProvider.notifier).setDeploying(true);
     ref.read(squadStatusProvider.notifier).setStatus("deploying");
 
-    // Simulasi responsivitas deploy state 1.5 detik
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (mounted) {
-      ref.read(isDeployingProvider.notifier).setDeploying(false);
-      ref.read(squadStatusProvider.notifier).setStatus("working");
+    // Beralih ke tab 0 (Agent Squad Timeline) agar pengguna melihat progres langsung
+    ref.read(activeWorkspaceTabProvider.notifier).setTab(0);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Squad otonom berhasil dideploy! Menjalankan misi...",
-            style: GoogleFonts.inter(fontSize: 12),
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    final activeEngine = ref.read(activeEngineProvider);
+    var targetLang = ref.read(targetLanguageProvider);
+
+    // Auto-align bahasa target jika prompt secara eksplisit merujuk ke Flutter / Dart
+    final lowerText = text.toLowerCase();
+    if (lowerText.contains("flutter") ||
+        lowerText.contains("widget") ||
+        lowerText.contains("dart")) {
+      if (!targetLang.toLowerCase().contains("dart") &&
+          !targetLang.toLowerCase().contains("flutter")) {
+        targetLang = "Dart / Flutter";
+        ref.read(targetLanguageProvider.notifier).setLanguage("Dart / Flutter");
+      }
     }
+
+    final maxLoops = ref.read(maxQaLoopsProvider);
+
+    // Memicu pipeline squad via Pipeline Coordinator (WebSocket & Responsive Stream)
+    ref.read(pipelineCoordinatorProvider).deploy(
+          task: text,
+          provider: activeEngine.toLowerCase().contains("cloud")
+              ? "openrouter"
+              : "ollama",
+          modelName: activeEngine,
+          targetLanguage: targetLang,
+          maxIterations: maxLoops,
+        );
+
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "Squad otonom berhasil dideploy! Aliran pemikiran agen disiarkan...",
+          style: GoogleFonts.inter(fontSize: 12),
+        ),
+        backgroundColor: const Color(0xFF10B981),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -88,6 +119,8 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
     final maxLoops = ref.watch(maxQaLoopsProvider);
     final targetLang = ref.watch(targetLanguageProvider);
     final isDeploying = ref.watch(isDeployingProvider);
+    final missionDuration = ref.watch(missionDurationProvider);
+    final squadStatus = ref.watch(squadStatusProvider);
 
     return Container(
       width: 330,
@@ -421,12 +454,12 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
                                     style: GoogleFonts.inter(fontSize: 11),
                                   ),
                                 ),
-                                selected: targetLang == "Dart",
+                                selected: targetLang.contains("Dart"),
                                 onSelected: (sel) {
                                   if (sel) {
                                     ref
                                         .read(targetLanguageProvider.notifier)
-                                        .setLanguage("Dart");
+                                        .setLanguage("Dart / Flutter");
                                   }
                                 },
                               ),
@@ -444,33 +477,65 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
           // Bottom Action Button (Deploy Squad) (REQ-022)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: FilledButton.icon(
-              onPressed: isDeploying ? null : _handleDeploy,
-              icon: isDeploying
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.rocket_launch_rounded, size: 18),
-              label: Text(
-                isDeploying
-                    ? "Deploying Squad..."
-                    : "Deploy Autonomous Squad",
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (missionDuration != null && squadStatus == 'completed') ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withAlpha(25),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.timer_rounded, size: 15, color: Color(0xFF10B981)),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Total Waktu: ${missionDuration.toStringAsFixed(1)}s",
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                FilledButton.icon(
+                  onPressed: isDeploying ? null : _handleDeploy,
+                  icon: isDeploying
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.rocket_launch_rounded, size: 18),
+                  label: Text(
+                    isDeploying
+                        ? "Deploying Squad..."
+                        : "Deploy Autonomous Squad",
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
-              ),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+              ],
             ),
           ),
         ],
@@ -487,7 +552,7 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
         label,
         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500),
       ),
-      onPressed: () => _applyPreset(text),
+      onPressed: () => _applyPreset(label, text),
     );
   }
 }

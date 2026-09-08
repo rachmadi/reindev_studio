@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/squad_pipeline_provider.dart';
 import 'widgets/app_header.dart';
 import 'widgets/control_panel.dart';
 import 'widgets/workspace_panel.dart';
@@ -9,6 +10,9 @@ class StudioScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Eagerly initialize WebSocket connection to backend
+    ref.watch(pipelineCoordinatorProvider);
+
     return Scaffold(
       appBar: const AppHeader(),
       body: LayoutBuilder(

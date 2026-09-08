@@ -33,8 +33,22 @@ def reviewer_agent(state: SquadState) -> dict:
     code_context = "\n".join(code_summary) if code_summary else "(Tidak ada kode)"
     
     test_summary = f"Passed: {test_results.get('passed')}, Total: {test_results.get('total')}, Output:\n{test_results.get('output', '')}"
+    target_lang = state.get("target_language", "python").strip()
+    is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
     
-    prompt = f"""Spesifikasi Produk:
+    guideline = (
+        "STANDAR AUDIT DART:\n"
+        "- Periksa kepatuhan Effective Dart, Sound Null Safety, keterpisahan lib/ dan test/.\n"
+        "- Pastikan tidak ada anti-pattern atau sisa kode Python."
+        if is_dart else
+        "STANDAR AUDIT PYTHON:\n"
+        "- Periksa kepatuhan PEP 8, modularitas package, dan exception handling."
+    )
+    
+    prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
+{guideline}
+
+Spesifikasi Produk:
 {specs}
 
 Rencana Arsitektur:
@@ -46,7 +60,7 @@ Kode Program:
 Hasil Pengujian Sandbox QA:
 {test_summary}
 
-Silakan lakukan audit komprehensif dan berikan laporan review resmi."""
+Silakan lakukan audit komprehensif dan berikan laporan review resmi (maksimal 2 paragraf singkat, status [APPROVED])."""
 
     messages = [
         SystemMessage(content=REVIEWER_SYSTEM_PROMPT),

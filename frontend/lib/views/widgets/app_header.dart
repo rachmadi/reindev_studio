@@ -145,12 +145,16 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
             decoration: BoxDecoration(
               color: backendStatus == BackendStatus.connected
                   ? const Color(0xFF10B981).withAlpha(30)
-                  : Colors.amber.withAlpha(30),
+                  : (backendStatus == BackendStatus.connecting
+                      ? Colors.amber.withAlpha(30)
+                      : Colors.redAccent.withAlpha(30)),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: backendStatus == BackendStatus.connected
                     ? const Color(0xFF10B981).withAlpha(100)
-                    : Colors.amber.withAlpha(100),
+                    : (backendStatus == BackendStatus.connecting
+                        ? Colors.amber.withAlpha(100)
+                        : Colors.redAccent.withAlpha(100)),
               ),
             ),
             child: Row(
@@ -162,7 +166,9 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                   decoration: BoxDecoration(
                     color: backendStatus == BackendStatus.connected
                         ? const Color(0xFF10B981)
-                        : Colors.amber,
+                        : (backendStatus == BackendStatus.connecting
+                            ? Colors.amber
+                            : Colors.redAccent),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -170,13 +176,17 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                 Text(
                   backendStatus == BackendStatus.connected
                       ? "FastAPI ws://127.0.0.1:8000"
-                      : "Connecting...",
+                      : (backendStatus == BackendStatus.connecting
+                          ? "Connecting..."
+                          : "Offline / Disconnected"),
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: backendStatus == BackendStatus.connected
                         ? const Color(0xFF10B981)
-                        : Colors.amber[800] ?? Colors.amber,
+                        : (backendStatus == BackendStatus.connecting
+                            ? Colors.amber[800] ?? Colors.amber
+                            : Colors.redAccent),
                   ),
                 ),
               ],

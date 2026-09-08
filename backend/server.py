@@ -205,7 +205,11 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     continue
                     
                 provider = data.get("provider", CONFIG_STATE["provider"])
-                model_name = data.get("model_name", CONFIG_STATE["ollama_model"])
+                raw_model = data.get("model_name", CONFIG_STATE["ollama_model"])
+                if "qwen2.5-coder:7b" in raw_model.lower():
+                    model_name = "qwen2.5-coder:7b"
+                else:
+                    model_name = raw_model
                 target_lang = data.get("target_language", CONFIG_STATE["target_language"])
                 max_iter = data.get("max_iterations", CONFIG_STATE["max_iterations"])
                 
@@ -238,17 +242,18 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                 # Eksekusi StateGraph secara asynchronous dan broadcast tiap transisi node
                 loop = asyncio.get_event_loop()
                 
+                role_info = {
+                    "pm": ("Product Manager", "thinking", f"Product Manager menganalisis spesifikasi misi ({target_lang.upper()})..."),
+                    "architect": ("System Architect", "thinking", f"System Architect merancang arsitektur modul dan file tree ({target_lang.upper()})..."),
+                    "developer": ("Developer", "working", f"Developer menyintesis kode sumber produksi bersih ({target_lang.upper()})..."),
+                    "tester": ("QA Tester", "testing", f"QA Tester menyusun automated test suite komprehensif ({target_lang.upper()})..."),
+                    "executor": ("QA Tester", "testing", "Mengeksekusi test runner dalam sandbox isolasi..."),
+                    "reviewer": ("Code Reviewer", "reviewing", f"Code Reviewer mengaudit Sound Null Safety & arsitektur ({target_lang.upper()})..."),
+                }
+                
                 try:
-                    # Jalankan stream di thread terpisah agar async loop WebSocket tetap responsif
-                    def run_stream():
-                        events = []
-                        for step_event in squad_graph.stream(initial_state):
-                            events.append(step_event)
-                        return events
-                    
                     stream_generator = squad_graph.stream(initial_state)
                     
-                    # Kita proses generator dengan thread executor per step
                     def get_next(gen):
                         try:
                             return next(gen), False
@@ -256,9 +261,35 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                             return None, True
 
                     accumulated_state = initial_state.copy()
+                    next_node_to_announce = "pm"
                     
                     while True:
-                        step_result, is_done = await loop.run_in_executor(None, get_next, stream_generator)
+                        # 0. Notifikasi awal sebelum LLM mulai berpikir agar UI langsung aktif berdenyut
+                        if next_node_to_announce and next_node_to_announce in role_info:
+                            r_name, r_status, r_desc = role_info[next_node_to_announce]
+                            await manager.send_personal(websocket, make_event("agent_state", {
+                                "node": next_node_to_announce,
+                                "status": r_status,
+                                "iteration": accumulated_state.get("iteration_count", 0),
+                                "log": f"[{r_name}]: {r_desc}"
+                            }))
+                            
+                        future = loop.run_in_executor(None, get_next, stream_generator)
+                        
+                        # Heartbeat loop tiap 2.5 detik selama LLM menghasilkan respon
+                        while not future.done():
+                            try:
+                                await asyncio.wait_for(asyncio.shield(future), timeout=2.5)
+                            except asyncio.TimeoutError:
+                                elapsed = round(time.time() - start_time, 1)
+                                cur_role = role_info.get(next_node_to_announce, ("Squad",))[0]
+                                await manager.send_personal(websocket, make_event("agent_heartbeat", {
+                                    "node": next_node_to_announce,
+                                    "elapsed_sec": elapsed,
+                                    "message": f"{cur_role} aktif memproses respon inferensi ({elapsed}s)..."
+                                }))
+                                
+                        step_result, is_done = future.result()
                         if is_done or not step_result:
                             break
                             
@@ -266,10 +297,10 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                             accumulated_state.update(node_output)
                             last_log = node_output.get("logs", [""])[-1] if node_output.get("logs") else ""
                             
-                            # 1. Notifikasi Agent Start / Progress
+                            # 1. Notifikasi Agent Selesai / Completed
                             await manager.send_personal(websocket, make_event("agent_state", {
                                 "node": node_name,
-                                "status": node_output.get("status", "running"),
+                                "status": "completed",
                                 "iteration": accumulated_state.get("iteration_count", 0),
                                 "log": last_log
                             }))
@@ -280,31 +311,41 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                                     "agent": "pm",
                                     "thought": node_output["specifications"]
                                 }))
+                                next_node_to_announce = "architect"
                             elif node_name == "architect" and "architecture_plan" in node_output:
                                 await manager.send_personal(websocket, make_event("agent_thought", {
                                     "agent": "architect",
                                     "thought": node_output["architecture_plan"]
                                 }))
+                                next_node_to_announce = "developer"
                             elif node_name == "developer" and "code_files" in node_output:
                                 await manager.send_personal(websocket, make_event("code_update", {
                                     "agent": "developer",
                                     "files": node_output["code_files"]
                                 }))
+                                next_node_to_announce = "tester"
                             elif node_name == "tester" and "test_files" in node_output:
                                 await manager.send_personal(websocket, make_event("code_update", {
                                     "agent": "tester",
                                     "files": node_output["test_files"]
                                 }))
+                                next_node_to_announce = "executor"
                             elif node_name == "executor" and "test_results" in node_output:
                                 await manager.send_personal(websocket, make_event("test_log", {
                                     "results": node_output["test_results"],
                                     "iteration": node_output.get("iteration_count", 0)
                                 }))
+                                test_res = node_output["test_results"]
+                                if not test_res.get("passed", False) and accumulated_state.get("iteration_count", 0) < max_iter:
+                                    next_node_to_announce = "developer"
+                                else:
+                                    next_node_to_announce = "reviewer"
                             elif node_name == "reviewer" and "review_notes" in node_output:
                                 await manager.send_personal(websocket, make_event("review_report", {
                                     "report": node_output["review_notes"],
                                     "status": node_output.get("status", "completed")
                                 }))
+                                next_node_to_announce = None
                                 
                     duration = round(time.time() - start_time, 2)
                     
@@ -340,6 +381,7 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                         "project_name": proj_slug,
                         "project_dir": str(proj_dir.resolve()),
                         "files": all_files,
+                        "files_generated": list(all_files.keys()),
                         "test_results": accumulated_state.get("test_results", {}),
                         "review_notes": accumulated_state.get("review_notes", "")
                     }))
@@ -354,4 +396,8 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                 }))
                 
     except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
+    finally:
         manager.disconnect(websocket)
