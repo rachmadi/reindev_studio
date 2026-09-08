@@ -299,3 +299,167 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 ### Ringkasan Rasio Penanganan Galat Iterasi 5:
 - **Diselesaikan Mandiri oleh Agen:** 8 kasus (72.7% - E-013, E-014, E-016, E-017, E-018, E-019, E-020, E-022)
 - **Diselesaikan atas Intervensi IA:** 3 kasus (27.3% - E-015, E-021, E-023)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 6 — 2026-09-08 (Sesi Pagi–Sore)
+## Fokus: Auto-Healing Layer, Environment Grounding, Preset E2E Robustness
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Kasus E-024: `assert 200 == 201` — FastAPI POST Tanpa `status_code=201`
+- **Waktu:** ~09:00 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Preset E2E FastAPI CRUD gagal dengan `assert 200 == 201`. Developer agent menghasilkan endpoint `@app.post(...)` tanpa parameter `status_code=201`, sehingga FastAPI mengembalikan default HTTP 200.
+- **Klasifikasi Kegagalan:** Kelas A (Version/API Knowledge) — model tidak "tahu" bahwa konvensi REST mengharuskan 201 Created pada POST sukses, dan FastAPI tidak meng-enforce ini secara otomatis.
+- **Akar Masalah:** Kurangnya instruksi eksplisit di prompt Developer dan tidak ada auto-healing di executor.
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah instruksi wajib `@app.post('/path/', status_code=201)`.
+  2. `executor.py`: Tambah regex `_ensure_post_201()` — setiap `@app.post(...)` yang tidak memiliki `status_code` secara otomatis disuntikkan `, status_code=201)`.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-025: `assert 204 == 404` — DELETE Endpoint Selalu Berhasil
+- **Waktu:** ~09:10 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Test `test_delete_nonexistent_product` gagal dengan `assert 204 == 404`. Endpoint DELETE selalu mengembalikan 204 meski produk tidak ada.
+- **Klasifikasi Kegagalan:** Kelas B (Framework Nuance + Coding Error) — model menulis kondisi `if len(products) == len(products):` yang selalu True (perbandingan dengan dirinya sendiri).
+- **Akar Masalah:** Model seharusnya membandingkan panjang list sebelum dan sesudah filter, tapi menghasilkan ekspresi tautologi `len(products) == len(products)`.
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah contoh kode eksplisit `initial_len = len(products)` di aturan DELETE endpoint.
+  2. `executor.py`: Auto-inject `initial_len = len(products)` sebelum operasi filter jika belum ada, dan patch `len(products) == len(products)` → `len(products) == initial_len`.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-026: `assert 422 == 201` — Pydantic Field `id: int` Mandatory pada POST
+- **Waktu:** ~09:15 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Test POST tanpa menyertakan field `id` mengembalikan HTTP 422 Unprocessable Entity. Developer menggunakan `id: int` (mandatory) bukan `id: int | None = None` (optional).
+- **Klasifikasi Kegagalan:** Kelas A (Version Knowledge) — model tidak tahu konvensi Pydantic v2 bahwa ID generasi server harus optional di schema request.
+- **Akar Masalah:** Pydantic v2 memperketat validasi field: field tanpa nilai default wajib disertakan dalam request body.
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah aturan `id: int | None = None` di prompt.
+  2. `executor.py`: Regex `content = re.sub(r'(\bid\s*:\s*(?:int|str|float)\b)(?!\s*=)', r'\1 | None = None', content)` — patch semua field `id` yang belum optional.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-027: `SyntaxError: assignment to expression` — Regex Patch Terlalu Agresif
+- **Waktu:** ~09:20 WIB
+- **Tingkat Keparahan:** Critical
+- **Gejala:** `SyntaxError: can't assign to expression here. Maybe you meant '==' instead of '='?` muncul setelah executor mem-patch `p.id`.
+- **Akar Masalah:** Regex `p\.id\s*(!=|==)` awalnya juga mengenai ekspresi assignment `p.id = ...` dan menggantinya dengan `getattr(...)` yang tidak bisa dijadikan assignment target.
+- **Tindakan Korektif:** Modifikasi regex agar hanya aktif pada konteks perbandingan (`!=` atau `==`), tidak pada assignment. Pattern `p\.id\s*(!=|==)` hanya menangkap operator `!=` dan `==`.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri dalam Micro Loop).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-028: `StateNotifier not found` — API Deprecated di Flutter Riverpod 3.x
+- **Waktu:** ~09:30 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Preset Flutter Widget gagal kompilasi: `StateNotifier not found`. Developer agent menggunakan `StateNotifier` yang dihapus di `flutter_riverpod >= 2.0`.
+- **Klasifikasi Kegagalan:** Kelas A (Version/API Knowledge) — model dilatih dengan dataset yang mencakup Riverpod 1.x, tidak tahu bahwa `StateNotifier` dihapus di versi 3.4.3 yang terpasang.
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah aturan eksplisit "DILARANG StateNotifier, DILARANG StateProvider, GUNAKAN `Provider<T>`".
+  2. `executor.py`: Auto-inject shim lokal `abstract class StateNotifier<T>` untuk backward compatibility sebagai fallback darurat.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri).
+- **Status:** Tuntas (Resolved) — namun kasus E-031 menunjukkan shim masih memiliki bug posisi injeksi.
+
+---
+
+### Kasus E-029: Test Stateful Gagal karena Auto-Reset Fixture
+- **Waktu:** ~09:45 WIB
+- **Tingkat Keparahan:** Medium
+- **Gejala:** Setelah auto-inject `@pytest.fixture(autouse=True)` untuk reset in-memory store, test stateful sekuensial (Create → Read → Delete) mulai gagal: data yang di-POST di test pertama tidak terlihat oleh test berikutnya.
+- **Akar Masalah:** Fixture `autouse=True` me-reset `products = []` antara setiap test case, sedangkan suite test ini dirancang stateful (test #2 bergantung pada data yang dibuat test #1).
+- **Tindakan Korektif:** Hapus auto-inject `_auto_reset_stores` dari executor. Reset store hanya boleh di-inject jika test file secara eksplisit mendefinisikan fixture sendiri.
+- **Sumber Solusi:** IA (Melaporkan regresi setelah fix sebelumnya) & AGEN (Mendiagnosis root cause stateful test ordering).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-030: `NameError: name 'sys' is not defined` — CLI Calculator
+- **Waktu:** ~10:00 WIB
+- **Tingkat Keparahan:** Medium
+- **Gejala:** Preset CLI Calculator gagal dengan `NameError: name 'sys' is not defined` meski `sys.exit(0)` ada di dalam fungsi `main()`.
+- **Akar Masalah:** Developer agent menggunakan `sys` tanpa `import sys` di bagian atas file.
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah aturan "WAJIB `import sys` di baris pertama".
+  2. `executor.py`: Auto-inject `import sys` di awal file jika `sys.` ditemukan dalam kode tapi `import sys` tidak ada.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-031: `Directives must appear before any declarations` — Dart Shim Injeksi Salah Posisi
+- **Waktu:** ~16:30 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Preset Flutter Widget gagal kompilasi di semua 3 loop dengan error berulang: `lib/card_metric.dart:7:1: Error: Directives must appear before any declarations`.
+- **Klasifikasi Kegagalan:** Bug di lapisan Auto-Healing executor (bukan kegagalan model).
+- **Akar Masalah:** StateNotifier shim (berisi deklarasi `abstract class`) di-prepend di awal string content menggunakan `content = shim + "\n" + content`. Namun content sudah diawali dengan `import` statements Dart. Hasil akhir: deklarasi class muncul SEBELUM import → Dart compiler error karena aturan Dart mewajibkan semua `import`/`part`/`library` directive mendahului deklarasi.
+  ```dart
+  abstract class StateNotifier<T> { ... }  // ← deklarasi (baris 1)
+  typedef StateNotifierProvider... ;        // ← deklarasi (baris 5)
+  import 'package:flutter/material.dart';  // ← ERROR: import setelah deklarasi (baris 7)
+  ```
+- **Tindakan Korektif:** Ubah strategi injeksi shim — scan semua baris untuk menemukan index `import` terakhir, lalu sisipkan shim SETELAH baris import terakhir tersebut (bukan di awal file):
+  ```python
+  last_import_idx = max(i for i, line in enumerate(lines)
+                        if re.match(r'\s*import\s+', line), default=-1)
+  lines.insert(last_import_idx + 1, "\n" + shim + "\n")
+  ```
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri setelah analisis output error).
+- **Status:** Tuntas (Resolved) — menunggu konfirmasi E2E test run berikutnya.
+
+---
+
+### Kasus E-032: FastAPI Multi-File → `exit code 2` (Collection Error Pytest)
+- **Waktu:** ~16:35 WIB
+- **Tingkat Keparahan:** High
+- **Gejala:** Preset FastAPI CRUD gagal di semua 3 loop dengan `exit code 2` (pytest collection error, bukan test failure). Developer menghasilkan 3 file: `models.py`, `main.py`, `test_main.py`. Test `from models import Product` gagal karena pytest sandbox tidak menemukan modul `models`.
+- **Klasifikasi Kegagalan:** Kelas B (Framework Nuance) — model mengikuti konvensi FastAPI production (multi-file separation of concerns) yang tidak kompatibel dengan single-directory sandbox pytest.
+- **Akar Masalah:** Sandbox pytest berjalan di single flat directory. Cross-file import `from models import Product` membutuhkan `models.py` dalam PYTHONPATH, tapi resolusi modul dinamis sandbox tidak selalu menangkap ini dengan benar pada `exit code 2` (sebelum test bahkan dimulai).
+- **Tindakan Korektif:**
+  1. `developer.py`: Tambah aturan eksplisit "WAJIB tulis SELURUH implementasi dalam SATU FILE `main.py`. DILARANG membuat `models.py`, `schemas.py`, `database.py`, atau file Python terpisah."
+  2. `executor.py` (auto-healing fallback): Jika Developer tetap membuat file satelit (`models.py`, `schemas.py`, dll.) bersama `main.py` FastAPI, konsolidasikan isinya ke `main.py` secara otomatis — hapus file satelit dari `code_files`, sisipkan kontennya setelah baris import terakhir `main.py`.
+- **Sumber Solusi:** AGEN (Diselesaikan mandiri setelah analisis exit code 2).
+- **Status:** Tuntas (Resolved) — menunggu konfirmasi E2E test run berikutnya.
+
+---
+
+### Kasus E-033: Environment Grounding — Kompensasi Knowledge Cutoff Model Lokal
+- **Waktu:** ~16:10 WIB
+- **Tingkat Keparahan:** Strategic (bukan error akut, melainkan risiko sistemik)
+- **Gejala (Potensi):** Model `qwen2.5-coder:7b` memiliki knowledge cutoff yang tidak mutakhir. Tanpa mekanisme verifikasi, model berpotensi terus menggunakan API yang sudah deprecated atau versi package yang salah (misal: Pydantic v1 syntax di environment Pydantic v2, `StateNotifier` di Riverpod 3.x).
+- **Klasifikasi Kegagalan:** Kelas A Sistemik — bukan satu error tunggal, tapi risiko berulang karena fundamental model lokal.
+- **Solusi yang Diimplementasikan:** Buat `backend/environment_grounding.py` — modul baru yang memeriksa fakta lingkungan aktual:
+  - **Python stack:** Jalankan `pip list --format=json` via subprocess untuk mendapatkan versi `fastapi`, `pydantic`, `pytest`, `uvicorn`, `httpx` yang benar-benar terpasang.
+  - **Dart/Flutter stack:** Baca `frontend/pubspec.lock` (tanpa network call) untuk mendapatkan versi `flutter_riverpod` aktual.
+  - Output berupa **Environment Fact Card** yang disuntikkan ke prompt Developer agent sebelum task spec dimulai.
+  - Di-cache via `@lru_cache` agar tidak spawn subprocess berulang.
+  - Dilindungi `try/except` berlapis agar tidak merusak sistem jika grounding gagal.
+- **Contoh Fact Card yang Dihasilkan:**
+  ```
+  [ENVIRONMENT FACTS — PYTHON STACK]
+  Python runtime: 3.13.15
+  fastapi==0.141.1 | pydantic==2.13.5 | pytest==9.1.1
+
+  • pydantic v2 AKTIF: id WAJIB `int | None = None`, gunakan @field_validator
+  • fastapi==0.141.1: POST wajib status_code=201, DELETE 204 + raise 404
+  • flutter_riverpod==3.4.3: StateNotifier TIDAK ADA, gunakan Provider<T>
+  ```
+- **Sumber Solusi:** IA (Konsep & desain strategi) & AGEN (Implementasi teknis).
+- **Status:** Tuntas (Implemented) — aktif berjalan sejak sesi ini.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Iterasi 6:
+- **Diselesaikan Mandiri oleh Agen:** 8 kasus (80% — E-024, E-025, E-026, E-027, E-028, E-030, E-031, E-032)
+- **Diselesaikan atas Intervensi IA:** 1 kasus (10% — E-029: stateful test ordering)
+- **Inisiatif Strategis IA + Implementasi Agen:** 1 kasus (10% — E-033: Environment Grounding)
