@@ -861,3 +861,25 @@ Implementasikan P0-1: Structured Diagnostic Parser & Targeted Error Feedback ber
  8. Menjalankan full regression test backend: 59 passed, 0 failed dalam 15.70s.
  9. Menyusun laporan formal lengkap di `dokumentasi-pengembangan/implementation/structured_diagnostic_parser_implementation.md`).
 
+---
+
+[PENGGUNA - 11:26]
+P0-2 — Design Only: Machine-Readable Contract. Buat desain arsitektur P0-2: Machine-Readable Contract sebagai kelanjutan diagnosis pasca-Phase 2...
+
+[ANTIGRAVITY - 11:28]
+(Menuntaskan desain arsitektur P0-2 Machine-Readable Contract di `dokumentasi-pengembangan/architecture/machine_readable_contract_design.md` [630 baris, 39.554 bytes]:
+ 1. Problem Definition: Menganalisis formal contract vacuum yang menyebabkan semantic drift antar agen berbasis narasi Markdown, berbeda dari sekadar masalah prompt engineering.
+ 2. Contract Boundary: Mengunci peran produser (PM/Architect), konsumen read-only (Developer/Tester/Reviewer), titik pembekuan immutability, dan pencegahan mutasi diam-diam via SHA-256.
+ 3. Machine-Readable Schema: Merancang schema JSON/Pydantic komprehensif (task_intent, target_ecosystem, data_models, interface_contracts, functional_requirements, testable_assertions, constraints, unresolved_ambiguities, provenance).
+ 4. Contract vs Oracle: Menetapkan pemisahan tegas antara Contract (apa yang harus dibangun) dan Oracle (evaluasi keberhasilan); Frozen Oracle tetap otoritas absolut pada benchmark.
+ 5. Contract Lifecycle: Merancang state machine DRAFT -> ALIGNED -> FROZEN -> EXECUTING -> VALIDATED.
+ 6. Agent Responsibilities: Batasan formal I/O untuk PM, Architect, Developer, Tester, Reviewer, dan Executor.
+ 7. Contract Validation Gate: Algoritma validasi deterministik sebelum kontrak masuk ke Developer (schema, konsistensi, testability, ambiguitas).
+ 8. Contract -> Tester: Derivasi test suite 1-ke-1 dari testable_assertions tanpa interpretasi bebas.
+ 9. Contract -> Reviewer: Matriks evaluasi 3 dimensi (Contract + Test Evidence + Artifacts) menggantikan judgement subjektif LLM.
+ 10. Failure Modes: 6 modus kegagalan kontrak beserta safeguard deterministiknya.
+ 11. Compatibility: Sinergi dengan Executor v2 SAFE dan Structured Diagnostic Parser P0-1.
+ 12. Migration Strategy: Strategi adopsi bertahap 3 fase [Shadow Dual-Write -> Active Consumer -> Contract-Driven Review].
+ Status desain: DESIGN ONLY — PENDING IA VALIDATION).
+
+

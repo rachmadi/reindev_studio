@@ -399,4 +399,36 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Tindak Lanjut:** Menunggu evaluasi dan putusan resmi Intent Architect terhadap implementasi P0-1 Structured Diagnostic Parser & Targeted Error Feedback.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## DESAIN ARSITEKTUR P0-2 (MACHINE-READABLE CONTRACT) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Design Review)
+- **Status Desain:** DESIGN ONLY — PENDING IA VALIDATION (Nol modifikasi kode sumber, nol eksperimen LLM).
+- **Dokumen Desain:** `dokumentasi-pengembangan/architecture/machine_readable_contract_design.md` (630 baris, 39.554 bytes).
+- **Cakupan 12 Dimensi Desain**:
+  1. Problem Definition: Menganalisis akar penyebab formal contract vacuum dan semantic drift antar agen yang berbeda secara fundamental dari masalah prompt.
+  2. Contract Boundary: Mengunci peran produser (PM/Architect), konsumen read-only (Developer/Tester/Reviewer), titik pembekuan immutability, dan pencegahan mutasi diam-diam via SHA-256.
+  3. Machine-Readable Schema: Merancang schema JSON/Pydantic komprehensif tanpa field dekoratif.
+  4. Contract vs Oracle: Menegaskan pemisahan kewenangan antara spesifikasi deklaratif dan orakel evaluasi (Frozen Oracle tetap supreme authority).
+  5. Contract Lifecycle: Merancang alur status 5 tahap (DRAFT -> ALIGNED -> FROZEN -> EXECUTING -> VALIDATED).
+  6. Agent Responsibilities: Batasan formal input/output untuk seluruh peran squad.
+  7. Contract Validation Gate: Gerbang inspeksi deterministik pra-Developer (skema, konsistensi, testability, ambiguitas).
+  8. Contract -> Tester: Derivasi test suite terarah langsung dari testable_assertions.
+  9. Contract -> Reviewer: Matriks evaluasi 3 dimensi (Contract + Test Evidence + Artifacts).
+  10. Failure Modes & Safeguards: Mengidentifikasi 6 modus kegagalan kontrak beserta pencegahan deterministiknya.
+  11. Compatibility: Sinergi konseptual penuh dengan Executor v2 SAFE dan Structured Diagnostic Parser P0-1.
+  12. Migration Strategy: Strategi migrasi evolusioner 3 fase (Shadow Dual-Write -> Active Consumer -> Contract-Driven Review).
+- **Design Verdict:** **`DESIGN ONLY — PENDING IA VALIDATION`**.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (DESIGN ONLY — PENDING IA VALIDATION)
+- **Waktu Laporan:** 2026-09-09 11:28 WIB
+- **Pelaksana Desain:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu penelaahan dan arahan resmi Intent Architect terhadap desain arsitektur P0-2 Machine-Readable Contract.
+
+
 
