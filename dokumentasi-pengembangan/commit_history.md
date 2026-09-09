@@ -197,7 +197,7 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Kepatuhan Protokol IIDD:** IMPLEMENTATION ONLY sesuai desain v1.0.1 APPROVED. Nol eksperimen LLM. Frozen Oracle tak tersentuh. Executor v2 SAFE dipertahankan. P0-1 dipertahankan.
 
 ### 5. Validasi Empiris Iterasi 6 Pasca P0-1, P0-2, & Executor v2 SAFE
-- **Commit Hash:** (pending)
+- **Commit Hash:** `573faff`
 - **Status:** TERSIMPAN SECARA LOKAL (ITERATION 6 REMAINS OPEN)
 - **Pesan Commit Utama:** `docs: record empirical validation results for iteration 6 post-P0-2 (33.3% pass rate, iteration 6 remains open)`
 - **Waktu Eksekusi:** 2026-09-09 14:50 WIB
