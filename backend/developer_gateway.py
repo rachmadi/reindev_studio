@@ -261,7 +261,8 @@ class OpenRouterDeveloperAdapter(BaseDeveloperAdapter):
         self._api_key = api_key or os.getenv("OPENROUTER_API_KEY", "").strip()
         self.base_url = (base_url or os.getenv("OPENROUTER_BASE_URL", self.DEFAULT_ENDPOINT)).rstrip("/")
         self.temperature = temperature
-        self.timeout_sec = timeout_sec
+        self.timeout_sec = int(os.getenv("OPENROUTER_TIMEOUT", str(timeout_sec)))
+
 
     def __repr__(self) -> str:
         # Keamanan kredensial: TIDAK PERNAH mencetak API key di repr

@@ -26,6 +26,7 @@ from backend.diagnostic_parser import (
     parse_pytest_output,
     HINT_HTTP_422,
     HINT_MATRIX_DIMENSIONS,
+    HINT_DART_BRACKET_CASCADE,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -261,6 +262,41 @@ FAILED test_main.py::test_create_product - assert 422 == 201
     assert t.semantic_hint is not None
     assert "[ACTIONABLE HINT]" in t.semantic_hint
     assert "HTTP 422" in t.semantic_hint
+
+
+# ===========================================================================
+# 6.2. Dart Bracket Cascade Semantic Hint Tests
+# ===========================================================================
+
+def test_semantic_hint_dart_bracket_cascade():
+    """Error kompilasi Dart cascade mismatch memicu HINT_DART_BRACKET_CASCADE."""
+    test1 = FailingTest(
+        test_name="compilation_check",
+        test_file="test/widget_test.dart",
+        failure_type="compilation_error",
+        message="lib/card_metric.dart:60:20: Error: Can't find ')' to match '('.",
+    )
+    hint1 = infer_semantic_hint(test1)
+    assert hint1 is not None
+    assert hint1 == HINT_DART_BRACKET_CASCADE
+    assert "[ACTIONABLE HINT]" in hint1
+    assert "cascade errors" in hint1
+
+    test2 = FailingTest(
+        test_name="compilation_check",
+        test_file="test/widget_test.dart",
+        failure_type="compilation_error",
+        message="lib/card_metric.dart:124:13: Error: Expected an identifier, but got ']'.",
+    )
+    hint2 = infer_semantic_hint(test2)
+    assert hint2 == HINT_DART_BRACKET_CASCADE
+
+
+def test_semantic_hint_no_hardcoded_widget_code():
+    """Hint Dart bracket cascade TIDAK PERNAH membocorkan kode widget preskriptif."""
+    assert "class CardMetric" not in HINT_DART_BRACKET_CASCADE
+    assert "Card(" not in HINT_DART_BRACKET_CASCADE
+    assert "Column(" not in HINT_DART_BRACKET_CASCADE
 
 
 # ===========================================================================

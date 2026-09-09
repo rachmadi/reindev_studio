@@ -54,13 +54,15 @@ except (ImportError, ValueError):
     from executor import run_sandbox_tests as run_sandbox_tests_legacy, SANDBOX_DIR
 
 try:
-    from .diagnostic_parser import parse_diagnostic, build_targeted_feedback
+    from .diagnostic_parser import parse_diagnostic, build_targeted_feedback, analyze_dart_bracket_balance, DartSyntaxDiagnostic
 except (ImportError, ValueError):
     try:
-        from diagnostic_parser import parse_diagnostic, build_targeted_feedback
+        from diagnostic_parser import parse_diagnostic, build_targeted_feedback, analyze_dart_bracket_balance, DartSyntaxDiagnostic
     except ImportError:
         def parse_diagnostic(*args, **kwargs): return None
         def build_targeted_feedback(*args, **kwargs): return ""
+        def analyze_dart_bracket_balance(*args, **kwargs): return []
+        class DartSyntaxDiagnostic: pass
 
 
 # ===========================================================================

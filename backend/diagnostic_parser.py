@@ -527,7 +527,228 @@ def parse_pytest_output(
 
 
 # ===========================================================================
-# 6. Dart / Flutter Test Parser Engine
+# 6. Dart / Flutter Syntax & Bracket Balance Diagnostic Engine
+# ===========================================================================
+
+@dataclass
+class DartSyntaxDiagnostic:
+    file_path: str
+    line: int
+    column: int
+    offending_token: str
+    issue: str  # "orphan_closing_delimiter", "mismatched_closing_delimiter", "unclosed_opening_delimiter"
+    expected_opener: Optional[str] = None
+    actual_opener: Optional[str] = None
+    opener_line: Optional[int] = None
+    likely_cause: str = ""
+
+    def format_diagnostic_block(self) -> str:
+        lines = [
+            "[DART SYNTAX DIAGNOSTIC]",
+            f"File: {self.file_path}",
+            f"Line: {self.line}",
+            f"Token: {self.offending_token}",
+            f"Issue: {self.issue.replace('_', ' ')}",
+            f"Likely cause: {self.likely_cause}"
+        ]
+        return "\n".join(lines)
+
+
+def tokenize_dart_delimiters(code: str) -> List[Tuple[str, int, int, int]]:
+    """
+    Memindai kode sumber Dart untuk mengekstrak token delimiter '(', ')', '[', ']', '{', '}'.
+    Mengabaikan komentar baris (//), komentar blok (/* */ termasuk nested),
+    string literal (tunggal, ganda, raw r'...', triple quotes '''/\"\"\"),
+    dan menangani string interpolation (${...}) dengan transisi state scope.
+    
+    Mengembalikan list of (char, line, col, index).
+    """
+    n = len(code)
+    i = 0
+    line = 1
+    col = 1
+    scope_stack: List[Tuple[str, str, bool, int]] = []  # ('STRING'/'INTERP', quote_type, is_raw, interp_depth)
+    delimiters: List[Tuple[str, int, int, int]] = []
+
+    while i < n:
+        ch = code[i]
+        curr_line = line
+        curr_col = col
+
+        if ch == '\n':
+            line += 1
+            col = 1
+        else:
+            col += 1
+
+        if scope_stack and scope_stack[-1][0] == 'STRING':
+            _, quote_type, is_raw, interp_depth = scope_stack[-1]
+            q_len = len(quote_type)
+
+            if not is_raw and ch == '\\' and i + 1 < n:
+                i += 2
+                col += 1
+                continue
+
+            if not is_raw and ch == '$' and i + 1 < n and code[i + 1] == '{':
+                delimiters.append(('{', curr_line, curr_col, i))
+                scope_stack[-1] = ('INTERP', quote_type, is_raw, 1)
+                i += 2
+                col += 1
+                continue
+
+            if code[i:i + q_len] == quote_type:
+                scope_stack.pop()
+                i += q_len
+                col += (q_len - 1)
+                continue
+
+            i += 1
+            continue
+
+        if scope_stack and scope_stack[-1][0] == 'INTERP':
+            _, quote_type, is_raw, interp_depth = scope_stack[-1]
+            if ch == '{':
+                delimiters.append(('{', curr_line, curr_col, i))
+                scope_stack[-1] = ('INTERP', quote_type, is_raw, interp_depth + 1)
+                i += 1
+                continue
+            elif ch == '}':
+                delimiters.append(('}', curr_line, curr_col, i))
+                if interp_depth == 1:
+                    scope_stack[-1] = ('STRING', quote_type, is_raw, 0)
+                else:
+                    scope_stack[-1] = ('INTERP', quote_type, is_raw, interp_depth - 1)
+                i += 1
+                continue
+
+        if ch == '/' and i + 1 < n and code[i + 1] == '/':
+            i += 2
+            col += 1
+            while i < n and code[i] != '\n':
+                i += 1
+                col += 1
+            continue
+
+        if ch == '/' and i + 1 < n and code[i + 1] == '*':
+            comment_depth = 1
+            i += 2
+            col += 1
+            while i < n and comment_depth > 0:
+                if code[i] == '\n':
+                    line += 1
+                    col = 1
+                    i += 1
+                elif code[i] == '/' and i + 1 < n and code[i + 1] == '*':
+                    comment_depth += 1
+                    i += 2
+                    col += 2
+                elif code[i] == '*' and i + 1 < n and code[i + 1] == '/':
+                    comment_depth -= 1
+                    i += 2
+                    col += 2
+                else:
+                    i += 1
+                    col += 1
+            continue
+
+        is_raw = False
+        if ch == 'r' and i + 1 < n and code[i + 1] in ("'", '"'):
+            is_raw = True
+            i += 1
+            col += 1
+            ch = code[i]
+
+        if ch in ("'", '"'):
+            if i + 2 < n and code[i:i + 3] == ch * 3:
+                quote_type = ch * 3
+                i += 3
+                col += 2
+                scope_stack.append(('STRING', quote_type, is_raw, 0))
+                continue
+            else:
+                quote_type = ch
+                i += 1
+                scope_stack.append(('STRING', quote_type, is_raw, 0))
+                continue
+
+        if ch in ('(', '[', '{', ')', ']', '}'):
+            delimiters.append((ch, curr_line, curr_col, i))
+
+        i += 1
+
+    return delimiters
+
+
+def analyze_dart_bracket_balance(code_str: str, file_path: str = "") -> List[DartSyntaxDiagnostic]:
+    """
+    Menganalisis keseimbangan delimiter (), [], {} pada kode Dart.
+    Mengembalikan daftar DartSyntaxDiagnostic untuk setiap ketidakseimbangan yang terdeteksi.
+    Fokus utama: mendeteksi lokasi pelanggaran pertama secara deterministik.
+    """
+    delims = tokenize_dart_delimiters(code_str)
+    stack: List[Tuple[str, int, int, int]] = []
+    matching = {')': '(', ']': '[', '}': '{'}
+    matching_rev = {'(': ')', '[': ']', '{': '}'}
+    diagnostics: List[DartSyntaxDiagnostic] = []
+
+    for d, l, c, idx in delims:
+        if d in ('(', '[', '{'):
+            stack.append((d, l, c, idx))
+        elif d in (')', ']', '}'):
+            expected_open = matching[d]
+            if not stack:
+                diagnostics.append(DartSyntaxDiagnostic(
+                    file_path=file_path,
+                    line=l,
+                    column=c,
+                    offending_token=d,
+                    issue="orphan_closing_delimiter",
+                    expected_opener=None,
+                    actual_opener=None,
+                    opener_line=None,
+                    likely_cause=f"duplicate or rogue closing delimiter '{d}' with no matching opening delimiter in widget tree"
+                ))
+            elif stack[-1][0] != expected_open:
+                opener, op_line, op_col, _ = stack[-1]
+                expected_close = matching_rev.get(opener, "?")
+                diagnostics.append(DartSyntaxDiagnostic(
+                    file_path=file_path,
+                    line=l,
+                    column=c,
+                    offending_token=d,
+                    issue="mismatched_closing_delimiter",
+                    expected_opener=opener,
+                    actual_opener=None,
+                    opener_line=op_line,
+                    likely_cause=(
+                        f"closing '{d}' encountered while opening '{opener}' (line {op_line}) is still open. "
+                        f"Likely duplicate closing bracket in nested widget tree or wrong delimiter type (expected '{expected_close}')."
+                    )
+                ))
+            else:
+                stack.pop()
+
+    if not diagnostics and stack:
+        for opener, op_line, op_col, _ in stack:
+            expected_close = matching_rev.get(opener, "?")
+            diagnostics.append(DartSyntaxDiagnostic(
+                file_path=file_path,
+                line=op_line,
+                column=op_col,
+                offending_token=opener,
+                issue="unclosed_opening_delimiter",
+                expected_opener=opener,
+                actual_opener=None,
+                opener_line=op_line,
+                likely_cause=f"opening '{opener}' at line {op_line} was never closed (missing '{expected_close}')"
+            ))
+
+    return diagnostics
+
+
+# ===========================================================================
+# 6.2. Dart / Flutter Test Output Parser Engine
 # ===========================================================================
 
 RE_DART_COMPILATION_ERROR = re.compile(
@@ -560,6 +781,15 @@ def parse_dart_output(
     # 1. Deteksi Compilation Errors (Error: ...)
     compilation_errors = list(RE_DART_COMPILATION_ERROR.finditer(cleaned_text))
     if compilation_errors:
+        # Cek apakah ada delimiter diagnostic pada code_files
+        bracket_diags: List[DartSyntaxDiagnostic] = []
+        if code_files:
+            for c_name, c_content in code_files.items():
+                if c_name.endswith(".dart"):
+                    diags = analyze_dart_bracket_balance(c_content, file_path=c_name)
+                    if diags:
+                        bracket_diags.extend(diags)
+
         failing_tests: List[FailingTest] = []
         for match in compilation_errors:
             f_path = normalize_file_path(match.group(1))
@@ -573,17 +803,47 @@ def parse_dart_output(
             sfile = f_path if not is_test else None
             sline = line_no if not is_test else None
 
-            failing_tests.append(FailingTest(
+            # Cek apakah error kompilasi berkaitan dengan delimiter / cascade
+            is_delimiter_related = any(k in err_msg.lower() for k in (
+                "can't find ')'", "can't find ']'", "can't find '}'",
+                "expected an identifier, but got ']'", "expected an identifier, but got ')'",
+                "expected an identifier, but got '}'", "expected to find ')'", "expected to find ']'",
+                "expected to find '}'", "unmatched '("
+            ))
+
+            msg = f"Compilation Error: {err_msg}"
+            source_l = sline
+            hint = None
+
+            # Jika ada bracket diagnostic yang cocok dengan file sumber
+            matching_diag = None
+            if bracket_diags and sfile:
+                for bd in bracket_diags:
+                    if bd.file_path == sfile or Path(bd.file_path).name == Path(sfile).name:
+                        matching_diag = bd
+                        break
+
+            if matching_diag:
+                # Prioritaskan root cause line dari bracket diagnostic daripada cascade line
+                source_l = matching_diag.line
+                msg += f"\n\n{matching_diag.format_diagnostic_block()}"
+                hint = HINT_DART_BRACKET_CASCADE
+            elif is_delimiter_related:
+                hint = HINT_DART_BRACKET_CASCADE
+
+            ft = FailingTest(
                 test_name="compilation_check",
                 test_file=tfile,
                 test_line=tline,
                 failure_type="compilation_error",
-                message=f"Compilation Error: {err_msg}",
+                message=msg,
                 source_file=sfile,
-                source_line=sline,
+                source_line=source_l,
                 traceback_excerpt=f"{f_path}:{line_no}:{col_no}: Error: {err_msg}",
-                confidence=1.0
-            ))
+                confidence=1.0,
+                semantic_hint=hint
+            )
+            failing_tests.append(ft)
 
         return DiagnosticEvidence(
             execution_status="error",
@@ -702,6 +962,17 @@ HINT_MATRIX_DIMENSIONS = (
     "Ensure invalid dimensions are rejected according to the contract."
 )
 
+HINT_DART_BRACKET_CASCADE = (
+    "[ACTIONABLE HINT]\n"
+    "Dart compilation failed due to mismatched delimiters (brackets/parentheses).\n"
+    "NOTE: Compiler errors pointing to outer widgets (e.g. \"Can't find ')' to match '('\") "
+    "are cascade errors caused by an extra, missing, or wrong delimiter deeper in the widget tree.\n"
+    "Check the [DART SYNTAX DIAGNOSTIC] above:\n"
+    "1. Inspect the exact line and token flagged.\n"
+    "2. Check if a closing delimiter was duplicated (e.g. extra '],') or used instead of '),'.\n"
+    "3. Ensure every opening '(' and '[' is closed exactly once with matching ')' and ']'."
+)
+
 
 def infer_semantic_hint(test: FailingTest) -> Optional[str]:
     """
@@ -755,6 +1026,29 @@ def infer_semantic_hint(test: FailingTest) -> Optional[str]:
     )
     if is_dim_error:
         return HINT_MATRIX_DIMENSIONS
+
+    # 3. Dart / Flutter Delimiter & Cascade Bracket Compilation Error
+    is_dart_bracket_cascade = (
+        ("can't find ')'" in full_lower or 'can\'t find ")"' in full_lower)
+        or ("can't find ']'" in full_lower or 'can\'t find "]"' in full_lower)
+        or ("can't find '}'" in full_lower or 'can\'t find "}"' in full_lower)
+        or "expected an identifier, but got ']'" in full_lower
+        or "expected an identifier, but got ')'" in full_lower
+        or "expected an identifier, but got '}'" in full_lower
+        or "expected to find ')'" in full_lower
+        or "expected to find ']'" in full_lower
+        or "expected to find '}'" in full_lower
+        or "unmatched '('" in full_lower
+        or "unmatched '['" in full_lower
+        or "unmatched '{'" in full_lower
+        or "[dart syntax diagnostic]" in full_lower
+        or (
+            ("bracket" in full_lower or "delimiter" in full_lower or "parenthes" in full_lower)
+            and ("mismatch" in full_lower or "unbalanced" in full_lower or "cascade" in full_lower)
+        )
+    )
+    if is_dart_bracket_cascade:
+        return HINT_DART_BRACKET_CASCADE
 
     return None
 
