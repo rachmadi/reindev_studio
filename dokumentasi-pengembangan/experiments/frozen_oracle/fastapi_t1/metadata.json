@@ -1,0 +1,22 @@
+{
+  "experiment": "frozen_oracle",
+  "case_id": "fastapi_t1",
+  "task": "Bangun modul REST API FastAPI untuk manajemen inventaris produk dengan validasi Pydantic dan automated pytest.",
+  "target_language": "Python",
+  "oracle_type": "immutable_validated_suite",
+  "test_files": {
+    "test_main.py": {
+      "sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+      "char_count": 1844,
+      "test_functions": [
+        "test_create_product",
+        "test_get_all_products",
+        "test_get_product_by_id",
+        "test_delete_product",
+        "test_delete_nonexistent_product"
+      ]
+    }
+  },
+  "validation_status": "MANUALLY_VALIDATED",
+  "validation_notes": "Suite divalidasi bebas dari asersi status code 200/201 yang ambigu, tidak berasumsi ID statis, dan menggunakan ID 999999 untuk menguji 404 tanpa tabrakan state in-memory."
+}

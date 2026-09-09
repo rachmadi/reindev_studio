@@ -154,6 +154,55 @@ eview_report, complete).
 - Backend FastAPI daemon (`:8000`) dan Web daemon (`:8085`) beroperasi stabil melayani inferensi model lokal Ollama dan eksekusi toolchain Dart nyata di sandbox.
 - Lakukan git commit atomik untuk Iterasi 5 dan push ke remote `origin/main`, kemudian lanjutkan perencanaan dan eksekusi **Iterasi 6: Code Canvas & Sandbox Terminal** (`REQ-027` s.d. `REQ-030`).
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 6: Code Canvas & Sandbox Terminal Explorer — 2026-09-08 10:00
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Capaian Utama:
+1. **Interactive File Tree Explorer (`file_explorer.dart`, REQ-027):** Komponen pohon direktori file proyek dinamis di sisi kiri panel workspace (lebar 220px). Memparsing kunci file datar dari event WebSocket `code_update` menjadi hierarki direktori bersarang dengan ikon tipe file spesifik bahasa (`.dart`, `.py`, `.yaml`, `.json`, `.md`), expand/collapse folder, highlight seleksi biru dengan border aksen, dan empty state informatif ("Belum ada file / Deploy Squad untuk memulai generasi kode").
+2. **Syntax-Highlighted Code Canvas Viewer (`code_viewer.dart`, REQ-028):** Area penampil kode canggih berbasis pustaka `flutter_highlight: ^0.7.0` dengan tema adaptif `atom-one-dark` dan `atom-one-light`. Dilengkapi gutter nomor baris independen dengan scroll vertikal sinkron, toolbar path/jumlah baris/ukuran file KB/bahasa terdeteksi otomatis, tombol animasi interaktif "Copy Code" yang memunculkan indikator centang hijau "Tersalin!" selama 2 detik, dan placeholder instruktif saat belum ada file yang dipilih.
+3. **Console Sandbox Terminal (`terminal_view.dart`, REQ-029):** Jendela konsol terminal bertema hitam pekat (`#0D0E14`) dengan tipografi monospace JetBrains Mono untuk memantau eksekusi subproses `dart test` atau `pytest`. Toolbar bergaya terminal modern dengan traffic lights macOS (merah, kuning, hijau), chip statistik langsung jumlah pengujian lulus/gagal (`X PASS` hijau dan `X FAIL` merah), fungsi pembersihan escape ANSI regex, klasifikasi pewarnaan baris otomatis (hijau=pass, merah=fail, amber=warn, biru=info, ungu=header, hijau=prompt), toggle autoscroll, dan kursor prompt idle `reindev-studio $ _`.
+4. **Visual Diff / Revision Viewer (`diff_viewer.dart`, REQ-030):** Penampil perbandingan revisi kode baris-demi-baris yang aktif saat terjadi siklus umpan balik mandiri (*self-healing*) dari umpan balik QA. Menghitung diff terpadu (*unified diff*) secara in-memory di Riverpod, mengelompokkan perubahan per chunk berkas dengan badge nomor iterasi, ringkasan penambahan (+ hijau) dan pengurangan (- merah), kartu collapsible yang dapat disembunyikan, dan penomoran baris gutter.
+5. **QualityReviewPanel & Terminal Lifecycle Synchronization (`quality_review_panel.dart`, Intervensi #42 & #43):** Mengintegrasikan Laporan Audit Mutu & Keamanan Code Reviewer berbasis Markdown ke Tab 3 Workspace Panel lengkap dengan badge `[APPROVED]`, ringkasan eksekutif, dan sub-tab 'Revision Diff History' yang menampilkan banner informatif 'First-Pass Quality (Zero Regression): 0 File Revisions Needed' jika lulus putaran pertama. Memperbaiki Sandbox Terminal: mengisolasi stat chip melalui `terminalStatsProvider`, mengeliminasi inflasi teks traceback, memperbaiki `UnboundLocalError` flag `is_dart` pada backend executor, menormalisasi relative import Python pada executor dan tester prompt, serta menyiarkan penutup resmi `=== SQUAD MISSION COMPLETED ===` saat event `complete` tiba sehingga konsol mencatat keberhasilan rilis produk.
+6. **Peremajaan Panel Tab Workspace & Status Bar (`workspace_panel.dart`):** Penggantian seluruh placeholder card sementara pada Tab 1 (Code Canvas & Explorer), Tab 2 (Sandbox Terminal), dan Tab 3 (Quality & Review Report) dengan implementasi widget nyata. Label siklus metodologi pada bottom status bar diperbarui menjadi `IIDD Cycle: Iterasi 6`.
+7. **Pengujian Mandiri Otomatis & Headed Interactive Testing:**
+   - `flutter analyze` 0 issues (1.6s).
+   - `flutter test` 4 suites 100% PASS (3.3s) mencakup verifikasi keberadaan seluruh tab dan widget baru.
+   - Kompilasi `flutter build web --release` tuntas.
+   - Uji eksekusi subproses nyata `dart test` dan `pytest` sandbox sukses.
+   - 5 screenshot visual Playwright (`tc6_01_initial.png` s.d. `tc6_05_agent_timeline.png`) terverifikasi sempurna.
+8. **Sinkronisasi Status Non-Kontradiktif & Resolusi Dynamic Package (Intervensi #45):**
+   - Eliminasi kontradiksi status rilis: jika ada temuan revisi atau kegagalan assertion pengujian, seluruh komponen (Terminal, Tab 3, Thought Stream, dan Bottom Status Bar) secara seragam menampilkan status `NEEDS REVISION` / `Perlu Revisi`.
+   - Sandbox executor dilengkapi dynamic Dart package resolution dan normalisasi import sehingga widget testing Flutter terkompilasi dan lulus 100%.
+9. **Eliminasi Negative Priming & Panduan State Provider (Intervensi #46):**
+   - Mengeliminasi klausa larangan lintas bahasa pada prompt agen yang memicu halusinasi `Kode Python masih ada dalam file Dart`.
+   - Menambahkan panduan eksplisit StateNotifierProvider pada `developer.py` dan `testWidgets` asinkron pada `tester.py`.
+10. **Live Self-Healing Loop Counter, Conditional Node Handoff & Evidence-Based Review (Intervensi #47):**
+    - `loopStatusProvider` pada Riverpod memancarkan state putaran loop secara real-time ke Bottom Status Bar (`Self-Healing: Loop X/Y (Berjalan)` / `Tuntas pada Loop X/Y` / `Berakhir di Loop X/Y (Maksimum)`), header topologi agen (`Loop X/Y`), dan Executive Summary Tab 3 (`Loop: X/Y`).
+    - Event WebSocket `loop_status` pada node executor memperjelas transisi siklus perbaikan (`retrying`, `max_reached`, `passed`) ke Thought Stream dan Terminal Log.
+    - Code Reviewer (`reviewer.py`) mewajibkan status `[NEEDS_REVISION]` disertai kutipan bukti otentik (*evidence quote*) dari log pengujian QA aktual, nama berkas spesifik, dan baris kode saat batas loop tercapai.
+    - Token budget Reviewer dinaikkan dari 300 ke 1000 token pada `backend/config.py` sehingga laporan audit utuh tanpa terpotong.
+    - Seluruh 4 test suites widget lulus 100%, bundle rilis web dikompilasi ulang, dan daemon backend uvicorn direfresh.
+11. **Optimasi Graph Routing (`route_after_developer`) & Investigasi Forensik 3 Loops Gagal (Intervensi #48):**
+    - Menggantikan edge statis `developer -> tester` dengan conditional edge `route_after_developer` di `backend/graph.py`: Loop 0 melempar ke `tester`, sedangkan Loop > 0 (self-healing) langsung melompat ke `executor` untuk menguji perbaikan kode terhadap test suite acuan yang stabil tanpa re-generasi LLM (menghemat ~170 detik per putaran loop), KECUALI jika `state.get("tests_need_update")` bernilai True.
+    - Investigasi forensik proyek gagal `project_20260908_115007` mengungkap 3 akar masalah: resolusi URI import Dart (`package:.../lib/...` -> `lib/lib/...`), moving goalpost QA Tester merombak test suite tiap loop dengan sintaks usang, dan Riverpod 3 deprecation (`StateNotifier`).
+    - Sandbox executor (`backend/executor.py`) diperkuat dengan pembersihan prefix import `lib/`, auto-linking sibling imports, dan sanitasi `ProviderScope`.
+    - Standardisasi Riverpod 3 Notifier pada prompt Developer & Tester.
+    - Pytest 16/16 PASS, Flutter widget test 4/4 PASS, dan reproduksi sandbox membuktikan 100% PASS (`00:00 +2: All tests passed!`).
+
+### 2. Kebutuhan yang Diselesaikan:
+- `REQ-027`: Interactive File Tree Explorer untuk navigasi hierarki file proyek (⏳ Menunggu Validasi IA).
+- `REQ-028`: Syntax-Highlighted Code Canvas Viewer dengan Copy Code dan info ukuran file (⏳ Menunggu Validasi IA).
+- `REQ-029`: Console Sandbox Terminal dengan output berwarna (hijau=passed, merah=failed) (⏳ Menunggu Validasi IA).
+- `REQ-030`: Visual Diff / Revision Viewer untuk melacak perbaikan bug Developer (⏳ Menunggu Validasi IA).
+- **Status Validation Gate:** ⏳ PENDING EVALUATION IA (Siap Diuji di Monitor Fisik `http://localhost:8085/`).
+- **Total Waktu Realisasi (IIDD):** 4.646 detik (~77 menit 26 detik / 1.29 jam) — Formula: 672s (Dev) + 1.216s (Test) + 2.758s (Fix).
+
+### 3. Rekomendasi untuk Iterasi 7:
+- Seluruh 4 tab utama studio (Agent Squad Timeline, Code Canvas & Explorer, Sandbox Terminal, Quality & Review Report) kini berfungsi penuh dengan arsitektur data reaktif Riverpod.
+- Alur kerja self-healing LangGraph kini optimal dan stabil: test suite berfungsi sebagai regression benchmark acuan tanpa re-generasi berulang yang boros latensi.
+- Sistem siap divalidasi penuh oleh Intent Architect sebelum melangkah ke Iterasi 7 (Native Desktop & E2E Validation).
 
 

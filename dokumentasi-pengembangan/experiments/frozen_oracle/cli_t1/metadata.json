@@ -1,0 +1,22 @@
+{
+  "experiment": "frozen_oracle",
+  "case_id": "cli_t1",
+  "task": "Bangun kalkulator CLI Python dengan operasi matematika matriks dan penanganan error komprehensif.",
+  "target_language": "Python",
+  "oracle_type": "immutable_validated_suite",
+  "test_files": {
+    "test_main.py": {
+      "sha256": "0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124",
+      "char_count": 2436,
+      "test_functions": [
+        "test_matrix_addition",
+        "test_matrix_subtraction",
+        "test_matrix_multiplication",
+        "test_matrix_addition_incompatible_dimensions",
+        "test_matrix_multiplication_incompatible_dimensions"
+      ]
+    }
+  },
+  "validation_status": "MANUALLY_VALIDATED",
+  "validation_notes": "Suite menguji operasi matematika murni (penjumlahan, pengurangan, perkalian) dan penanganan error dimensi tanpa dependensi stdin/input() atau interaktivitas CLI."
+}

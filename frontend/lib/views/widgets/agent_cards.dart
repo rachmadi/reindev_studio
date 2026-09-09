@@ -42,6 +42,7 @@ class _AgentCardsRowState extends ConsumerState<AgentCardsRow>
     final activeRole = ref.watch(activeAgentRoleProvider);
     final agentStatuses = ref.watch(agentStatusesProvider);
     final currentFilter = ref.watch(streamFilterProvider);
+    final loopState = ref.watch(loopStatusProvider);
 
     ref.listen<AgentRole?>(activeAgentRoleProvider, (previous, next) {
       if (next != null) {
@@ -77,6 +78,56 @@ class _AgentCardsRowState extends ConsumerState<AgentCardsRow>
                     fontWeight: FontWeight.w700,
                     color: theme.colorScheme.onSurfaceVariant,
                     letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Dynamic Loop Counter Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: loopState.currentLoop > 0
+                        ? (loopState.isMaxReached
+                            ? const Color(0xFFEF4444).withAlpha(35)
+                            : const Color(0xFFF59E0B).withAlpha(35))
+                        : theme.colorScheme.primary.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: loopState.currentLoop > 0
+                          ? (loopState.isMaxReached
+                              ? const Color(0xFFEF4444).withAlpha(120)
+                              : const Color(0xFFF59E0B).withAlpha(120))
+                          : theme.colorScheme.primary.withAlpha(80),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.repeat_rounded,
+                        size: 11,
+                        color: loopState.currentLoop > 0
+                            ? (loopState.isMaxReached
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFF59E0B))
+                            : theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        loopState.currentLoop > 0
+                            ? "Loop ${loopState.currentLoop}/${loopState.maxLoops}"
+                            : "Loop 0/${loopState.maxLoops}",
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: loopState.currentLoop > 0
+                              ? (loopState.isMaxReached
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFFF59E0B))
+                              : theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

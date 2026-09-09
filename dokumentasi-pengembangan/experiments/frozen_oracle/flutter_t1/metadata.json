@@ -1,0 +1,19 @@
+{
+  "experiment": "frozen_oracle",
+  "case_id": "flutter_t1",
+  "task": "Bangun komponen widget kartu metrik modern responsif Flutter dengan Material Design 3 dan Riverpod state.",
+  "target_language": "Dart",
+  "oracle_type": "immutable_validated_suite",
+  "test_files": {
+    "card_metric_test.dart": {
+      "sha256": "4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528",
+      "char_count": 1537,
+      "test_functions": [
+        "renders CardMetric with Material 3 Card and Riverpod state",
+        "renders responsively inside constrained box without overflow"
+      ]
+    }
+  },
+  "validation_status": "MANUALLY_VALIDATED",
+  "validation_notes": "Suite menguji rendering komponen CardMetric, keberadaan Card MD3, teks metrik terikat, dan rendering responsif bebas overflow tanpa getter fiktif atau akses style rapuh."
+}

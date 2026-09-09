@@ -24,7 +24,7 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
             ])
         elif role == "reviewer":
             return FakeListChatModel(responses=[
-                "# Laporan Review Kode\n- Status: APPROVED\n- Analisis: Kode modular, penanganan error dimensi vektor telah dipasang, pengujian lulus 100%."
+                "# Laporan Review Kode\n- Status: [APPROVED]\n- Analisis: Kode modular, penanganan error dimensi vektor telah dipasang, pengujian lulus 100%."
             ])
         else:
             return FakeListChatModel(responses=[
@@ -58,8 +58,8 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
             "pm": 300,
             "architect": 350,
             "developer": 1000,
-            "tester": 600,
-            "reviewer": 300,
+            "tester": 1000,
+            "reviewer": 1000,
         }
         num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", str(role_num_predict.get(role, 600))))
         

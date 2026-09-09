@@ -1,17 +1,27 @@
+import copy
+import json
 import re
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ..state import SquadState
     from ..config import get_llm
     from ..environment_grounding import generate_fact_card
+    from ..tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
     try:
         from environment_grounding import generate_fact_card
     except ImportError:
-        def generate_fact_card(target_language: str) -> str:  # type: ignore[misc]
+        def generate_fact_card(target_language: str, task: str = "") -> str:  # type: ignore[misc]
             return ""
+    try:
+        from tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
+    except ImportError:
+        def get_tracer(run_id=None): return None
+        def compute_sha256(s): return ""
+        def compute_dict_hashes(f): return {}
+        def compute_object_hash(o): return ""
 
 DEV_SYSTEM_PROMPT = """Anda adalah Senior Software Developer dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menulis kode program berkualitas produksi berdasarkan spesifikasi dari Product Manager dan rencana arsitektur dari System Architect.
@@ -129,6 +139,40 @@ def developer_agent(state: SquadState) -> dict:
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
     iteration = state.get("iteration_count", 0)
     test_results = state.get("test_results", {})
+    
+    # Observability: Rekam snapshot INPUT AKTUAL yang diterima fungsi secara mendalam (deep copy)
+    dev_input_snapshot = {
+        "task": user_task,
+        "specifications": specs,
+        "architecture_plan": arch_plan,
+        "iteration_count": iteration,
+        "code_files": copy.deepcopy(state.get("code_files", {})),
+        "test_files": copy.deepcopy(state.get("test_files", {})),
+        "test_results": copy.deepcopy(test_results),
+        "logs": copy.deepcopy(state.get("logs", [])),
+        "status": state.get("status", "")
+    }
+    dev_input_hashes = {
+        "code_files_hashes": compute_dict_hashes(dev_input_snapshot["code_files"]),
+        "test_files_hashes": compute_dict_hashes(dev_input_snapshot["test_files"]),
+        "specifications_sha256": compute_sha256(specs),
+        "architecture_plan_sha256": compute_sha256(arch_plan),
+        "test_results_sha256": compute_object_hash(test_results),
+        "input_snapshot_sha256": compute_object_hash(dev_input_snapshot)
+    }
+
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="developer",
+            event_type="input",
+            iteration=iteration,
+            data={
+                "developer_input": dev_input_snapshot,
+                "developer_input_hashes": dev_input_hashes,
+                "iteration": iteration
+            }
+        )
     
     feedback_section = ""
     if iteration > 0 and test_results:
@@ -252,6 +296,23 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
     new_log = f"[Developer]: Berhasil menghasilkan/memperbarui {len(final_code_files)} file kode bersih ({target_lang.upper()}): {file_list_str}."
     current_logs = state.get("logs", [])
     
+    # Observability Trace Logging: Rekam OUTPUT AKTUAL Developer
+    iteration = state.get("iteration_count", 0)
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="developer",
+            event_type="output",
+            iteration=iteration,
+            data={
+                "developer_raw_output": raw_output,
+                "developer_parsed_output": final_code_files,
+                "code_files_hashes": compute_dict_hashes(final_code_files),
+                "newly_parsed_files": list(code_files.keys()),
+                "iteration": iteration
+            }
+        )
+
     return {
         "code_files": final_code_files,
         "status": "dev_done",

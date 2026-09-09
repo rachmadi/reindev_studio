@@ -27,19 +27,15 @@ def architect_agent(state: SquadState) -> dict:
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
     
     structure_rule = (
-        "ATURAN STRUKTUR PROYEK DART (WAJIB):\n"
-        "Gunakan tata letak standar paket Dart:\n"
-        "project/\n"
-        "├── pubspec.yaml (konfigurasi nama proyek, sdk: '>=3.0.0 <4.0.0', dev_dependencies: test: ^1.24.0)\n"
-        "├── lib/\n"
-        "│   └── [nama_modul].dart (implementasi kode sumber Dart murni)\n"
-        "└── test/\n"
-        "    └── [nama_modul]_test.dart (test suite menggunakan package:test/test.dart)\n"
-        "BATASAN JUMLAH BERKAS (WAJIB):\n"
-        "Rancang MAKSIMAL 2 file kode produksi (lib/) dan 1 file tes (test/). DILARANG membuat lebih dari 3 file.\n"
+        "ATURAN STRUKTUR PROYEK DART / FLUTTER (WAJIB):\n"
+        "- Gunakan struktur modul tunggal kohesif: MAKSIMAL 1 file kode implementasi untuk Developer di lib/ (contoh: `lib/card_metric.dart`) dan 1 file test untuk QA Tester (`test/card_metric_test.dart`).\n"
+        "- Gabungkan model data, provider Riverpod, dan Widget UI dalam 1 file `lib/card_metric.dart` untuk mencegah fragmentasi file dan kesalahan impor silang.\n"
+        "- DILARANG merancang struktur banyak file yang terpisah-pisah untuk widget sederhana.\n"
         if is_dart else
         "ATURAN STRUKTUR PROYEK PYTHON (WAJIB):\n"
-        "Gunakan tata letak modul Python modular (core/, services/, tests/test_*.py). Maksimal 2-3 file total.\n"
+        "- Gunakan struktur modul Python sederhana dan kohesif: MAKSIMAL 1-2 file kode implementasi untuk Developer (misal: `main.py` atau `models.py` + `main.py`) dan 1 file test untuk QA Tester (`test_*.py`).\n"
+        "- Untuk REST API FastAPI: gabungkan model Pydantic, in-memory store, dan routes dalam `main.py` (atau `models.py` dan `main.py`) untuk menghindari fragmentasi folder dan kesalahan impor silang.\n"
+        "- DILARANG merancang hierarki folder yang terlalu dalam (hindari app/api/, app/schemas/, app/models/). Jaga struktur tetap datar di root.\n"
     )
     
     prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}

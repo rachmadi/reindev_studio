@@ -281,3 +281,120 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Putusan PASS Diberikan IA:** 2026-09-08 09:28:17 WIB
 - **Total Waktu Realisasi IIDD:** **2.998,53 detik (~49 menit 59 detik / 0.83 jam)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 6: Code Canvas & Sandbox Terminal Explorer (REQ-027–REQ-030) — 2026-09-08
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Analisis spesifikasi master REQ-027–REQ-030 & instalasi `flutter_highlight: ^0.7.0` | 09:32:54 | 09:33:45 | 51 s | 0.85 m (0.01 j) |
+| 2 | Perancangan File Tree Explorer (`file_explorer.dart`, REQ-027) | 09:33:45 | 09:34:52 | 67 s | 1.12 m (0.02 j) |
+| 3 | Perancangan Syntax-Highlighted Code Canvas (`code_viewer.dart`, REQ-028) | 09:34:52 | 09:35:30 | 38 s | 0.63 m (0.01 j) |
+| 4 | Perancangan Console Sandbox Terminal (`terminal_view.dart`, REQ-029) | 09:35:30 | 09:36:18 | 48 s | 0.80 m (0.01 j) |
+| 5 | Perancangan Visual Diff / Revision Viewer (`diff_viewer.dart`, REQ-030) | 09:36:18 | 09:36:45 | 27 s | 0.45 m (0.01 j) |
+| 6 | Integrasi Riverpod providers, TerminalEntry, DiffEntry & event handler (`squad_pipeline_provider.dart`) | 09:36:45 | 09:39:28 | 163 s | 2.72 m (0.05 j) |
+| 7 | Penggantian 3 placeholder tabs dengan widget nyata di `workspace_panel.dart` & peremajaan status bar | 09:39:28 | 09:40:20 | 52 s | 0.87 m (0.01 j) |
+| 8 | Perancangan test case komprehensif Iterasi 6 pada `test/widget_test.dart` & persiapan handoff | 09:40:20 | 09:44:06 | 226 s | 3.77 m (0.06 j) |
+| | **Subtotal Waktu Pengembangan** | | | **672 s** | **11.20 m (0.19 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi `flutter analyze` diagnostik awal (identifikasi 2 lint/icon issue) | 09:40:23 | 09:40:53 | 30 s | 0.50 m (0.01 j) |
+| 2 | Eksekusi ulang `flutter analyze` pasca-perbaikan (0 issues found clean) | 09:41:26 | 09:41:30 | 4 s | 0.07 m (0.00 j) |
+| 3 | Eksekusi widget test suite (`flutter test`, 4 suites 100% PASS) | 09:43:42 | 09:43:50 | 8 s | 0.13 m (0.00 j) |
+| 4 | Kompilasi bundle rilis Web (`flutter build web --release`) | 09:42:17 | 09:43:48 | 91 s | 1.52 m (0.03 j) |
+| 5 | Daur ulang dan peluncuran ulang HTTP server port 8085 | 09:43:55 | 09:44:00 | 5 s | 0.08 m (0.00 j) |
+| 6 | Instalasi runtime browser headless Playwright Chromium | 09:51:08 | 09:55:30 | 262 s | 4.37 m (0.07 j) |
+| 7 | Pengujian visual Headed Interactive Testing (TC6-01 s.d. TC6-05) via Playwright | 09:55:46 | 10:00:25 | 279 s | 4.65 m (0.08 j) |
+| 8 | Analisis statis & eksekusi regression widget test pasca-perbaikan payload key | 10:14:49 | 10:15:07 | 18 s | 0.30 m (0.01 j) |
+| 9 | Kompilasi ulang web release & restart backend uvicorn + HTTP web server | 10:15:10 | 10:16:36 | 86 s | 1.43 m (0.02 j) |
+| 10 | Regression test suite pasca-pengembangan QualityReviewPanel (4/4 PASS) | 10:41:45 | 10:41:53 | 8 s | 0.13 m (0.00 j) |
+| 11 | Kompilasi ulang web release pasca-QualityReviewPanel & daur ulang server | 10:41:56 | 10:43:10 | 74 s | 1.23 m (0.02 j) |
+| 12 | Eksekusi regression test `flutter test` (4/4 PASS) & restart uvicorn server fresh | 10:45:45 | 10:46:15 | 30 s | 0.50 m (0.01 j) |
+| 13 | Eksekusi regression test `flutter test` pasca implementasi `loopStatusProvider` & loop visualizer (4/4 PASS) | 11:43:24 | 11:43:32 | 8 s | 0.13 m (0.00 j) |
+| 14 | Kompilasi bundle rilis Web (`flutter build web --release`) & restart uvicorn live daemon | 11:43:33 | 11:44:20 | 47 s | 0.78 m (0.01 j) |
+| 15 | Investigasi forensik log proyek `project_20260908_115007` & verifikasi reproduksi sandbox Flutter test (100% PASS) | 11:51:40 | 11:54:30 | 170 s | 2.83 m (0.05 j) |
+| 16 | Eksekusi regression test backend `pytest` (16/16 PASS) dan widget `flutter test` (4/4 PASS) pasca routing edge | 11:56:27 | 11:57:57 | 90 s | 1.50 m (0.03 j) |
+| 17 | Daur ulang dan peluncuran ulang daemon live uvicorn server port 8000 | 11:57:59 | 11:58:05 | 6 s | 0.10 m (0.00 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **1.216 s** | **20.27 m (0.34 jam)** |
+
+### Komponen 3: Waktu Perbaikan & Adaptasi (Fixing / Rework Time)
+| No | Aktivitas Perbaikan / Debugging | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Koreksi icon getter `edit_document_rounded` -> `edit_note_rounded` & fix separatorBuilder `_x` | 09:40:53 | 09:41:07 | 14 s | 0.23 m (0.00 j) |
+| 2 | Refactoring parameter lambda separatorBuilder `_x` -> `idx` (kepatuhan linter Flutter) | 09:41:07 | 09:41:26 | 19 s | 0.32 m (0.01 j) |
+| 3 | Pembersihan orphan remnant placeholder `_buildReviewTab` di `workspace_panel.dart` | 09:40:05 | 09:40:09 | 4 s | 0.07 m (0.00 j) |
+| 4 | Investigasi & perbaikan key mismatch payload (`output` vs `stdout`) & parsing boolean/num `passed` (Intervensi #42) | 10:11:45 | 10:16:30 | 285 s | 4.75 m (0.08 j) |
+| 5 | Perancangan `QualityReviewPanel`, isolasi stat chip terminal, normalisasi relative import Python, & penutup sesi misi (Intervensi #43) | 10:28:30 | 10:43:10 | 880 s | 14.67 m (0.24 j) |
+| 6 | Resolusi Python UnboundLocalError variabel `is_dart` pada root scope `run_sandbox_tests` di `backend/executor.py` dan verifikasi subproses eksekusi pengujian | 10:44:00 | 10:45:40 | 100 s | 1.67 m (0.03 j) |
+| 7 | Investigasi & perbaikan format tabel Markdown GFM `requirement_traceability_matrix.md` serta audit otomatis seluruh berkas dokumentasi (Intervensi #44) | 10:50:35 | 10:53:30 | 175 s | 2.92 m (0.05 j) |
+| 8 | Eliminasi kontradiksi status rilis vs review di seluruh UI (Terminal, Quality Tab, ThoughtStream, Status Bar), perbaikan package name auto-alignment Dart di `executor.py`, penanganan overflow status bar, dan re-kompilasi release web (Intervensi #45) | 10:56:39 | 11:06:00 | 560 s | 9.33 m (0.16 j) |
+| 9 | Investigasi anomali review notes 'kode python dalam file dart', eliminasi cross-language negative priming pada prompt agen (`reviewer.py`, `developer.py`, `tester.py`), penambahan panduan StateNotifierProvider & `testWidgets`, serta restart daemon backend (Intervensi #46) | 11:20:29 | 11:24:30 | 241 s | 4.02 m (0.07 j) |
+| 10 | Implementasi 4 penyempurnaan krusial: ekspansi token Reviewer (`num_predict: 1000`), penegasan handoff bersyarat QA-Reviewer & event `loop_status`, prompt evidence-based review [NEEDS_REVISION] dengan kutipan galat aktual, `loopStatusProvider` Riverpod, dan visualisasi loop dinamis pada Status Bar, Topology Header, dan Tab Quality Review (Intervensi #47) | 11:38:30 | 11:43:20 | 290 s | 4.83 m (0.08 j) |
+| 11 | Implementasi conditional edge `route_after_developer` di `backend/graph.py`, penyelarasan event server di `server.py`, sanitasi import Dart (`lib/lib/...` fix) & auto-link sibling files di `executor.py`, serta standardisasi Riverpod 3 di prompt agen (Intervensi #48) | 11:54:30 | 11:57:40 | 190 s | 3.17 m (0.05 j) |
+| | **Subtotal Waktu Perbaikan** | | | **2.758 s** | **45.97 m (0.77 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Iterasi 6:
+\mathbf{\text{Total Waktu Realisasi} = 672\text{ s (Dev)} + 1.216\text{ s (Test)} + 2.758\text{ s (Fix)} = 4.646\text{ detik} \approx 77\text{ menit } 26\text{ detik} (1.29\text{ jam})}
+- **Waktu Mulai Eksekusi Iterasi 6:** 2026-09-08 09:32:54 WIB
+- **Waktu Penyelesaian Pasca-Perbaikan:** 2026-09-08 11:58:05 WIB
+- **Total Waktu Realisasi IIDD:** **4.646 detik (~77 menit 26 detik / 1.29 jam)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RISET, EKSPERIMEN & INVESTIGASI FORENSIK (Evaluasi Executor Multi-Mode & Frozen Oracle) — 2026-09-08
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur & Eksperimen | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Perancangan & scaffolding artefak Frozen Oracle FastAPI T1 (`test_main.py`, `metadata.json`, `checksums.sha256`) | 22:30:00 | 22:38:00 | 480 s | 8.00 m (0.13 j) |
+| 2 | Integrasi schema `frozen_oracle_path` pada `backend/state.py` dan request payload `backend/server.py` | 22:38:00 | 22:42:30 | 270 s | 4.50 m (0.08 j) |
+| 3 | Implementasi `frozen_oracle_node` multi-file loader deterministik & routing conditional edge di `backend/graph.py` | 22:42:30 | 22:50:15 | 465 s | 7.75 m (0.13 j) |
+| 4 | Penyusunan test suite verifikasi `backend/test_frozen_oracle.py` (33 unit tests backend) | 22:50:15 | 22:54:00 | 225 s | 3.75 m (0.06 j) |
+| 5 | Pengembangan script automasi forensik & analisis matriks eksperimen di scratch directory | 14:00:00 | 15:06:00 | 3.960 s | 66.00 m (1.10 j) |
+| | **Subtotal Waktu Pengembangan** | | | **5.400 s** | **90.00 m (1.50 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi regresi unit test backend `pytest backend/` pasca Frozen Oracle (33/33 PASS) | 22:54:00 | 22:55:30 | 90 s | 1.50 m (0.03 j) |
+| 2 | Eksekusi single run verifikasi E2E Frozen Oracle (`project_20260908_225625`) | 22:56:00 | 22:59:00 | 180 s | 3.00 m (0.05 j) |
+| 3 | Eksekusi Replikasi 2 Mode CODE_ONLY (3 Preset: FastAPI, Flutter, CLI) | 15:10:00 | 16:20:00 | 4.200 s | 70.00 m (1.17 j) |
+| 4 | Eksekusi Pengujian Lanjutan 9-Run Matrix (3 Preset x 3 Mode: ON, CODE_ONLY, OFF) oleh IA | 23:00:00 | 23:34:00 | 2.040 s | 34.00 m (0.57 j) |
+| 5 | Eksekusi pengujian replikasi & benchmark komparatif komputasi lokal sebelumnya | 16:30:00 | 18:42:00 | 7.520 s | 125.33 m (2.09 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **14.030 s** | **233.83 m (3.90 jam)** |
+
+### Komponen 3: Waktu Perbaikan, Forensik & Dokumentasi Riset (Fixing / Investigation Time)
+| No | Aktivitas Perbaikan, Investigasi Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi forensik replikasi kedua CODE_ONLY vs Set 1, 2, 3 (`experiment_code_only_replication2_investigation.md`) | 18:45:00 | 20:30:00 | 6.300 s | 105.00 m (1.75 j) |
+| 2 | Perumusan metodologi confounding factor QA Tester, desain arsitektur Frozen Oracle, & Bab 11 catatan riset | 20:30:00 | 22:30:00 | 7.200 s | 120.00 m (2.00 j) |
+| 3 | Pemantauan live pengujian 9-run matrix, inspeksi log, verifikasi integritas run trace & SHA-256 hash | 23:20:00 | 23:34:00 | 840 s | 14.00 m (0.23 j) |
+| 4 | Penyusunan laporan analisis forensik komprehensif 12 bab (`experiments/executor_comparison_forensic_analysis.md`) | 23:34:00 | 23:38:30 | 270 s | 4.50 m (0.08 j) |
+| 5 | Investigasi komparasi cross-preset, ekstraksi diffs, dan perumusan rekomendasi perbaikan studio | 21:00:00 | 23:00:46 | 8.046 s | 134.10 m (2.23 j) |
+| | **Subtotal Waktu Perbaikan & Investigasi** | | | **22.656 s** | **377.60 m (6.29 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Riset & Eksperimen:
+\mathbf{\text{Total Waktu Realisasi} = 5.400\text{ s (Dev)} + 14.030\text{ s (Test)} + 22.656\text{ s (Fix/Investigasi)} = 42.086\text{ detik} \approx 11\text{ jam } 41\text{ menit } 26\text{ detik} (11.69\text{ jam})}
+- **Waktu Mulai Sesi Riset & Eksperimen:** 2026-09-08 11:58:05 WIB (Pasca Iterasi 6)
+- **Waktu Sesi Berakhir (Istirahat IA):** 2026-09-08 23:39:31 WIB
+- **Total Rentang Waktu Aktual:** **11 jam 41 menit 26 detik (~11.69 jam)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+
+
+
+
+

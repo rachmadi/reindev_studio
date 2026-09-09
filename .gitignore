@@ -38,3 +38,6 @@ desktop.ini
 backend/output/*
 !backend/output/.gitkeep
 backend/sandbox/
+output/
+backend/scratch_*.json
+

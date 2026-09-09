@@ -99,3 +99,33 @@ class IsDeployingNotifier extends Notifier<bool> {
 
 final isDeployingProvider =
     NotifierProvider<IsDeployingNotifier, bool>(IsDeployingNotifier.new);
+
+class ExecutorInterventionNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void setIntervention(bool enabled) {
+    state = enabled;
+    ref.read(executorModeProvider.notifier).state = enabled ? "ON" : "OFF";
+  }
+
+  void toggle() => setIntervention(!state);
+}
+
+final executorInterventionProvider =
+    NotifierProvider<ExecutorInterventionNotifier, bool>(
+        ExecutorInterventionNotifier.new);
+
+class ExecutorModeNotifier extends Notifier<String> {
+  @override
+  String build() => "ON";
+
+  void setMode(String mode) {
+    final upper = mode.toUpperCase();
+    state = upper;
+    ref.read(executorInterventionProvider.notifier).state = (upper != "OFF");
+  }
+}
+
+final executorModeProvider =
+    NotifierProvider<ExecutorModeNotifier, String>(ExecutorModeNotifier.new);

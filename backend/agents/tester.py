@@ -4,10 +4,16 @@ try:
     from ..state import SquadState
     from ..config import get_llm
     from .developer import clean_code_content, parse_code_blocks
+    from ..tracer import get_tracer, compute_dict_hashes
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
     from agents.developer import clean_code_content, parse_code_blocks
+    try:
+        from tracer import get_tracer, compute_dict_hashes
+    except ImportError:
+        def get_tracer(run_id=None): return None
+        def compute_dict_hashes(f): return {}
 
 TESTER_SYSTEM_PROMPT = """Anda adalah Senior QA & Test Engineer dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah merancang dan menulis automated test suite berdasarkan spesifikasi dari Product Manager dan kode yang telah ditulis oleh Developer.
@@ -44,6 +50,30 @@ void main() {
   });
 }
 === END FILE ===
+
+Contoh Flutter Widget Test (flutter_test):
+=== FILE: test/widget_test.dart ===
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../lib/metrics_card.dart';
+
+void main() {
+  testWidgets('renders widget properly', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: MetricsCard(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MetricsCard), findsOneWidget);
+  });
+}
+=== END FILE ===
 """
 
 def tester_agent(state: SquadState) -> dict:
@@ -61,16 +91,33 @@ def tester_agent(state: SquadState) -> dict:
     code_context = "\n".join(code_summary) if code_summary else "(Belum ada file kode)"
     
     test_instruction = (
-        "ATURAN DART UNIT TEST (WAJIB):\n"
-        "- Gunakan framework package:test: `import 'package:test/test.dart';`\n"
-        "- Import file implementasi menggunakan relative import, contoh: `import '../lib/calculator.dart';`\n"
-        "- Fungsi pengujian dalam `void main() { group('...', () { test('...', () { expect(actual, equals(expected)); }); }); }`\n"
-        "- Simpan di folder test/ dengan akhiran _test.dart (contoh: === FILE: test/calculator_test.dart ===).\n"
-        "- DILARANG KERAS menggunakan sintaks Python (pytest, def, assert, test_*.py)!"
+        "ATURAN DART / FLUTTER TEST (WAJIB):\n"
+        "- Buat HANYA 1 unit test case widget komprehensif yang menguji bahwa widget dirender dengan benar dalam ProviderScope (maksimal 30-40 baris)!\n"
+        "- DILARANG membuat lebih dari 1 test case!\n"
+        "- DILARANG melakukan mutasi state seperti 'provider.state = ...' di dalam test! Fokus murni pada verifikasi rendering widget dan keberadaan teks/komponen UI.\n"
+        "- Gunakan format:\n"
+        "  testWidgets('renders widget properly', (WidgetTester tester) async {\n"
+        "    await tester.pumpWidget(ProviderScope(child: MaterialApp(home: Scaffold(body: MyWidget()))));\n"
+        "    await tester.pumpAndSettle();\n"
+        "    expect(find.byType(MyWidget), findsOneWidget);\n"
+        "  });\n"
+        "- Gunakan import relatif ke file implementasi di lib/, contoh: `import '../lib/card_metric.dart';`.\n"
+        "- DILARANG menggunakan mockito, DILARANG membuat class Mock, DILARANG menggunakan when()!\n"
+        "- Verifikasi menggunakan matcher Flutter standar (contoh: find.byType(...), findsOneWidget, find.text(...)).\n"
+        "- Hindari mengakses properti internal style spesifik (seperti card.color atau card.elevation) secara rapuh.\n"
+        "- Simpan di folder test/ dengan akhiran _test.dart (contoh: === FILE: test/card_metric_test.dart ===)."
         if is_dart else
         "ATURAN PYTHON TEST (WAJIB):\n"
         "- Gunakan framework pytest: `import pytest`\n"
-        "- Simpan dengan nama file test_*.py."
+        "- Uji fungsi-fungsi yang telah diimplementasikan oleh Developer di atas sesuai signature dan tipe datanya.\n"
+        "- Untuk FastAPI: gunakan TestClient dari fastapi.testclient (`from fastapi.testclient import TestClient`, `client = TestClient(app)`). DILARANG menggunakan `app.test_client()` (itu sintaks Flask)!\n"
+        "- Gunakan import absolut dari root modul (contoh: `from main import app`, `from services.product_service import ProductService`).\n"
+        "- DILARANG KERAS menggunakan relative import bertitik ganda (`from ..main`) karena memicu ImportError pada pytest!\n"
+        "- DILARANG mengimpor built-in exception (seperti ValueError, TypeError) dari modul Developer; built-in exception sudah otomatis tersedia secara global di Python.\n"
+        "- DILARANG menguji string pesan error exception secara kaku dengan `assert str(exc_info.value) == '...'`; cukup pastikan exception terlempar (`pytest.raises(...)`). Untuk SystemExit, periksa `exc_info.value.code == 1`.\n"
+        "- Validasi logika input test: Jika menguji exception galat dimensi matriks tidak kompatibel (misal perkalian matriks), pastikan dimensi benar-benar tidak kompatibel (misal cols(A) != rows(B)).\n"
+        "- Untuk modul CLI/Matrix: uji fungsi dan method kalkulasi secara langsung (misal: matrix.add(), matrix.multiply(), parse_matrix()); hindari memanggil fungsi main() dengan argv langsung.\n"
+        "- Simpan dengan nama file test_*.py di root direktori."
     )
     
     prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
@@ -115,6 +162,28 @@ Silakan tulis automated unit test suite lengkap sesuai aturan di atas dalam form
     new_log = f"[QA Tester]: Berhasil menyusun {len(formatted_test_files)} file unit test ({target_lang.upper()}): {file_list_str}."
     current_logs = state.get("logs", [])
     
+    # Observability Trace Logging
+    iteration = state.get("iteration_count", 0)
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="tester",
+            event_type="output",
+            iteration=iteration,
+            data={
+                "input_state": {
+                    "target_language": target_lang,
+                    "iteration": iteration,
+                    "has_specifications": bool(specs),
+                    "code_files_keys": list(code_files.keys())
+                },
+                "raw_output": raw_output,
+                "test_files": formatted_test_files,
+                "test_files_hashes": compute_dict_hashes(formatted_test_files),
+                "iteration": iteration
+            }
+        )
+
     return {
         "test_files": formatted_test_files,
         "status": "tester_done",

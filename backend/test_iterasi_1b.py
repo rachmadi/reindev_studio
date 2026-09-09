@@ -9,7 +9,7 @@ from backend.agents.architect import architect_agent
 from backend.agents.tester import tester_agent as run_tester_node
 from backend.agents.reviewer import reviewer_agent
 from backend.executor import run_sandbox_tests, executor_node
-from backend.graph import route_after_executor, build_squad_graph
+from backend.graph import route_after_executor, route_after_developer, build_squad_graph
 
 # Beritahu pytest agar tidak menganggap node tester sebagai test case
 run_tester_node.__test__ = False
@@ -112,6 +112,28 @@ def test_cyclic_routing_logic():
         "max_iterations": 3
     }
     assert route_after_executor(failed_state_maxed) == "reviewer"
+
+    # Skenario 4: Route after developer pada loop 0 -> Menuju ke QA Tester
+    dev_state_initial: SquadState = {
+        "iteration_count": 0,
+        "test_files": {}
+    }
+    assert route_after_developer(dev_state_initial) == "tester"
+
+    # Skenario 5: Route after developer pada loop perbaikan (iteration > 0) -> Menuju ke Executor langsung (tanpa re-generate QA test)
+    dev_state_retry: SquadState = {
+        "iteration_count": 1,
+        "test_files": {"test_calc.py": "def test(): pass"}
+    }
+    assert route_after_developer(dev_state_retry) == "executor"
+
+    # Skenario 6: Route after developer saat tests_need_update = True -> Menuju ke QA Tester
+    dev_state_update_needed: SquadState = {
+        "iteration_count": 1,
+        "test_files": {"test_calc.py": "def test(): pass"},
+        "tests_need_update": True
+    }
+    assert route_after_developer(dev_state_update_needed) == "tester"
 
 def test_reviewer_agent():
     state: SquadState = {

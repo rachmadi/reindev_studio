@@ -1,4 +1,4 @@
-from typing import TypedDict, Dict, List, Any
+from typing import TypedDict, Dict, List, Any, Optional
 
 class SquadState(TypedDict):
     task: str                          # Deskripsi tugas/fitur awal dari pengguna (Intent)
@@ -15,3 +15,8 @@ class SquadState(TypedDict):
     review_notes: str                  # Laporan audit dari Code Reviewer
     status: str                        # Status alur kerja
     logs: List[str]                    # Catatan kronologis pemikiran dan aktivitas agen
+    run_id: str                        # ID unik sesi eksekusi untuk observability trace
+    output_dir: str                    # Direktori output tempat menyimpan artefak & trace
+    executor_intervention_enabled: bool  # Mode eksperimen: apakah Executor mengintervensi/auto-heal artefak (default: True)
+    executor_mode: str                 # Mode eksperimen: "ON", "OFF", atau "CODE_ONLY" (default: "ON")
+    frozen_oracle_path: Optional[str]  # Path direktori frozen oracle (jika diset, bypass Tester LLM dan load test suite statis)

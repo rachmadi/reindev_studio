@@ -117,10 +117,56 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 ---
 
 ## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 6: Code Explorer & Sandbox Terminal — 2026-09-08
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Interactive File Tree Explorer (`file_explorer.dart`, REQ-027) | 1.5 | 0.05 | 3.0 m | -1.45 | Parsing path direktori, ikon per ekstensi bahasa, seleksi node |
+| Syntax-Highlighted Code Canvas (`code_viewer.dart`, REQ-028) | 2.0 | 0.06 | 3.5 m | -1.94 | `flutter_highlight` atom-one, line number gutter, Copy Code |
+| Console Sandbox Terminal (`terminal_view.dart`, REQ-029) | 2.0 | 0.06 | 3.8 m | -1.94 | Monospace hitam, coloring pass/fail/warn, stat chip, autoscroll |
+| Visual Diff / Revision Viewer (`diff_viewer.dart`, REQ-030) | 1.5 | 0.05 | 2.8 m | -1.45 | Unified diff line-by-line, chunk collapsing, iterasi badge |
+| QualityReviewPanel, Status Sync & Prompt De-biasing (Intervensi #43–#46) | — | 0.58 | 34.6 m | — | Termasuk re-kompilasi web & uvicorn restarts |
+| Dynamic Loop Visualizer, Token Predict Expansion & Evidence-Based Review (Intervensi #47) | — | 0.09 | 5.7 m | — | Termasuk `loopStatusProvider`, re-kompilasi web & restart server |
+| Conditional Graph Routing, Forensik 3 Loops & Import/Riverpod Sanitization (Intervensi #48) | — | 0.13 | 7.6 m | — | Termasuk `route_after_developer`, sanitasi Dart import, verifikasi pytest 16/16 & flutter test |
+| **Total Iterasi 6** | **7.0** | **1.29** | **77.4 m** | **-5.71** | **5.4x lebih cepat** |
+
+*Rincian Formula Iterasi 6 (Timestamp 2026-09-08 09:32:54 s.d. 11:58:05 WIB):*
+- Waktu Pengembangan Awal (Dev): 672 detik (11.20 menit / 0.19 jam)
+- Total Waktu Pengujian & Uji Ulang (Test): 1.216 detik (20.27 menit / 0.34 jam)
+- Total Waktu Perbaikan & Adaptasi (Fix): 2.758 detik (45.97 menit / 0.77 jam)
+- **TOTAL WAKTU REALISASI ITERASI 6:** **4.646 detik (~77 menit 26 detik / 1.29 jam)**
+- Status Validasi Intent Architect: **⏳ PENDING EVALUATION IA (Siap Diuji di http://localhost:8085/)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## RISET & EKSPERIMEN: Evaluasi Executor Multi-Mode & Frozen Oracle — 2026-09-08
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Eksperimen | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Arsitektur Frozen Oracle & Injeksi Test Deterministik | — | 1.50 | 90.0 m | — | Scaffolding test artifact T1, schema state, routing edge graph & unit test backend |
+| Eksekusi Replikasi CODE_ONLY & Benchmark Multi-Run | — | 2.10 | 126.0 m | — | Eksekusi replikasi 2, validasi hash immutability, perbandingan dengan Set 1 & Set 2 |
+| Eksekusi 9-Run Matrix (3 Preset x 3 Mode: ON, CODE_ONLY, OFF) | — | 1.80 | 108.0 m | — | Verifikasi empiris dampak intervensi executor pada kondisi live model lokal 7B |
+| Investigasi Forensik Replikasi 2 & Matriks Set 1–3 | — | 2.50 | 150.0 m | — | Identifikasi confounding factor QA Tester vs code auto-healing pada 15 runs |
+| Forensic Analysis 9-Run Matrix & Laporan Komparatif 12 Bab | — | 3.79 | 227.4 m | — | Kompilasi `executor_comparison_forensic_analysis.md`, pembuktian kausalitas, & rekomendasi |
+| **Total Sesi Riset & Eksperimen** | **—** | **11.69** | **701.4 m** | **—** | **Studi komprehensif multi-mode & frozen oracle** |
+
+*Rincian Formula Sesi Riset & Eksperimen (Timestamp 2026-09-08 11:58:05 s.d. 23:39:31 WIB):*
+- Waktu Pengembangan Awal (Dev): 5.400 detik (90.00 menit / 1.50 jam)
+- Total Waktu Pengujian & Uji Ulang (Test): 14.030 detik (233.83 menit / 3.90 jam)
+- Total Waktu Perbaikan, Forensik & Dokumentasi (Fix): 22.656 detik (377.60 menit / 6.29 jam)
+- **TOTAL WAKTU REALISASI SESI RISET:** **42.086 detik (~11 jam 41 menit 26 detik / 11.69 jam)**
+- Status: **✅ SELESAI & DIVERIFIKASI (Sesi Ditutup untuk Istirahat IA)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
 ## Ringkasan Kumulatif Proyek
 ## ═══════════════════════════════════════════════════════════════════════════
 
-| Iterasi | Nama Iterasi | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Rasio Efisiensi |
+| Iterasi / Fase | Nama Iterasi / Aktivitas | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Rasio Efisiensi |
 |---|---|---|---|---|---|---|
 | **1a** | Core Multi-Agent State & Agents (PM, Dev) | 6.5 | 0.13 | 8.0 m | -6.37 | 48.8x |
 | **1b** | Squad Pipeline & Self-Healing Cyclic Loop | 7.5 | 0.53 | 32.1 m | -6.97 | 14.2x |
@@ -128,7 +174,15 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **3** | Flutter UI Shell & MD3 Theming | 6.5 | 0.12 | 7.3 m | -6.38 | 53.3x |
 | **4** | Mission Control Hub & Engine Switcher | 5.5 | 0.17 | 10.0 m | -5.33 | 32.4x |
 | **5** | Agent Pipeline Visualization & Stream | 7.0 | 0.83 | 50.0 m | -6.17 | 8.4x |
-| 6 | Code Explorer & Sandbox Terminal | 7.0 | — | — | — | — |
+| **6** | Code Explorer & Sandbox Terminal | 7.0 | 1.29 | 77.4 m | -5.71 | 5.4x |
+| **Riset** | Riset & Eksperimen Executor Multi-Mode & Frozen Oracle | — | 11.69 | 701.4 m | — | Studi Empiris (11.69 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
-| **TOTAL** | **Kumulatif Selesai (1a + 1b + 2 + 3 + 4 + 5)** | **39.0** | **1.97** | **118.5 m** | **-37.03** | **19.8x lebih cepat** |
+| **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset/Eksperimen s.d. Sesi Ini)** | **46.0** | **14.95** | **897.4 m** | **-31.05** | **Termasuk 11.69 jam riset mendalam** |
+
+
+
+
+
+
 

@@ -117,6 +117,8 @@ class WebSocketService {
     required String modelName,
     required String targetLanguage,
     required int maxIterations,
+    bool executorInterventionEnabled = true,
+    String executorMode = "ON",
   }) {
     final payload = {
       'action': 'start_squad',
@@ -125,6 +127,8 @@ class WebSocketService {
       'model_name': modelName,
       'target_language': targetLanguage,
       'max_iterations': maxIterations,
+      'executor_intervention_enabled': executorInterventionEnabled,
+      'executor_mode': executorMode,
     };
 
     final sent = send(payload);

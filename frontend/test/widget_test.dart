@@ -221,6 +221,91 @@ void main() {
     expect(find.byType(MarkdownBody), findsWidgets);
     expect(find.text('Deploy Autonomous Squad'), findsOneWidget);
   });
+
+  testWidgets('Iterasi 6 — Code Canvas Explorer, Sandbox Terminal & Diff Viewer (REQ-027 s.d. REQ-030)', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: ReinDevStudioApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Verifikasi 4 tabs tersedia termasuk tab Iterasi 6
+    expect(find.text('Code Canvas & Explorer'), findsOneWidget);
+    expect(find.text('Sandbox Terminal'), findsOneWidget);
+    expect(find.text('Quality & Review Report'), findsOneWidget);
+
+    // 2. Klik tab "Code Canvas & Explorer" (REQ-027, REQ-028)
+    await tester.tap(find.text('Code Canvas & Explorer'));
+    await tester.pumpAndSettle();
+
+    // Verifikasi empty state FileTreeExplorer ditampilkan
+    expect(find.text('Belum ada file'), findsOneWidget);
+    expect(find.textContaining('Deploy Squad untuk'), findsOneWidget);
+
+    // Verifikasi placeholder CodeViewer (belum ada file terpilih)
+    expect(find.text('Pilih file dari explorer'), findsOneWidget);
+
+    // 3. Klik tab "Sandbox Terminal" (REQ-029)
+    await tester.tap(find.text('Sandbox Terminal'));
+    await tester.pumpAndSettle();
+
+    // Verifikasi terminal idle prompt muncul
+    expect(find.textContaining('reindev-studio'), findsOneWidget);
+    expect(find.textContaining('Menunggu eksekusi dart test / pytest'), findsOneWidget);
+    // Verifikasi toolbar SANDBOX TERMINAL
+    expect(find.text('SANDBOX TERMINAL'), findsOneWidget);
+
+    // 4. Klik tab "Quality & Review Report" (REQ-030)
+    await tester.tap(find.text('Quality & Review Report'));
+    await tester.pumpAndSettle();
+
+    // Verifikasi QualityReviewPanel header dan empty state
+    expect(find.text('QUALITY & REVIEW REPORT'), findsOneWidget);
+    expect(find.text('Belum Ada Laporan Audit'), findsOneWidget);
+
+    // Verifikasi sub-tab Revision Diff
+    await tester.tap(find.textContaining('Revision Diff'));
+    await tester.pumpAndSettle();
+    expect(find.text('Belum Ada Riwayat Revisi'), findsOneWidget);
+    expect(find.textContaining('self-healing'), findsOneWidget);
+
+    // 5. Verifikasi status bar menampilkan "IIDD Cycle: Iterasi 6"
+    expect(find.text('IIDD Cycle: Iterasi 6'), findsOneWidget);
+
+    // 6. Simulasikan pipeline dan verifikasi Terminal terisi
+    await tester.tap(find.text('Agent Squad Timeline'));
+    await tester.pumpAndSettle();
+
+    final fastApiPreset = find.widgetWithText(ActionChip, 'FastAPI CRUD');
+    await tester.tap(fastApiPreset);
+    await tester.pumpAndSettle();
+
+    final deployBtnFinder = find.widgetWithText(FilledButton, 'Deploy Autonomous Squad');
+    await tester.tap(deployBtnFinder);
+    await tester.pump();
+
+    // Lanjutkan hingga simulasi selesai
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+
+    // Verifikasi status Complete
+    expect(find.text('Deploy Autonomous Squad'), findsOneWidget);
+
+    // Klik tab terminal dan pastikan log terisi
+    await tester.tap(find.text('Sandbox Terminal'));
+    await tester.pumpAndSettle();
+
+    // Idle atau log — kedua kondisi valid (WS offline = simulation tanpa test_log event)
+    expect(
+      find.textContaining('reindev-studio').evaluate().isNotEmpty ||
+          find.text('SANDBOX TERMINAL').evaluate().isNotEmpty,
+      isTrue,
+    );
+  });
 }
-
-

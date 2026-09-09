@@ -88,6 +88,8 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
     }
 
     final maxLoops = ref.read(maxQaLoopsProvider);
+    final executorIntervention = ref.read(executorInterventionProvider);
+    final executorMode = ref.read(executorModeProvider);
 
     // Memicu pipeline squad via Pipeline Coordinator (WebSocket & Responsive Stream)
     ref.read(pipelineCoordinatorProvider).deploy(
@@ -98,6 +100,8 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
           modelName: activeEngine,
           targetLanguage: targetLang,
           maxIterations: maxLoops,
+          executorInterventionEnabled: executorIntervention,
+          executorMode: executorMode,
         );
 
 
@@ -118,6 +122,8 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
     final theme = Theme.of(context);
     final maxLoops = ref.watch(maxQaLoopsProvider);
     final targetLang = ref.watch(targetLanguageProvider);
+    final executorIntervention = ref.watch(executorInterventionProvider);
+    final executorMode = ref.watch(executorModeProvider);
     final isDeploying = ref.watch(isDeployingProvider);
     final missionDuration = ref.watch(missionDurationProvider);
     final squadStatus = ref.watch(squadStatusProvider);
@@ -465,6 +471,146 @@ class _ControlPanelState extends ConsumerState<ControlPanel> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Executor Intervention Mode:",
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: executorMode == "ON"
+                                    ? const Color(0xFF10B981).withAlpha(40)
+                                    : (executorMode == "CODE_ONLY"
+                                        ? const Color(0xFF06B6D4).withAlpha(40)
+                                        : Colors.amber.withAlpha(40)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                executorMode,
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: executorMode == "ON"
+                                      ? const Color(0xFF10B981)
+                                      : (executorMode == "CODE_ONLY"
+                                          ? const Color(0xFF06B6D4)
+                                          : Colors.amber),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                padding: EdgeInsets.zero,
+                                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                avatar: Icon(
+                                  Icons.auto_fix_high_rounded,
+                                  size: 13,
+                                  color: executorMode == "ON"
+                                      ? const Color(0xFF10B981)
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                label: Center(
+                                  child: Text(
+                                    "ON",
+                                    style: GoogleFonts.inter(fontSize: 11),
+                                  ),
+                                ),
+                                selected: executorMode == "ON",
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    ref
+                                        .read(
+                                            executorModeProvider.notifier)
+                                        .setMode("ON");
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                             Expanded(
+                              child: ChoiceChip(
+                                padding: EdgeInsets.zero,
+                                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                label: Center(
+                                  child: Text(
+                                    "CODE",
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: executorMode == "CODE_ONLY"
+                                          ? const Color(0xFF06B6D4)
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                selected: executorMode == "CODE_ONLY",
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    ref
+                                        .read(
+                                            executorModeProvider.notifier)
+                                        .setMode("CODE_ONLY");
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: ChoiceChip(
+                                padding: EdgeInsets.zero,
+                                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                avatar: Icon(
+                                  Icons.block_rounded,
+                                  size: 13,
+                                  color: executorMode == "OFF"
+                                      ? Colors.amber
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                label: Center(
+                                  child: Text(
+                                    "OFF",
+                                    style: GoogleFonts.inter(fontSize: 11),
+                                  ),
+                                ),
+                                selected: executorMode == "OFF",
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    ref
+                                        .read(
+                                            executorModeProvider.notifier)
+                                        .setMode("OFF");
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          executorMode == "ON"
+                              ? "Auto-healing & intervensi code + test aktif."
+                              : (executorMode == "CODE_ONLY"
+                                  ? "Intervensi hanya pada code; test DILARANG diubah."
+                                  : "Pengujian artefak murni tanpa intervensi."),
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withAlpha(180),
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ],
                     ),

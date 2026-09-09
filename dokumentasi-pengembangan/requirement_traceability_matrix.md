@@ -1,7 +1,7 @@
 # Requirement Traceability Matrix (RTM) - ReinDev Studio
 **Metodologi:** IIDD (Iterative Intent-Driven Development) via Siklus I-CERV  
-**Status Saat Ini:** Iterasi 5 SELESAI DIIMPLEMENTASIKAN (⏳ PENDING EVALUATION IA — REQ-023 s.d. REQ-026: ⏳ Menunggu Validasi IA)  
-**Terakhir Diperbarui:** 2026-09-07
+**Status Saat Ini:** Iterasi 6 SELESAI DIIMPLEMENTASIKAN (⏳ PENDING EVALUATION IA — REQ-027 s.d. REQ-030: ⏳ Menunggu Validasi IA)  
+**Terakhir Diperbarui:** 2026-09-08
 
 ---
 
@@ -33,11 +33,10 @@
 | **REQ-024** | WebSocket Client Service (web_socket_channel) dengan Riverpod StreamProvider | 5 | ✅ Selesai | frontend/lib/services/websocket_service.dart |
 | **REQ-025** | Live Auto-scrolling Agent Thought & Discussion Stream Viewer | 5 | ✅ Selesai | frontend/lib/views/widgets/thought_stream.dart |
 | **REQ-026** | Animasi denyut visual (pulsing indicator) pada kartu agent yang sedang aktif mengeksekusi | 5 | ✅ Selesai | frontend/lib/views/widgets/agent_cards.dart |
-
-| **REQ-027** | Interactive File Tree Explorer untuk menavigasi file proyek yang di-generate | 6 | [ ] Belum Dimulai | frontend/lib/views/widgets/file_explorer.dart |
-| **REQ-028** | Syntax-Highlighted Code Canvas Viewer dengan opsi Copy Code dan info ukuran file | 6 | [ ] Belum Dimulai | frontend/lib/views/widgets/code_viewer.dart |
-| **REQ-029** | Console Sandbox Terminal (output berwarna untuk unit test passed/failed) | 6 | [ ] Belum Dimulai | frontend/lib/views/widgets/terminal_view.dart |
-| **REQ-030** | Visual Diff / Revision Viewer untuk melacak perbaikan bug yang dilakukan Dev atas feedback QA | 6 | [ ] Belum Dimulai | frontend/lib/views/widgets/diff_viewer.dart |
+| **REQ-027** | Interactive File Tree Explorer untuk menavigasi file proyek yang di-generate | 6 | ⏳ Menunggu Validasi IA | frontend/lib/views/widgets/file_explorer.dart |
+| **REQ-028** | Syntax-Highlighted Code Canvas Viewer dengan opsi Copy Code dan info ukuran file | 6 | ⏳ Menunggu Validasi IA | frontend/lib/views/widgets/code_viewer.dart |
+| **REQ-029** | Console Sandbox Terminal (output berwarna untuk unit test passed/failed) | 6 | ⏳ Menunggu Validasi IA | frontend/lib/views/widgets/terminal_view.dart |
+| **REQ-030** | Visual Diff / Revision Viewer untuk melacak perbaikan bug yang dilakukan Dev atas feedback QA | 6 | ⏳ Menunggu Validasi IA | frontend/lib/views/widgets/diff_viewer.dart |
 | **REQ-031** | Aksi Desktop Native: Buka Folder di Windows Explorer via Process.run(explorer.exe) | 7 | [ ] Belum Dimulai | frontend/lib/services/desktop_service.dart |
 | **REQ-032** | Aksi Desktop Native: Buka di VS Code / Antigravity via Process.run(code) | 7 | [ ] Belum Dimulai | frontend/lib/services/desktop_service.dart |
 | **REQ-033** | Fitur Export Project Bundle ke dalam arsip ZIP siap pakai | 7 | [ ] Belum Dimulai | backend/services/exporter.py |
