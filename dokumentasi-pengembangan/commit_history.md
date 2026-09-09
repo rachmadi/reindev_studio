@@ -115,3 +115,27 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Kepatuhan Protokol IIDD:** 100% patuh tata kelola rilis (Release Gate dibuka, dikomit dan dipush hanya setelah status PASS diberikan secara eksplisit oleh IA).
 
 
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## EKSPERIMEN TERKONTROL (Phase 0, Phase 1, Phase 2) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Commit Sementara / Interim (Persetujuan Khusus IA — Status PENDING)
+- **Commit Hash:** c444085 -> 5952f8d -> 151175a -> 4aee902
+- **Status:** TERDORONG KE REMOTE DENGAN STATUS VALIDASI MENUNGGU (PENDING VALIDATION)
+- **Pesan Commit Utama:** docs: complete Phase 2 Main Controlled Experiment report and audit (status pending validation)
+- **Waktu Eksekusi:** 2026-09-09 10:24 WIB
+- **Total Waktu Realisasi Sesi 2026-09-09:** 15.860 detik (~4 jam 24 menit 20 detik / 4.41 jam)
+- **Cakupan Berkas:**
+  - dokumentasi-pengembangan/experiments/executor_phase2_main_experiment.md
+  - dokumentasi-pengembangan/conversation_log.md
+  - dokumentasi-pengembangan/catatan_riset_pengujian_preset.md
+  - dokumentasi-pengembangan/decision_log.md
+  - dokumentasi-pengembangan/error_log.md
+  - dokumentasi-pengembangan/human_intervention.md
+  - dokumentasi-pengembangan/durasi_per_fitur.md
+  - dokumentasi-pengembangan/waktu_estimasi_vs_realisasi.md
+  - dokumentasi-pengembangan/validation_log.md
+- **Kepatuhan Protokol IIDD:** Commit interim dieksekusi atas izin eksplisit Intent Architect untuk mengamankan artefak eksperimen 30 run; status validasi resmi tetap terkunci pada MENUNGGU (PENDING VALIDATION).

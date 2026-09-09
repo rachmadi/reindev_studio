@@ -264,3 +264,30 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   2. Menahan seluruh perubahan kode, prompt, dan konfigurasi (*read-only mode*).
   3. Menginstruksikan rekonstruksi trace lengkap dan audit forensik lapisan kegagalan sebelum menyusun rencana perbaikan komprehensif.
 
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## EKSPERIMEN TERKONTROL (Phase 0, Phase 1, Phase 2) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Micro Loop Agen)
+- **Phase 0 (Frozen Oracle Validation):**
+  - SHA-256 ketiga test suite beku tervalidasi 100% identik dengan ground truth.
+  - Hasil audit referensi: FastAPI T1 (5/5 PASS), CLI T1 (5/5 PASS), Flutter T1 (2/2 PASS).
+- **Phase 1 (Controlled Pilot 9 Runs):**
+  - Mengonfirmasi temuan mutasi test suite pada mode ON (Oracle Dilution).
+  - Mengeliminasi mode ON dari eksperimen lanjutan demi menjaga validitas ilmiah.
+- **Phase 2 (Main Controlled Experiment 30 Runs):**
+  - 30 run selesai tuntas (3 tasks × 2 modes × 5 replications).
+  - Integritas Frozen Oracle lolos audit 100% (0 pelanggaran kriptografis).
+  - Mode OFF: 5/15 PASS (33.3%) — membuktikan kapabilitas *autonomous self-healing* Developer LLM pada 4 kasus.
+  - Mode CODE_ONLY: 4/15 PASS (26.7%) — membuktikan peran Executor sebagai *zero-shot syntax polyfill* di iterasi 0 dan ketiadaan kapabilitas perbaikan logika multi-iterasi (0 kasus).
+  - Stagnasi persisten: 21/30 run (70.0%) gagal akibat batas 3 iterasi.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (PENDING VALIDATION BY INTENT ARCHITECT)
+- **Waktu Laporan:** 2026-09-09 10:32 WIB
+- **Pelaksana Eksperimen:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu penelaahan hasil audit dokumentasi-pengembangan/experiments/executor_phase2_main_experiment.md dan arahan strategis IA untuk perbaikan squad ReinDev Studio.

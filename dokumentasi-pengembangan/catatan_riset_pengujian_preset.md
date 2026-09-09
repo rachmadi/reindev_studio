@@ -557,17 +557,53 @@ Pemeriksaan forensik terhadap log trace membuktikan kepatuhan 100% terhadap selu
 
 ---
 
-### E. Status & Tahapan Pengujian Lanjutan
+#### E. Status & Tahapan Pengujian Lanjutan
 
 Harness pengujian Frozen Oracle telah berhasil dibangun, diverifikasi, dan dikunci (*locked and forensically validated*).
 
-Saat ini **pengujian lanjutan sedang berlangsung** untuk mengeksekusi matriks perbandingan tiga kondisi perlakuan terhadap test suite beku yang identik:
-1. **Kondisi 1: Executor OFF** — Menguji performa murni sintesis Developer tanpa intervensi perbaikan kode maupun test (`total_transformations = 0`).
-2. **Kondisi 2: Executor CODE_ONLY** — Menguji kontribusi intervensi perbaikan kode implementasi saja (`main.py`) dengan test suite tetap beku dan immutable (`test_transformations = 0`).
-3. **Kondisi 3: Executor ON** — Menguji intervensi penuh (perbaikan kode implementasi dan penyesuaian test jika ada).
+---
 
-Hasil komparatif dari ketiga kondisi perlakuan ini akan menjadi bukti empiris penentu (*definitive empirical evidence*) untuk mengukur efektivitas intervensi Executor secara objektif tanpa bias variasi orakel pengujian.
+## 12. Hasil & Temuan Eksperimen Terkontrol Tiga Fase (Phase 0, Phase 1, Phase 2) — 2026-09-09
 
+Menindaklanjuti temuan bias orakel dan intervensi semu, Intent Architect menetapkan *Research Experiment Protocol v1* dengan pendekatan multi-fase menggunakan tiga Frozen Oracle independen:
+- **FastAPI T1:** SHA-256 `a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63`
+- **CLI T1:** SHA-256 `0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124`
+- **Flutter T1:** SHA-256 `4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528`
 
+### A. Phase 0 — Validasi Kriptografis & Fungsional Frozen Oracle
+- Seluruh ketiga suite pengujian beku diaudit terhadap implementasi referensi dan diverifikasi lulus 100% tanpa cacat logika maupun ambiguitas assertion.
+- Berkas acuan `checksums.sha256` dan `metadata.json` dikunci permanen di direktori `dokumentasi-pengembangan/experiments/frozen_oracle/`.
 
+### B. Phase 1 — Controlled Pilot (9-Run Matrix: 3 Task × 3 Mode [OFF, CODE_ONLY, ON])
+- **Temuan Kritis Mode ON (Oracle Dilution):**
+  - Pada Mode `ON`, Executor memodifikasi test suite secara agresif (`test_before_hash != test_after_hash`), merelaksasi assertion dari `== 201` menjadi `in (200, 201, 400)`, serta menghapus assertion kunci pada Flutter.
+  - Mode `ON` terbukti secara ilmiah **merusak validitas eksperimen** karena mengubah ground truth evaluasi secara sepihak (*moving the goalposts*).
+- **Keputusan Protokol:** Mode `ON` resmi **dieliminasi secara permanen** dari pengujian utama (Phase 2). Eksperimen utama difokuskan secara murni pada perbandingan **OFF vs CODE_ONLY**.
 
+### C. Phase 2 — Main Controlled Experiment (30-Run Matrix: 3 Task × 2 Mode × 5 Replikasi)
+Seluruh 30 run dieksekusi secara berurutan pada 9 September 2026 menggunakan model `qwen2.5-coder:7b` (Ollama) dengan batas `max_iterations = 3` dan isolasi tester penuh (`tester_events == 0`).
+
+#### 1. Matriks Hasil Kuantitatif
+| Task | Mode | Runs | Test Passed | Pass Rate | Reviewer Approved | Avg Iterations | Avg Duration (s) | Total Txs |
+|---|---|---|---|---|---|---|---|---|
+| **FastAPI T1** | **OFF** | 5 | 2 | **40.0%** | 2 | 2.20 | 127.2 | 0 |
+| **FastAPI T1** | **CODE_ONLY** | 5 | 1 | **20.0%** | 1 | 2.40 | 125.3 | 11 |
+| **CLI T1** | **OFF** | 5 | 0 | **0.0%** | 1 | 3.00 | 206.5 | 0 |
+| **CLI T1** | **CODE_ONLY** | 5 | 2 | **40.0%** | 2 | 1.80 | 159.6 | 5 |
+| **Flutter T1** | **OFF** | 5 | 3 | **60.0%** | 2 | 2.40 | 185.2 | 0 |
+| **Flutter T1** | **CODE_ONLY** | 5 | 1 | **20.0%** | 1 | 2.40 | 658.5* | 8 |
+| **TOTAL** | **OFF** | 15 | 5 | **33.3%** | 5 | 2.53 | 173.0 | 0 |
+| **TOTAL** | **CODE_ONLY** | 15 | 4 | **26.7%** | 4 | 2.20 | 314.5 | 24 |
+| **KESELURUHAN**| **ALL** | 30 | 9 | **30.0%** | 9 | 2.37 | 243.7 | 24 |
+
+*\* Catatan: Durasi Flutter CODE_ONLY terdistorsi oleh latency Ollama socket freeze pada Run 28 (2582.3s).*
+
+#### 2. Empat Temuan Kausal Utama (Causal Attribution):
+1. **Autonomous Developer Self-Healing (13.3% / 4 kasus):**
+   Developer LLM (`qwen2.5-coder:7b`) terbukti memiliki kemampuan self-healing sejati di bawah Mode OFF (Run 7 FastAPI, Run 23, 25, dan 29 Flutter). Berawal dari kegagalan di Iterasi 0, Developer mampu menyerap error compiler/test runner dan merevisi kodenya hingga lulus 100% pada Iterasi 2 tanpa bantuan Executor deterministik.
+2. **Executor CODE_ONLY Berfungsi Sebagai Zero-Shot Polyfill (13.3% / 4 kasus):**
+   Pada Run 2, 14, 20, dan 26, Executor membantu meluluskan kode langsung di Iterasi 0 dengan menyuntikkan missing imports (`BaseModel`, typing `List`) atau perbaikan sintaksis dasar.
+3. **Ketiadaan Multi-Iteration Healing pada Executor (0 kasus):**
+   Pada seluruh run di mana tes awal gagal (Iterasi > 0), intervensi Executor **tidak pernah berhasil mengubah kegagalan menjadi kelulusan** di iterasi berikutnya. Executor tidak memiliki kapabilitas penalaran logika bisnis.
+4. **Stagnasi Persisten (70.0% / 21 kasus):**
+   Mayoritas kegagalan mencapai batas `max_iterations = 3` akibat looping error konseptual yang sama (misalnya kesalahan penanganan argumen CLI dan arsitektur Riverpod yang tidak terurai oleh feedback teks sederhana).

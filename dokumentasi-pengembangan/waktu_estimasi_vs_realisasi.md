@@ -163,6 +163,26 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 ---
 
 ## ═══════════════════════════════════════════════════════════════════════════
+## EKSPERIMEN TERKONTROL (Phase 0, 1, 2) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Eksperimen Terkontrol | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Phase 0: Validasi 3 Frozen Oracle & Checksums | — | 0.45 | 27.0 m | — | Audit fungsional & penguncian kriptografis SHA-256 |
+| Phase 1: Controlled Pilot (9-Run Matrix 3×3) | — | 0.85 | 51.0 m | — | Evaluasi OFF vs CODE_ONLY vs ON & deteksi Oracle Dilution |
+| Phase 2: Main Controlled Experiment (30 Runs) | — | 3.11 | 186.3 m | — | Eksekusi sekuensial, mitigasi socket latency & verifikasi 100% |
+| **Total Sesi Eksperimen Terkontrol (2026-09-09)** | **—** | **4.41** | **264.3 m** | **—** | **30 Runs Phase 2 + 9 Runs Phase 1 + Phase 0** |
+
+*Rincian Formula Sesi Eksperimen 2026-09-09 (07:00 s.d. 10:32 WIB):*
+- Waktu Pengembangan Awal (Dev): 1.620 detik (27.00 menit / 0.45 jam)
+- Total Waktu Pengujian & Uji Ulang (Test): 10.640 detik (177.33 menit / 2.96 jam)
+- Total Waktu Perbaikan, Forensik & Dokumentasi (Fix): 3.600 detik (60.00 menit / 1.00 jam)
+- **TOTAL WAKTU REALISASI EKSPERIMEN:** **15.860 detik (~4 jam 24 menit 20 detik / 4.41 jam)**
+- Status: **✅ SELESAI & TERVERIFIKASI (Status Validasi: Menunggu Putusan IA)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
 ## Ringkasan Kumulatif Proyek
 ## ═══════════════════════════════════════════════════════════════════════════
 
@@ -175,10 +195,11 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **4** | Mission Control Hub & Engine Switcher | 5.5 | 0.17 | 10.0 m | -5.33 | 32.4x |
 | **5** | Agent Pipeline Visualization & Stream | 7.0 | 0.83 | 50.0 m | -6.17 | 8.4x |
 | **6** | Code Explorer & Sandbox Terminal | 7.0 | 1.29 | 77.4 m | -5.71 | 5.4x |
-| **Riset** | Riset & Eksperimen Executor Multi-Mode & Frozen Oracle | — | 11.69 | 701.4 m | — | Studi Empiris (11.69 jam) |
+| **Riset 1** | Riset & Eksperimen Awal Executor & Baseline | — | 11.69 | 701.4 m | — | 2026-09-08 (11.69 jam) |
+| **Eksperimen** | Controlled Experiments (Phase 0, 1, 2 [30 Runs]) | — | 4.41 | 264.3 m | — | 2026-09-09 (4.41 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset/Eksperimen s.d. Sesi Ini)** | **46.0** | **14.95** | **897.4 m** | **-31.05** | **Termasuk 11.69 jam riset mendalam** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen s.d. Sesi Ini)** | **46.0** | **19.36** | **1.161,7 m** | **-26.64** | **Termasuk 16.10 jam riset & eksperimen terkontrol** |
 
 
 

@@ -577,8 +577,54 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Iterasi 6 (Revisi Pasca-Investigasi E2E):
-- **Diselesaikan Mandiri oleh Agen:** 14 kasus (82.35% — E-024, E-025, E-026, E-027, E-028, E-030, E-031, E-032, E-034, E-035, E-036, E-037, E-038, E-039)
-- **Diselesaikan atas Intervensi IA:** 2 kasus (11.76% — E-029: stateful test ordering, E-040: UI vs Sandbox shielding discrepancy)
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 3 kasus (17.65% — E-033: Environment Grounding, E-041: Riverpod dead code, E-042: QA matrix math contradiction)
-- **Total Galat Terdokumentasi:** 42 kasus (E-001 s/d E-042)
+---
+
+### Kasus E-043: Oracle Dilution pada Mode Executor ON Mengubah Ground Truth Eksperimen
+- **Waktu:** 2026-09-09 ~00:15 WIB (Phase 1 Pilot Run 3 & 9)
+- **Tingkat Keparahan:** Critical (Methodological Ground Truth Corruption)
+- **Gejala:** Pada Phase 1 Pilot Mode ON, test suite unit test termutasi (`test_before_hash != test_after_hash`), assertion status code `assert response.status_code == 201` dilunakkan menjadi `in (200, 201, 400)`, dan assertion widget Flutter diubah secara deterministik oleh regex Executor.
+- **Akar Masalah:** Logika Executor mode ON mengasumsikan test suite fleksibel dan boleh disesuaikan dengan kebiasaan output LLM Developer, melanggar prinsip pengujian berbasis Frozen Oracle.
+- **Tindakan Korektif:** Mengeliminasi mode ON dari Phase 2 Main Controlled Experiment dan mengunci penegakan fail-loudly verification `test_before_hash == test_after_hash` pada mode CODE_ONLY.
+- **Sumber Solusi:** INTERVENSI IA (Protokol Penelitian Riset Eksperimen v1).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-044: Socket Disconnect & Inference Hang pada Ollama Subprocess (Run 28 Phase 2)
+- **Waktu:** 2026-09-09 ~09:31 WIB (Phase 2 Run 28, `project_20260909_093137`)
+- **Tingkat Keparahan:** High (Latency & Socket Blocking)
+- **Gejala:** Eksekusi Run 28 (Flutter T1 Rep 4 CODE_ONLY) mengalami penundaan ekstrim hingga 2582 detik pada node Architect/Developer sebelum akhirnya kembali merespon.
+- **Akar Masalah:** Driver local Ollama mengalami socket timeout sementara tanpa error fatal pada proses Windows, menyebabkan event stream generator pada thread executor tertahan.
+- **Tindakan Korektif:** Socket lokal pulih secara mandiri, sistem melanjutkan eksekusi ke Developer iterasi 1, 2, 3 dan tuntas mencatat run secara utuh dengan status validasi integritas tetap lolos 100%.
+- **Sumber Solusi:** AGEN (Self-recovering & Runner State Persistence).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-045: Stagnasi Penalaran Logika Bisnis Developer LLM pada Multi-Iteration Self-Healing
+- **Waktu:** 2026-09-09 (Melintasi 21 Run Gagal Phase 2)
+- **Tingkat Keparahan:** Medium (Algorithmic Reasoning Limitation)
+- **Gejala:** Developer LLM berulang kali menghasilkan kode dengan struktur kegagalan identik pada Iterasi 1, 2, dan 3 kendati telah disuplai pesan traceback error pytest / dart test.
+- **Akar Masalah:** Model ukuran 7 miliar parameter (`qwen2.5-coder:7b`) memiliki keterbatasan penalaran saat menghadapi spesifikasi bercabang banyak tanpa panduan contoh input-output konkret.
+- **Tindakan Korektif (Terencana):** Penyempurnaan prompt error diagnostic dengan menyertakan diff kode sebelumnya dan ekstraksi ekspektasi assertion eksplisit.
+- **Sumber Solusi:** AGEN (Analisis Forensik Phase 2).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-046: Divergensi Evaluasi Reviewer LLM vs Hasil Teknis Test Runner Sandbox (Run 23)
+- **Waktu:** 2026-09-09 ~09:17 WIB (Phase 2 Run 23, `project_20260909_091724`)
+- **Tingkat Keparahan:** Medium (Reviewer Semantic Discrepancy)
+- **Gejala:** Unit test Flutter sandbox lulus 100% (2/2 tests passed), namun Reviewer LLM menolak persetujuan rilis dengan status `needs_revision` karena berargumen widget tidak sepenuhnya mematuhi arsitektur Riverpod.
+- **Akar Masalah:** Ketiadaan pengikatan deterministik antara kelulusan teknis sandbox dan keputusan rilis Reviewer LLM.
+- **Tindakan Korektif (Terencana):** Menegakkan aturan penguncian bahwa jika seluruh unit test Frozen Oracle lulus 100%, Reviewer tidak boleh menganulir kecuali ditemukan cacat keamanan kritis.
+- **Sumber Solusi:** AGEN (Analisis Forensik Phase 2).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Phase 2):
+- **Diselesaikan Mandiri oleh Agen:** 16 kasus
+- **Diselesaikan atas Intervensi IA:** 4 kasus
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 6 kasus
+- **Total Galat Terdokumentasi:** 46 kasus (E-001 s/d E-046)

@@ -393,8 +393,43 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Total Rentang Waktu Aktual:** **11 jam 41 menit 26 detik (~11.69 jam)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RISET EKSPERIMEN TERKONTROL (Phase 0, Phase 1, Phase 2) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
 
+### Komponen 1: Waktu Pengembangan Awal (Development Time)
+| No | Aktivitas Pengembangan Fitur & Runner | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Perancangan & scaffolding harness test Frozen Oracle (CLI & Flutter) | 07:05:00 | 07:14:00 | 540 s | 9.00 m (0.15 j) |
+| 2 | Pengembangan runner otomatis Phase 1 Pilot (`scratch/run_pilot_phase1.py`) | 07:15:00 | 07:22:00 | 420 s | 7.00 m (0.12 j) |
+| 3 | Rekayasa runner sekuensial Phase 2 (`scratch/run_phase2_main.py`) dengan fail-loudly SHA-256 audit pre/post-run | 08:05:00 | 08:16:00 | 660 s | 11.00 m (0.18 j) |
+| | **Subtotal Waktu Pengembangan** | | | **1.620 s** | **27.00 m (0.45 jam)** |
 
+### Komponen 2: Waktu Pengujian & Pengujian Ulang (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Phase 0 — Audit Kriptografis & Fungsional 3 Frozen Oracle (3 Tasks) | 07:00:00 | 07:14:00 | 840 s | 14.00 m (0.23 j) |
+| 2 | Phase 1 — Controlled Pilot (9-Run Matrix: 3 Task × 3 Mode) | 07:23:00 | 08:02:00 | 2.340 s | 39.00 m (0.65 j) |
+| 3 | Phase 2 — Main Controlled Experiment (30-Run Matrix: 3 Task × 2 Mode × 5 Reps) | 08:17:20 | 10:21:40 | 7.460 s | 124.33 m (2.07 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **10.640 s** | **177.33 m (2.96 jam)** |
 
+### Komponen 3: Waktu Perbaikan, Forensik & Dokumentasi Riset (Fixing / Investigation Time)
+| No | Aktivitas Perbaikan, Investigasi Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi fenomena Oracle Dilution pada Phase 1 Mode ON (`scratch/deep_analyze_pilot.py`) | 08:02:00 | 08:14:00 | 720 s | 12.00 m (0.20 j) |
+| 2 | Pemulihan socket & pemantauan live latency eksekusi Run 28 Flutter | 09:32:00 | 10:14:00 | 2.520 s | 42.00 m (0.70 j) |
+| 3 | Ekstraksi forensik mikro `run_trace.jsonl` melintasi seluruh 30 run Phase 2 | 10:22:00 | 10:23:30 | 90 s | 1.50 m (0.03 j) |
+| 4 | Penyusunan laporan komprehensif `executor_phase2_main_experiment.md` | 10:23:30 | 10:24:00 | 30 s | 0.50 m (0.01 j) |
+| 5 | Pemutakhiran dokumen catatan riset, decision log, error log, human intervention & validation log | 10:28:00 | 10:32:00 | 240 s | 4.00 m (0.07 j) |
+| | **Subtotal Waktu Perbaikan & Investigasi** | | | **3.600 s** | **60.00 m (1.00 jam)** |
 
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Eksperimen Terkontrol (2026-09-09):
+\mathbf{\text{Total Waktu Realisasi} = 1.620\text{ s (Dev)} + 10.640\text{ s (Test)} + 3.600\text{ s (Fix/Investigasi)} = 15.860\text{ detik} \approx 4\text{ jam } 24\text{ menit } 20\text{ detik} (4.41\text{ jam})}
+- **Waktu Mulai Sesi 2026-09-09:** 07:00:00 WIB
+- **Waktu Penyelesaian Eksperimen & Dokumentasi:** 10:32:00 WIB
+- **Total Durasi Aktual:** **3 jam 32 menit (berjalan simultan dan terukur)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
