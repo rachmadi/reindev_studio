@@ -367,6 +367,7 @@ class MachineReadableContract(BaseModel):
     testable_assertions: List[TestableAssertion] = Field(default_factory=list)
     constraints: ContractConstraints = Field(default_factory=ContractConstraints)
     unresolved_ambiguities: List[UnresolvedAmbiguity] = Field(default_factory=list)
+    target_file: Optional[str] = None
 
     @field_validator("contract_version")
     @classmethod
@@ -815,6 +816,29 @@ def seal_and_freeze_contract(
         c_dict = contract_data.to_dict()
     else:
         return False, {}, ["Input kontrak bukan dictionary atau model valid."], []
+
+    # Authoritative Target File Binding (Intervensi 1)
+    domain = c_dict.get("task_intent", {}).get("domain", "")
+    target_lang = c_dict.get("target_ecosystem", {}).get("language", "")
+    is_dart = "dart" in target_lang.lower() or domain == "FLUTTER_WIDGET"
+
+    if is_dart:
+        # Contract Gate menetapkan secara eksplisit: target_file = lib/card_metric.dart
+        # Nama file yang diberikan Architect tidak boleh mengoverride target file authoritative.
+        c_dict["target_file"] = "lib/card_metric.dart"
+        for iface in c_dict.get("interface_contracts", []):
+            if isinstance(iface, dict):
+                iface["target_file"] = "lib/card_metric.dart"
+        for m in c_dict.get("data_models", []):
+            if isinstance(m, dict):
+                m["target_file"] = "lib/card_metric.dart"
+    elif not c_dict.get("target_file"):
+        for iface in c_dict.get("interface_contracts", []):
+            if isinstance(iface, dict) and iface.get("target_file"):
+                c_dict["target_file"] = iface["target_file"]
+                break
+        if not c_dict.get("target_file"):
+            c_dict["target_file"] = c_dict.get("target_ecosystem", {}).get("entrypoint", "main.py")
 
     # Validasi 4 Pilar
     is_valid, errors, warnings = validate_contract_gate(

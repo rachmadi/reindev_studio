@@ -209,9 +209,26 @@ def developer_agent(state: SquadState) -> dict:
                 }
             )
     
+    # P0-2 & Intervensi 1: Determine Authoritative Target File from Contract
+    authoritative_target_file = None
+    if contract:
+        authoritative_target_file = contract.get("target_file")
+        if not authoritative_target_file:
+            for iface in contract.get("interface_contracts", []):
+                if iface.get("target_file"):
+                    authoritative_target_file = iface["target_file"]
+                    break
+        if not authoritative_target_file:
+            for m in contract.get("data_models", []):
+                if m.get("target_file"):
+                    authoritative_target_file = m["target_file"]
+                    break
+    if not authoritative_target_file:
+        authoritative_target_file = "lib/card_metric.dart" if is_dart else "main.py"
+
     feedback_section = ""
     if iteration > 0 and test_results:
-        # P0-1: Utamakan targeted developer_feedback dari diagnostic parser
+        # P0-1 & Intervensi 2: Compact Repair Context (<= 1.000 karakter)
         targeted_feedback = state.get("developer_feedback")
         if not targeted_feedback and isinstance(test_results.get("diagnostic_evidence"), dict):
             try:
@@ -230,51 +247,80 @@ def developer_agent(state: SquadState) -> dict:
                     contract=contract
                 )
 
-        output_err = targeted_feedback if targeted_feedback else test_results.get("output", "")
-        
-        # Sediakan konteks kode yang sudah ditulis sebelumnya
+        if targeted_feedback:
+            compact_err = targeted_feedback.strip()
+        else:
+            raw_out = test_results.get("output", "") or test_results.get("stdout", "")
+            lines = [ln.strip() for ln in raw_out.splitlines() if ln.strip()]
+            err_lines = [ln for ln in lines if any(k in ln.lower() for k in ("error", "failed", "exception", "nosuchmethod", "undefined"))]
+            if err_lines:
+                compact_err = "\n".join(err_lines[:8])
+            else:
+                compact_err = "\n".join(lines[:6])
+
+        # Pastikan compact feedback <= 1000 chars
+        if len(compact_err) > 1000:
+            compact_err = compact_err[:980] + "\n...(dipotong untuk efisiensi konteks)"
+
+        # Sediakan konteks kode yang sudah ditulis sebelumnya - prioritaskan authoritative target file
         prev_code_blocks = []
-        for fname, content in state.get("code_files", {}).items():
-            prev_code_blocks.append(f"=== FILE: {fname} ===\n{content}\n=== END FILE ===")
+        code_files = state.get("code_files", {})
+        if authoritative_target_file in code_files:
+            prev_code_blocks.append(f"=== FILE: {authoritative_target_file} ===\n{code_files[authoritative_target_file]}\n=== END FILE ===")
+        else:
+            for fname, content in code_files.items():
+                prev_code_blocks.append(f"=== FILE: {fname} ===\n{content}\n=== END FILE ===")
+                break
         prev_code_str = "\n".join(prev_code_blocks) if prev_code_blocks else "(Belum ada kode)"
-        
-        # Sediakan konteks test suite dari QA Tester
+
+        # Sediakan konteks test suite dari QA Tester secara ringkas (tanpa bocoran)
         qa_test_blocks = []
         for fname, content in state.get("test_files", {}).items():
-            qa_test_blocks.append(f"=== TEST FILE: {fname} ===\n{content}\n=== END TEST FILE ===")
+            if len(content) > 1200:
+                test_summary = content[:1200] + "\n// ... (sisa test suite dipotong untuk efisiensi konteks)"
+            else:
+                test_summary = content
+            qa_test_blocks.append(f"=== TEST FILE: {fname} ===\n{test_summary}\n=== END TEST FILE ===")
         qa_test_str = "\n".join(qa_test_blocks) if qa_test_blocks else "(Belum ada test)"
-        
+
         feedback_section = f"""
 
 [PERHATIAN KRUSIAL - SIKLUS PERBAIKAN SELF-HEALING (LOOP {iteration}/{state.get('max_iterations', 3)})]:
-Pengujian QA Tester GAGAL dengan pesan galat berikut:
-{output_err}
+DIAGNOSTIK KEGAGALAN TERARAH (COMPACT FEEDBACK <= 1000 CHARS):
+{compact_err}
 
-BERKAS KODE YANG TELAH ANDA TULIS:
+BERKAS KODE TERAKHIR ANDA:
 {prev_code_str}
 
-BERKAS UNIT TEST DARI QA TESTER YANG WAJIB ANDA LOLOSKAN:
+BERKAS TEST RUNNER:
 {qa_test_str}
 
 INSTRUKSI PERBAIKAN:
-1. Analisis galat di atas dan periksa baris kode spesifik yang menyebabkan pengujian gagal.
-2. Perbaiki fungsi atau logika kode Anda agar seluruh assertion pada berkas test QA Tester LULUS 100%. Jika QA Tester mengharapkan exception/ValueError untuk input tertentu (misal dimensi matriks atau parameter tidak valid), sesuaikan validasi fungsi Anda agar melempar exception tersebut.
-3. Tuliskan kembali berkas yang diperbaiki dengan nama file yang SAMA PERSIS.
+1. Analisis diagnostik terarah di atas dan perbaiki fungsi atau logika kode.
+2. Pastikan antarmuka kode memenuhi ekspektasi test runner dan kontrak resmi.
+3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!
 """
-        
+
     contract_section = ""
     if contract:
         models = [m.get("model_name") for m in contract.get("data_models", [])]
         interfaces = [f"{i.get('http_method') or ''} {i.get('identifier')}".strip() for i in contract.get("interface_contracts", [])]
         contract_section = f"""
 [KONTRAK RESMI PROYEK (STRICTLY FROZEN - WAJIB DIPATUHI 100%)]:
+- Target File Authoritative (WAJIB): {authoritative_target_file}
+- ATURAN MUTLAK TARGET FILE: Developer WAJIB menghasilkan dan memperbaiki kode HANYA pada file target authoritative '{authoritative_target_file}' (menggunakan blok === FILE: {authoritative_target_file} ===).
+- PERINGATAN KERAS: DILARANG menggunakan nama file alternatif/lain (misalnya jika System Architect mengusulkan nama file lain, nama file dari Architect TIDAK BOLEH mengoverride Target File Authoritative ini).
 - Domain: {contract.get('task_intent', {}).get('domain', '')}
 - Model Data Resmi: {', '.join(models) if models else '(Sesuai interface)'}
 - Antarmuka Resmi: {', '.join(interfaces) if interfaces else '(Fungsi utama)'}
 - Batasan: DILARANG menambah endpoint, fungsi, atau model di luar kontrak resmi ini!
 """
 
-    arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
+    if iteration == 0:
+        arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
+    else:
+        # Intervensi 2: Compact Repair Context - hilangkan arsitektur usang/bertele-tele di loop perbaikan
+        arch_section = f"\n[Rencana Arsitektur]: Gunakan Target File Authoritative '{authoritative_target_file}' dan ikuti Kontrak Resmi di atas.\n"
 
     
     if is_dart:
