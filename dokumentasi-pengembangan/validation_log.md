@@ -716,5 +716,30 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   *Hasil:* ✅ Terpenuhi (67/67 PASS, hash match 100%).
 
 ### 2. Status Validation Gate (Intent Architect)
-- **Status Validasi:** ⏳ **VALIDATION PENDING (CHECKPOINT FREEZE SEBELUM 9-RUN ABLASI QWEN vNEXT)**
-- **Catatan Otoritas:** Seluruh artefak kode baru dibekukan (*freeze*) sebagai checkpoint arsitektur resmi. Seluruh variabel dikunci untuk pelaksanaan 9-run controlled ablation Qwen 7B vNext.
+- **Status Validasi:** ⏳ **VALIDATION PENDING (HASIL EMPIRIS 9-RUN SELESAI — MENUNGGU EVALUASI INTENT ARCHITECT)**
+- **Catatan Otoritas:** Checkpoint arsitektur Architect vNext + Blueprint Validator telah diuji secara menyeluruh melalui 9-run controlled ablation (FastAPI, CLI, Flutter x 3 repetisi). Seluruh artefak tersimpan secara deterministik dan siap untuk evaluasi strategis Intent Architect.
+
+### 3. Hasil Empiris 9-Run Controlled Ablation Qwen 7B vNext (2026-09-10 01:33 WIB)
+- **Konfigurasi Pengujian:**
+  - Squad & Developer Model: `qwen2.5-coder:7b` via Ollama (Unified Local Squad)
+  - Architect: `vNext + Blueprint Validator (v1.1.0)`
+  - Executor Mode: `SAFE`
+  - Total Durasi: 2.446,7s (~40.8 menit)
+  - Gross Pass Rate: **0 / 9 (0.0%)**
+
+- **Failure Transition Matrix (Pergeseran Kategori Kegagalan):**
+
+| Dimensi Evaluasi | Qwen 7B Baseline (Sebelumnya) | Qwen 7B vNext (Sekarang) | Dampak Intervensi |
+|---|---|---|---|
+| **FastAPI T1 (Exit Code 2 Crash)** | 3 / 3 Crash (`NameError: field_validator`) | **0 / 3 Crash (100% Unblocked)** | Blueprint Validator memicu revisi; pytest berjalan penuh, Rep 1 lulus 1/5 unit test. |
+| **CLI T1 (Contract Gate Rejection)** | 3 / 3 Ditolak (`REJECTED`) | **1 / 3 Lolos FROZEN, 2 / 3 Ditolak** | Run 5 tembus Gate (`FROZEN`) dan jalan 3 loop; Run 4 & 6 ditolak gate tanpa kebocoran Oracle. |
+| **Flutter T1 (Blueprint Consistency)** | 3 / 3 FROZEN, Gagal Developer Reasoning | **3 / 3 FROZEN, Gagal Developer Reasoning** | Konsistensi Dart 100% (0 error validator), eksekusi stabil 3 iterasi penuh. |
+| **Contract Frozen Rate** | 66.7% (6/9) | **77.8% (7/9)** | Peningkatan kelolosan pipeline ke fase eksekusi sandbox. |
+| **Unit Tests Passed** | 0 passed | **1 test passed (FastAPI Rep 1: 1/5)** | Kemajuan parsial pertama pada unit test Python. |
+| **Total Blueprint Revisions** | 0 (Tanpa Validator) | **8 revisi (FastAPI: 6, CLI: 2, Flutter: 0)** | Intervensi deterministik AST bekerja aktif. |
+
+- **Temuan Kausal & Batasan Kognitif Model 7B:**
+  1. *Unblocking Pipeline vs Fixing Developer Logic*: Blueprint Validator berhasil mencegah fatal crash yang memblokir pipeline, sehingga pengujian sandbox dan reviewer deterministik dapat berjalan. Namun, pada level Developer Agent, model 7B lokal masih mengalami *reasoning ceiling* dalam memenuhi seluruh assertion test suite yang ketat.
+  2. *Batas Re-generation Prompting*: Ketika validator memberikan umpan balik revisi AST, model 7B memerlukan bimbingan struktural yang presisi; pada `max_revisions = 2`, model terkadang belum berhasil memasukkan seluruh import ke header file.
+  3. *Integritas Frozen Oracle*: Seluruh SHA-256 Frozen Oracle terbukti 100% utuh sebelum dan sesudah eksekusi 9 runs.
+

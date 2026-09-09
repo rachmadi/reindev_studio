@@ -547,3 +547,46 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Total Durasi Aktual:** **21 menit 10 detik (100% dihitung berdasarkan timestamp eksperimen)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 9-RUN CONTROLLED ABLATION QWEN 2.5-CODER:7B vNEXT — 2026-09-10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal & Persiapan Runner (Development Time)
+| No | Aktivitas Pengembangan Fitur & Runner | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Perancangan & konfigurasi runner otomatis 9-run ablasi Qwen 7B vNext (`scratch/run_qwen7b_vnext_9run_ablation.py`) | 00:52:10 | 00:53:01 | 51 s | 0.85 m (0.01 j) |
+| | **Subtotal Waktu Pengembangan & Runner** | | | **51 s** | **0.85 m (0.01 jam)** |
+
+### Komponen 2: Waktu Pengujian Terkontrol 9 Runs (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Run 1/9 — FastAPI T1 Rep 1 (Loops: 3, Tests: 1/5, BP Rev: 2, Developer Reasoning) | 00:53:01 | 00:58:36 | 335.0 s | 5.58 m (0.09 j) |
+| 2 | Run 2/9 — FastAPI T1 Rep 2 (Loops: 3, Tests: 0/1, BP Rev: 2, Developer Reasoning) | 00:58:36 | 01:04:39 | 363.1 s | 6.05 m (0.10 j) |
+| 3 | Run 3/9 — FastAPI T1 Rep 3 (Loops: 3, Tests: 0/1, BP Rev: 2, Developer Reasoning) | 01:04:40 | 01:09:46 | 306.3 s | 5.11 m (0.09 j) |
+| 4 | Run 4/9 — CLI T1 Rep 1 (Loops: 0, Contract Gate Rejected, BP Rev: 0) | 01:09:46 | 01:12:01 | 135.3 s | 2.26 m (0.04 j) |
+| 5 | Run 5/9 — CLI T1 Rep 2 (Loops: 3, Tests: 0/1, BP Rev: 2, Developer Reasoning) | 01:12:01 | 01:19:46 | 464.4 s | 7.74 m (0.13 j) |
+| 6 | Run 6/9 — CLI T1 Rep 3 (Loops: 0, Contract Gate Rejected, BP Rev: 0) | 01:19:46 | 01:21:43 | 117.4 s | 1.96 m (0.03 j) |
+| 7 | Run 7/9 — Flutter T1 Rep 1 (Loops: 3, Tests: 0/1, BP Rev: 0, Developer Reasoning) | 01:21:43 | 01:25:44 | 241.1 s | 4.02 m (0.07 j) |
+| 8 | Run 8/9 — Flutter T1 Rep 2 (Loops: 3, Tests: 0/1, BP Rev: 0, Developer Reasoning) | 01:25:44 | 01:29:36 | 231.5 s | 3.86 m (0.06 j) |
+| 9 | Run 9/9 — Flutter T1 Rep 3 (Loops: 3, Tests: 0/1, BP Rev: 0, Developer Reasoning) | 01:29:36 | 01:33:48 | 252.4 s | 4.21 m (0.07 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **2.446,5 s** | **40.78 m (0.68 jam)** |
+
+### Komponen 3: Waktu Analisis Forensik & Dokumentasi (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Ekstraksi forensik trace, verifikasi SHA-256 Oracle, evaluasi Failure Transition Matrix | 01:33:48 | 01:36:18 | 150 s | 2.50 m (0.04 j) |
+| 2 | Penyusunan laporan ablasi, pemutakhiran validation_log, durasi_per_fitur, commit_history | 01:36:18 | 01:38:48 | 150 s | 2.50 m (0.04 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **300 s** | **5.00 m (0.08 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Ablasi 9-Run Qwen 7B vNext:
+\mathbf{\text{Total Waktu Realisasi} = 51\text{ s (Dev)} + 2.446,5\text{ s (Test)} + 300\text{ s (Doc/Forensik)} = 2.797,5\text{ detik} \approx 46\text{ menit } 38\text{ detik} (0.78\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-10 00:52:10 WIB
+- **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 01:38:48 WIB
+- **Total Durasi Aktual:** **46 menit 38 detik (100% dihitung berdasarkan timestamp eksperimen)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+

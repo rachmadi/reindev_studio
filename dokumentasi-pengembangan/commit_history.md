@@ -317,6 +317,23 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Cross-domain smoke test: Python `AuthService` terdeteksi inkonsistensi simbol decorator dan berhasil diperbaiki otomatis pada revisi 1 (100% resolvable); Dart `UserProfileCard` 100% konsisten pada konstruktor dan pemanggilan.
   - Frozen Oracle SHA-256: 100% utuh dan immutable.
 
+### 13. Pelaksanaan 9-Run Controlled Ablation Qwen 2.5 Coder 7B vNext (Hasil & Failure Transition)
+- **Status:** ⏳ VALIDATION PENDING (Hasil Empiris 9-Run Selesai — Menunggu Evaluasi Intent Architect)
+- **Pesan Commit Target:** `docs(ablation): record 9-run controlled ablation results for qwen2.5-coder:7b vNext with blueprint validator [validation pending]`
+- **Waktu Eksekusi:** 2026-09-10 01:38 WIB
+- **Total Waktu Realisasi Sesi:** 2.797,5 detik (~46 menit 38 detik / 0.78 jam)
+- **Cakupan Berkas:**
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_vnext_summary.json` [NEW]
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_vnext_result.md` [NEW]
+  - `dokumentasi-pengembangan/durasi_per_fitur.md` [MODIFIED]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+- **Hasil Eksperimen & Analisis Kunci:**
+  - Gross Pass Rate: **0 / 9 (0.0%)** dalam total durasi 2.446,7s.
+  - Failure Transition: Fatal crash collection Python (`NameError`) berhasil dieliminasi 100% pada fase awal; 1/5 unit test lulus pada FastAPI Rep 1; kelolosan Contract Gate meningkat dari 66.7% ke 77.8% (7/9 run berhasil eksekusi sandbox); Dart/Flutter 100% konsisten internal.
+  - Keterbatasan Kausal: Model 7B lokal memiliki *cognitive capacity ceiling* dalam mematuhi seluruh instruksi revisi secara simultan pada konteks panjang, membuktikan bahwa intervensi arsitektural berhasil membuka jalur eksekusi (unblocking pipeline) namun penalaran sintesis solusi akhir tetap membutuhkan model berkemampuan penalaran lebih tinggi.
+
+
 
 
 
