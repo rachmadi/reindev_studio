@@ -317,7 +317,11 @@ INSTRUKSI PERBAIKAN:
 """
 
     if iteration == 0:
-        arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
+        arch_section = (
+            f"\nRencana Arsitektur & File Tree (PANDUAN KONSEPTUAL):\n"
+            f"[PERINGATAN PRESEDEN: Jika ada kelas/pola di rancangan arsitek yang bertentangan dengan FACT CARD di atas, FACT CARD MUTLAK MENANG]\n"
+            f"{arch_plan}\n"
+        ) if arch_plan else ""
     else:
         # Intervensi 2: Compact Repair Context - hilangkan arsitektur usang/bertele-tele di loop perbaikan
         arch_section = f"\n[Rencana Arsitektur]: Gunakan Target File Authoritative '{authoritative_target_file}' dan ikuti Kontrak Resmi di atas.\n"
@@ -388,6 +392,7 @@ Spesifikasi Product Manager:
 ATURAN KETAT:
 Tulis seluruh implementasi file kode HANYA dalam bahasa {target_lang.upper()}.
 Jangan gunakan bahasa pemrograman lain!
+Patuhi ENVIRONMENT FACT CARD dan POLA KANONIKAL di atas sebagai kebenaran mutlak runtime.
 
 Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."""
     

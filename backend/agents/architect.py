@@ -11,6 +11,7 @@ try:
         ContractStatus
     )
     from ..tracer import get_tracer
+    from ..environment_grounding import generate_fact_card_for_architect
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -30,6 +31,10 @@ except (ImportError, ValueError):
         from tracer import get_tracer
     except ImportError:
         def get_tracer(run_id=None): return None
+    try:
+        from environment_grounding import generate_fact_card_for_architect
+    except ImportError:
+        def generate_fact_card_for_architect(*args, **kwargs): return ""
 
 ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
@@ -41,6 +46,9 @@ Format luaran yang WAJIB Anda hasilkan:
    - Untuk setiap task non-UI (REST API, CLI, modul komputasi/matematis, Library): Anda WAJIB mendefinisikan antarmuka publik yang dapat diobservasi dan diuji secara independen (nama fungsi/kelas, signature callable, parameter input, return type).
    - Jangan biarkan Developer menebak-nebak antarmuka publik. Pastikan antarmuka selaras dengan kebutuhan task.
 4. Panduan Implementasi untuk Developer Agent
+5. INTEGRITAS ENVIRONMENT RUNTIME (WAJIB):
+   - DILARANG KERAS merancang blueprint, class, atau dependency yang menggunakan API/simbol yang dinyatakan terlarang dalam ENVIRONMENT FACT CARD.
+   - Patuhi versi pustaka yang terpasang aktual di runtime.
 
 Gunakan Bahasa Indonesia yang profesional, presisi, dan terstruktur tanpa kata-kata pengantar berlebih.
 """
@@ -287,10 +295,17 @@ def architect_agent(state: SquadState) -> dict:
             "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
         )
 
+    # Environment Grounding untuk Architect
+    try:
+        arch_fact_card = generate_fact_card_for_architect(target_lang, task=user_task)
+    except Exception:
+        arch_fact_card = ""
+    env_section = f"\n{arch_fact_card}\n" if arch_fact_card else ""
+
     prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
 
 {structure_rule}
-
+{env_section}
 Deskripsi Tugas Pengguna:
 {user_task}
 
@@ -300,6 +315,7 @@ Spesifikasi Product Manager:
 ATURAN KETAT:
 Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {target_lang.upper()} murni (Maksimal 2-3 file total).
 DILARANG KERAS merancang file tree atau struktur dalam bahasa selain {target_lang.upper()}!
+DILARANG KERAS merancang kelas, dependensi, atau pola yang dinyatakan dilarang dalam BATASAN ARSITEKTUR WAJIB di atas!
 
 Tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
 

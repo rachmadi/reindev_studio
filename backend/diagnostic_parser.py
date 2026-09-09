@@ -973,6 +973,12 @@ HINT_DART_BRACKET_CASCADE = (
     "3. Ensure every opening '(' and '[' is closed exactly once with matching ')' and ']'."
 )
 
+HINT_GROUNDING_UNDEFINED_SYMBOL = (
+    "[GROUNDING HINT]\n"
+    "Simbol/API yang digunakan tidak terdefinisi pada versi library/runtime aktif.\n"
+    "Tindakan: Periksa ENVIRONMENT FACT CARD dan gunakan pola kanonikal resmi."
+)
+
 
 def infer_semantic_hint(test: FailingTest) -> Optional[str]:
     """
@@ -1049,6 +1055,15 @@ def infer_semantic_hint(test: FailingTest) -> Optional[str]:
     )
     if is_dart_bracket_cascade:
         return HINT_DART_BRACKET_CASCADE
+
+    # 4. Undefined Symbol / Deprecated API / Grounding Mismatch
+    is_grounding_issue = (
+        ("isn't defined" in full_lower or "isn't a type" in full_lower)
+        or ("cannot import name" in full_lower or "has no attribute" in full_lower)
+        or ("not defined" in full_lower and "name" in full_lower)
+    )
+    if is_grounding_issue:
+        return HINT_GROUNDING_UNDEFINED_SYMBOL
 
     return None
 
