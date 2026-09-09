@@ -9,6 +9,7 @@ try:
     from .agents.reviewer import reviewer_agent
     from .executor_v2 import executor_node_v2 as executor_node
     from .tracer import get_tracer, compute_dict_hashes
+    from .contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
 except (ImportError, ValueError):
     from state import SquadState
     from agents.pm import pm_agent
@@ -22,6 +23,13 @@ except (ImportError, ValueError):
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
+    try:
+        from contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
+    except ImportError:
+        def seal_and_freeze_contract(c): return True, c, [], []
+        def verify_contract_checkpoint(c, name): pass
+        class ContractStatus: FROZEN = "FROZEN"; REJECTED = "REJECTED"
+
 
 def frozen_oracle_node(state: SquadState) -> dict:
     """
@@ -165,6 +173,77 @@ def route_after_executor(state: SquadState) -> str:
         
     return decision
 
+def contract_validation_node(state: SquadState) -> dict:
+    """
+    Mengeksekusi Deterministic Contract Validation Gate (P0-2) antara Architect dan Developer.
+    Jika ada kontrak pada state:
+    1. Validasi 4 pilar (Schema, Referential Integrity, Requirement Coverage, Consistency).
+    2. Jika lulus: hitung canonical SHA-256 (RFC 8785 anti-circular) dan segel status ke FROZEN.
+    3. Jika gagal: tetapkan status REJECTED dan catat validation errors.
+    Jika tidak ada kontrak (legacy test/mock): lewati secara aman tanpa blocking.
+    """
+    contract = state.get("contract")
+    if not contract:
+        return {"status": "contract_gate_skipped"}
+
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="contract_gate",
+            event_type="contract_validation_started",
+            iteration=0,
+            data={
+                "contract_id": contract.get("contract_id"),
+                "status_before": contract.get("status")
+            }
+        )
+
+    success, frozen_contract, errors, warnings = seal_and_freeze_contract(contract)
+
+    if success:
+        sha256_seal = frozen_contract.get("provenance", {}).get("contract_sha256", "")
+        if tracer:
+            tracer.log_event(
+                stage="contract_gate",
+                event_type="contract_frozen",
+                iteration=0,
+                data={
+                    "contract_id": frozen_contract.get("contract_id"),
+                    "contract_sha256": sha256_seal,
+                    "warnings_count": len(warnings)
+                }
+            )
+
+        new_log = f"[Contract Validation Gate]: Kontrak divalidasi 100% dan TERKUNCI (FROZEN) dengan segel SHA-256 {sha256_seal[:12]}..."
+        return {
+            "contract": frozen_contract,
+            "contract_version": frozen_contract.get("contract_version", "1.0.1"),
+            "contract_status": ContractStatus.FROZEN.value,
+            "contract_sha256": sha256_seal,
+            "contract_validation_errors": [],
+            "logs": state.get("logs", []) + [new_log]
+        }
+    else:
+        if tracer:
+            tracer.log_event(
+                stage="contract_gate",
+                event_type="contract_validation_failed",
+                iteration=0,
+                data={
+                    "contract_id": contract.get("contract_id"),
+                    "errors": errors,
+                    "warnings": warnings
+                }
+            )
+
+        new_log = f"[Contract Validation Gate]: Validasi kontrak DITOLAK (REJECTED) dengan {len(errors)} galat deterministik."
+        return {
+            "contract": frozen_contract,
+            "contract_status": ContractStatus.REJECTED.value,
+            "contract_validation_errors": errors,
+            "logs": state.get("logs", []) + [new_log]
+        }
+
 def build_squad_graph():
     """Membangun StateGraph lengkap untuk virtual software squad ReinDev Studio."""
     workflow = StateGraph(SquadState)
@@ -172,6 +251,7 @@ def build_squad_graph():
     # 1. Daftarkan seluruh Node Spesialis
     workflow.add_node("pm", pm_agent)
     workflow.add_node("architect", architect_agent)
+    workflow.add_node("contract_gate", contract_validation_node)
     workflow.add_node("developer", developer_agent)
     workflow.add_node("tester", tester_agent)
     workflow.add_node("frozen_oracle", frozen_oracle_node)
@@ -181,7 +261,8 @@ def build_squad_graph():
     # 2. Rangkaikan Edges Sekuensial
     workflow.add_edge(START, "pm")
     workflow.add_edge("pm", "architect")
-    workflow.add_edge("architect", "developer")
+    workflow.add_edge("architect", "contract_gate")
+    workflow.add_edge("contract_gate", "developer")
     
     # Conditional edge dari developer: panggil tester atau frozen_oracle pada loop 0
     workflow.add_conditional_edges(
@@ -213,3 +294,4 @@ def build_squad_graph():
 
 # Instance default yang siap digunakan
 squad_graph = build_squad_graph()
+

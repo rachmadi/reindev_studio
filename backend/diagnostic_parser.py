@@ -67,6 +67,9 @@ class FailingTest:
     source_symbol: Optional[str] = None
     traceback_excerpt: Optional[str] = None
     confidence: float = 1.0
+    linked_assertion_id: Optional[str] = None
+    linked_req_id: Optional[str] = None
+    linked_interface_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -85,8 +88,12 @@ class FailingTest:
             source_line=data.get("source_line"),
             source_symbol=data.get("source_symbol"),
             traceback_excerpt=data.get("traceback_excerpt"),
-            confidence=float(data.get("confidence", 1.0))
+            confidence=float(data.get("confidence", 1.0)),
+            linked_assertion_id=data.get("linked_assertion_id"),
+            linked_req_id=data.get("linked_req_id"),
+            linked_interface_id=data.get("linked_interface_id")
         )
+
 
 
 @dataclass
@@ -693,11 +700,83 @@ def prioritize_failures(failing_tests: List[FailingTest]) -> Tuple[List[FailingT
     return top_3, omitted
 
 
+def map_evidence_to_contract(
+    test: FailingTest,
+    contract: Optional[Dict[str, Any]]
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Memetakan bukti kegagalan (FailingTest) ke klausul kontrak (assertion_id, req_id, interface_id)
+    hanya jika mapping dapat ditentukan secara deterministik dan tidak ambigu:
+    1. Exact match pada assertion_id di nama test (contoh: AST-01, ast_01, ast01).
+    2. Unambiguous match pada target_symbol unik (contoh: get_products).
+    3. Unambiguous match pada linked_interface_id unik (contoh: IFC-01).
+
+    Jika tidak dapat dipetakan secara pasti: mengembalikan (None, None, None) tanpa halusinasi.
+    """
+    if not contract or not isinstance(contract, dict):
+        return None, None, None
+
+    assertions = contract.get("testable_assertions", [])
+    if not assertions:
+        return None, None, None
+
+    test_name = (test.test_name or "").strip()
+    test_name_lower = test_name.lower()
+
+    # 1. Exact match pada assertion_id di nama test
+    for a in assertions:
+        aid = (a.get("assertion_id") or "").strip()
+        if not aid:
+            continue
+        aid_norm = aid.lower().replace("-", "_")
+        aid_compact = aid.lower().replace("-", "")
+        if (
+            re.search(rf"(?:_|\b){re.escape(aid_norm)}(?:_|\b)", test_name_lower)
+            or re.search(rf"(?:_|\b){re.escape(aid.lower())}(?:_|\b)", test_name_lower)
+            or re.search(rf"(?:_|\b){re.escape(aid_compact)}(?:_|\b)", test_name_lower)
+        ):
+            return a.get("assertion_id"), a.get("linked_req_id"), a.get("linked_interface_id")
+
+    # 2. Match pada target_symbol yang unik
+    source_sym = (test.source_symbol or "").strip().lower()
+    candidate_matches = []
+    for a in assertions:
+        tsym = (a.get("target_symbol") or "").strip().lower()
+        if not tsym:
+            continue
+        if source_sym and source_sym == tsym:
+            candidate_matches.append(a)
+        elif re.search(rf"\b{re.escape(tsym)}\b", test_name_lower):
+            candidate_matches.append(a)
+
+    if len(candidate_matches) == 1:
+        matched = candidate_matches[0]
+        return matched.get("assertion_id"), matched.get("linked_req_id"), matched.get("linked_interface_id")
+
+    # 3. Match pada linked_interface_id yang unik
+    interface_matches = []
+    for a in assertions:
+        liface = (a.get("linked_interface_id") or "").strip().lower()
+        if not liface:
+            continue
+        liface_norm = liface.replace("-", "_")
+        if re.search(rf"\b{re.escape(liface_norm)}\b", test_name_lower) or re.search(rf"\b{re.escape(liface)}\b", test_name_lower):
+            interface_matches.append(a)
+
+    if len(interface_matches) == 1:
+        matched = interface_matches[0]
+        return matched.get("assertion_id"), matched.get("linked_req_id"), matched.get("linked_interface_id")
+
+    # Tidak dapat ditentukan secara pasti (unresolved) -> jangan halusinasi!
+    return None, None, None
+
+
 def build_targeted_feedback(
     evidence: DiagnosticEvidence,
     iteration: int = 1,
     max_iterations: int = 3,
-    run_id: Optional[str] = None
+    run_id: Optional[str] = None,
+    contract: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Menyusun payload Markdown umpan balik diagnostik yang ringkas, hemat token (<600 karakter),
@@ -705,6 +784,7 @@ def build_targeted_feedback(
     
     KRUSIAL: Non-preskriptif! Menjelaskan apa yang gagal dan buktinya,
     TIDAK mendikte baris perbaikan kode spesifik.
+    Jika mapping kontrak tersedia secara deterministik, sertakan referensi assertion/klausul.
     """
     if evidence.execution_status == "passed":
         return ""
@@ -724,6 +804,21 @@ def build_targeted_feedback(
         type_label = test.failure_type.replace("_", " ").upper()
         lines.append(f"{idx}. [{type_label}] dalam test: {test.test_name}")
         
+        # Mapping deterministik ke kontrak jika tersedia
+        c_aid = test.linked_assertion_id
+        c_rid = test.linked_req_id
+        c_ifid = test.linked_interface_id
+        if not c_aid and contract:
+            c_aid, c_rid, c_ifid = map_evidence_to_contract(test, contract)
+
+        if c_aid:
+            mapping_str = f"Assertion {c_aid}"
+            if c_rid:
+                mapping_str += f" (Klausul: {c_rid})"
+            lines.append(f"   - Pemetaan Kontrak: {mapping_str}")
+            if c_ifid:
+                lines.append(f"   - Antarmuka Terkait: {c_ifid}")
+
         test_loc = test.test_file
         if test.test_line:
             test_loc += f" (baris {test.test_line})"
@@ -784,15 +879,17 @@ def build_targeted_feedback_from_dict(
     evidence_dict: Dict[str, Any],
     iteration: int = 1,
     max_iterations: int = 3,
-    run_id: Optional[str] = None
+    run_id: Optional[str] = None,
+    contract: Optional[Dict[str, Any]] = None
 ) -> str:
     """Helper untuk menyusun targeted feedback langsung dari dictionary diagnostic_evidence."""
     try:
         evidence = DiagnosticEvidence.from_dict(evidence_dict)
-        return build_targeted_feedback(evidence, iteration, max_iterations, run_id)
+        return build_targeted_feedback(evidence, iteration, max_iterations, run_id, contract)
     except Exception:
         # Fail-safe jika deserialisasi dictionary gagal
         return ""
+
 
 
 # ===========================================================================
@@ -805,7 +902,8 @@ def parse_diagnostic(
     test_files: Optional[Dict[str, str]] = None,
     target_language: str = "python",
     run_id: Optional[str] = None,
-    iteration: int = 0
+    iteration: int = 0,
+    contract: Optional[Dict[str, Any]] = None
 ) -> DiagnosticEvidence:
     """
     Titik masuk utama untuk menganalisis hasil sandbox runner secara deterministik.
@@ -859,6 +957,15 @@ def parse_diagnostic(
                 code_files=code_files,
                 test_files=test_files
             )
+
+        # Pemetaan deterministik bukti ke klausul kontrak jika kontrak disediakan
+        if contract:
+            for t in evidence.failing_tests:
+                if not t.linked_assertion_id:
+                    aid, rid, ifid = map_evidence_to_contract(t, contract)
+                    t.linked_assertion_id = aid
+                    t.linked_req_id = rid
+                    t.linked_interface_id = ifid
 
         if tracer:
             tracer.log_event(

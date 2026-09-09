@@ -7,6 +7,7 @@ try:
     from ..config import get_llm
     from ..environment_grounding import generate_fact_card
     from ..tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
+    from ..contract import verify_contract_checkpoint, ContractIntegrityError
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -22,6 +23,12 @@ except (ImportError, ValueError):
         def compute_sha256(s): return ""
         def compute_dict_hashes(f): return {}
         def compute_object_hash(o): return ""
+    try:
+        from contract import verify_contract_checkpoint, ContractIntegrityError
+    except ImportError:
+        def verify_contract_checkpoint(c, name, raise_on_error=False): return True, None
+        class ContractIntegrityError(Exception): pass
+
 
 DEV_SYSTEM_PROMPT = """Anda adalah Senior Software Developer dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menulis kode program berkualitas produksi berdasarkan spesifikasi dari Product Manager dan rencana arsitektur dari System Architect.
@@ -173,6 +180,22 @@ def developer_agent(state: SquadState) -> dict:
                 "iteration": iteration
             }
         )
+
+    # P0-2: Verifikasi Integritas Kontrak FROZEN sebelum Developer memproses
+    contract = state.get("contract")
+    if contract and contract.get("status") in ("FROZEN", "EXECUTING"):
+        checkpoint_name = f"developer_iteration_{iteration}" if iteration > 0 else "developer_pre_flight"
+        verify_contract_checkpoint(contract, checkpoint_name, raise_on_error=True)
+        if tracer:
+            tracer.log_event(
+                stage="developer",
+                event_type="contract_integrity_verified",
+                iteration=iteration,
+                data={
+                    "checkpoint": checkpoint_name,
+                    "contract_sha256": contract.get("provenance", {}).get("contract_sha256")
+                }
+            )
     
     feedback_section = ""
     if iteration > 0 and test_results:
@@ -191,7 +214,8 @@ def developer_agent(state: SquadState) -> dict:
                     test_results["diagnostic_evidence"],
                     iteration=iteration,
                     max_iterations=state.get("max_iterations", 3),
-                    run_id=state.get("run_id")
+                    run_id=state.get("run_id"),
+                    contract=contract
                 )
 
         output_err = targeted_feedback if targeted_feedback else test_results.get("output", "")
@@ -226,7 +250,20 @@ INSTRUKSI PERBAIKAN:
 3. Tuliskan kembali berkas yang diperbaiki dengan nama file yang SAMA PERSIS.
 """
         
+    contract_section = ""
+    if contract:
+        models = [m.get("model_name") for m in contract.get("data_models", [])]
+        interfaces = [f"{i.get('http_method') or ''} {i.get('identifier')}".strip() for i in contract.get("interface_contracts", [])]
+        contract_section = f"""
+[KONTRAK RESMI PROYEK (STRICTLY FROZEN - WAJIB DIPATUHI 100%)]:
+- Domain: {contract.get('task_intent', {}).get('domain', '')}
+- Model Data Resmi: {', '.join(models) if models else '(Sesuai interface)'}
+- Antarmuka Resmi: {', '.join(interfaces) if interfaces else '(Fungsi utama)'}
+- Batasan: DILARANG menambah endpoint, fungsi, atau model di luar kontrak resmi ini!
+"""
+
     arch_section = f"\nRencana Arsitektur & File Tree:\n{arch_plan}\n" if arch_plan else ""
+
     
     if is_dart:
         lang_rule = (
@@ -288,7 +325,7 @@ Tugas Pengguna:
 
 Spesifikasi Product Manager:
 {specs}
-{arch_section}{feedback_section}
+{arch_section}{contract_section}{feedback_section}
 
 ATURAN KETAT:
 Tulis seluruh implementasi file kode HANYA dalam bahasa {target_lang.upper()}.

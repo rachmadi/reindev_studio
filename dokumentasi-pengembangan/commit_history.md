@@ -168,3 +168,30 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Cakupan Berkas:** `dokumentasi-pengembangan/architecture/machine_readable_contract_design.md`, `dokumentasi-pengembangan/conversation_log.md`, `dokumentasi-pengembangan/validation_log.md`
 - **Kepatuhan Protokol IIDD:** 100% DESIGN ONLY, nol perubahan kode backend, nol eksperimen LLM, Frozen Oracle tak tersentuh.
 
+### 4. Implementasi P0-2: Machine-Readable Contract & Dual-Layer Reviewer
+- **Commit Hash:** (pending — menunggu validasi IA)
+- **Status:** TERSIMPAN SECARA LOKAL (PENDING IA VALIDATION)
+- **Pesan Commit Utama:** `feat: implement P0-2 machine-readable contract, 4-pillar validation gate & dual-layer reviewer (pending validation)`
+- **Waktu Eksekusi:** 2026-09-09 11:53 WIB
+- **Cakupan Berkas:**
+  - `backend/contract.py` [NEW — ~864 baris, full contract engine]
+  - `backend/test_contract.py` [NEW — 24 test cases, 0.44s]
+  - `backend/state.py` [MODIFIED — 6 field contract baru di SquadState]
+  - `backend/diagnostic_parser.py` [MODIFIED — FailingTest linked fields + map_evidence_to_contract()]
+  - `backend/agents/pm.py` [MODIFIED — inisiasi DRAFT contract]
+  - `backend/agents/architect.py` [MODIFIED — smart fallback + complete_aligned_contract()]
+  - `backend/graph.py` [MODIFIED — contract_validation_node + SHA-256 order fix]
+  - `backend/agents/developer.py` [MODIFIED — checkpoint + contract grounding prompt]
+  - `backend/agents/tester.py` [MODIFIED — checkpoint + testable assertions injection]
+  - `backend/agents/reviewer.py` [COMPLETELY REWRITTEN — Dual-Layer: deterministic gate + bounded LLM]
+  - `dokumentasi-pengembangan/implementation/machine_readable_contract_implementation.md` [NEW]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED — entri P0-2]
+- **Hasil Verifikasi:** 83/83 tests PASS (59 existing + 24 new), 16.00s — nol regresi
+- **Bug Kritis Diperbaiki:**
+  1. SHA-256 mismatch — status FROZEN diubah **sebelum** hash dihitung
+  2. NameError `verify_contract_checkpoint` di `developer.py`
+  3. `verify_contract_checkpoint` signature: returns `(bool, Optional[str])`, bukan `None`
+  4. AST Structural false failure — fallback contract kini parse tanda tangan fungsi dari `arch_plan`
+  5. `FailingTest` field name: `message` (bukan `error_message`)
+  6. Assertion ID boundary matching: `(?:_|\b)` pattern
+- **Kepatuhan Protokol IIDD:** IMPLEMENTATION ONLY sesuai desain v1.0.1 APPROVED. Nol eksperimen LLM. Frozen Oracle tak tersentuh. Executor v2 SAFE dipertahankan. P0-1 dipertahankan.

@@ -21,3 +21,10 @@ class SquadState(TypedDict):
     executor_mode: str                 # Mode eksperimen: "ON", "OFF", atau "CODE_ONLY" (default: "ON")
     frozen_oracle_path: Optional[str]  # Path direktori frozen oracle (jika diset, bypass Tester LLM dan load test suite statis)
     developer_feedback: Optional[str]  # Umpan balik diagnostik terstruktur P0-1 untuk Developer (Targeted Error Feedback)
+    contract: Optional[Dict[str, Any]]  # Dokumen Machine-Readable Contract formal P0-2 (single authoritative state)
+    contract_version: Optional[str]    # Versi kontrak aktif (misal: "1.0.1")
+    contract_status: Optional[str]     # Status lifecycle kontrak: DRAFT, ALIGNED, FROZEN, EXECUTING, VALIDATED, REJECTED
+    contract_sha256: Optional[str]     # Hash kanonikal SHA-256 (RFC 8785) segel integritas kontrak
+    contract_change_requested: Optional[bool] # Flag permintaan amandemen kontrak jika ada kontradiksi/ambiguitas
+    contract_validation_errors: Optional[List[str]] # Daftar pesan galat validasi deterministik jika ditolak gate
+

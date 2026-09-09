@@ -5,6 +5,7 @@ try:
     from ..config import get_llm
     from .developer import clean_code_content, parse_code_blocks
     from ..tracer import get_tracer, compute_dict_hashes
+    from ..contract import verify_contract_checkpoint
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -14,6 +15,7 @@ except (ImportError, ValueError):
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
+    from contract import verify_contract_checkpoint
 
 TESTER_SYSTEM_PROMPT = """Anda adalah Senior QA & Test Engineer dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah merancang dan menulis automated test suite berdasarkan spesifikasi dari Product Manager dan kode yang telah ditulis oleh Developer.
@@ -84,11 +86,45 @@ def tester_agent(state: SquadState) -> dict:
     target_lang = state.get("target_language", "python").strip()
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
     
+    # Contract Checkpoint & Grounding
+    contract = state.get("contract")
+    if contract:
+        is_valid, err_msg = verify_contract_checkpoint(contract, "tester_pre_flight")
+        if not is_valid:
+            raise ValueError(f"Contract integrity violation at tester pre-flight: {err_msg}")
+
     # Format isi code_files agar QA dapat melihat implementasi yang akan diuji
     code_summary = []
     for fname, content in code_files.items():
         code_summary.append(f"--- File: {fname} ---\n{content}\n")
     code_context = "\n".join(code_summary) if code_summary else "(Belum ada file kode)"
+
+    contract_section = ""
+    if contract:
+        assertions = contract.get("testable_assertions", [])
+        contract_section = (
+            "\n[KONTRAK RESMI & TESTABLE ASSERTIONS (SINGLE SOURCE OF TRUTH)]:\n"
+            f"Contract ID: {contract.get('contract_id', 'UNKNOWN')} (v{contract.get('contract_version', '1.0.0')})\n"
+            "DAFTAR TESTABLE ASSERTIONS YANG WAJIB DIUJI:\n"
+        )
+        for ast in assertions:
+            outcome = ast.get("expected_outcome", {})
+            contract_section += (
+                f"- Assertion ID: {ast.get('assertion_id')}\n"
+                f"  Linked Req: {ast.get('linked_req_id')} | Linked Interface: {ast.get('linked_interface_id')}\n"
+                f"  Target Symbol: {ast.get('target_symbol')} | Test Type: {ast.get('test_type')}\n"
+                f"  Inputs: {ast.get('inputs')}\n"
+                f"  Expected Outcome ({outcome.get('outcome_type')}): {outcome.get('value')}\n"
+                f"  Expected Status: {outcome.get('status_code')} | Exception: {outcome.get('exception_class')}\n"
+                f"  Semantic Assertion: {ast.get('assertion')}\n"
+            )
+        contract_section += (
+            "\nATURAN TRACEABILITY ASSERTION (WAJIB & STRICT):\n"
+            "1. Untuk SETIAP test function / test case yang Anda buat, WAJIB sertakan komentar traceability persis:\n"
+            "   # Test for: [ASSERTION_ID] (linked to [LINKED_REQ_ID])\n"
+            "   Contoh: # Test for: AST-01 (linked to REQ-01)\n"
+            "2. Anda HANYA boleh menguji assertion yang tercantum di atas. DILARANG mengarang kriteria di luar kontrak.\n"
+        )
     
     test_instruction = (
         "ATURAN DART / FLUTTER TEST (WAJIB):\n"
@@ -123,7 +159,7 @@ def tester_agent(state: SquadState) -> dict:
     prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
 
 {test_instruction}
-
+{contract_section}
 Spesifikasi & Kriteria Penerimaan:
 {specs}
 
@@ -175,7 +211,9 @@ Silakan tulis automated unit test suite lengkap sesuai aturan di atas dalam form
                     "target_language": target_lang,
                     "iteration": iteration,
                     "has_specifications": bool(specs),
-                    "code_files_keys": list(code_files.keys())
+                    "code_files_keys": list(code_files.keys()),
+                    "contract_id": contract.get("contract_id") if contract else None,
+                    "contract_sha256": contract.get("provenance", {}).get("contract_sha256") if contract else None
                 },
                 "raw_output": raw_output,
                 "test_files": formatted_test_files,
