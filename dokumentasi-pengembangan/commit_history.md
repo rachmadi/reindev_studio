@@ -195,3 +195,24 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   5. `FailingTest` field name: `message` (bukan `error_message`)
   6. Assertion ID boundary matching: `(?:_|\b)` pattern
 - **Kepatuhan Protokol IIDD:** IMPLEMENTATION ONLY sesuai desain v1.0.1 APPROVED. Nol eksperimen LLM. Frozen Oracle tak tersentuh. Executor v2 SAFE dipertahankan. P0-1 dipertahankan.
+
+### 5. Validasi Empiris Iterasi 6 Pasca P0-1, P0-2, & Executor v2 SAFE
+- **Commit Hash:** (pending)
+- **Status:** TERSIMPAN SECARA LOKAL (ITERATION 6 REMAINS OPEN)
+- **Pesan Commit Utama:** `docs: record empirical validation results for iteration 6 post-P0-2 (33.3% pass rate, iteration 6 remains open)`
+- **Waktu Eksekusi:** 2026-09-09 14:50 WIB
+- **Cakupan Berkas:**
+  - `dokumentasi-pengembangan/experiments/validation_iterasi6_post_p02.md` [NEW]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+  - `backend/output/validation_iterasi6_runs.json` [NEW]
+- **Hasil Validasi:** 9 Run Selesai (3 Task x 3 Replikasi). Pass Rate 33.3% (3 PASS, 6 FAIL).
+- **Temuan Kunci:**
+  - Frozen Oracle 100% Intact (SHA-256 identik).
+  - P0-2 Machine-Readable Contract 100% Tersegel FROZEN tanpa pelanggaran kriptografis.
+  - P0-1 Diagnostic Parser 100% aktif menghasilkan umpan balik terstruktur bersih tanpa noise ANSI.
+  - Executor SAFE 100% steril (0 mutasi kode/test).
+  - Reviewer Dual-Layer 100% konsisten menolak kode gagal dan memvalidasi AST.
+  - Akar Masalah Utama: Developer Reasoning Limitation pada model 7B lokal (stagnasi semantik HTTP 422 & interface kalkulator).
+- **Verdict:** `FAIL — ITERATION 6 REMAINS OPEN`
+- **Kepatuhan Protokol IIDD:** Eksperimen dijalankan apa adanya tanpa perubahan kode sebelum/selama pengujian, Frozen Oracle tidak dimodifikasi, batas 3 loop ditegakkan murni.
