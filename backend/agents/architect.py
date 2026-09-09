@@ -1,3 +1,13 @@
+"""
+System Architect Agent (v1.1.0)
+ReinDev Studio — Iterasi 6
+
+Merancang arsitektur perangkat lunak modular, peta file tree, dan kontrak antarmuka publik.
+v1.1.0: Injeksi Architect vNext Invariants (Coverage, Authority, Symbol Resolvability,
+Declaration Consistency), Pre-Seal Self-Review, dan Deterministic Blueprint Validator
+Self-Healing Revision Loop (max 2 revisions).
+"""
+
 import re
 import json
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -12,6 +22,7 @@ try:
     )
     from ..tracer import get_tracer
     from ..environment_grounding import generate_fact_card_for_architect
+    from ..architect_validator import validate_architect_blueprint
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -35,6 +46,10 @@ except (ImportError, ValueError):
         from environment_grounding import generate_fact_card_for_architect
     except ImportError:
         def generate_fact_card_for_architect(*args, **kwargs): return ""
+    try:
+        from architect_validator import validate_architect_blueprint
+    except ImportError:
+        def validate_architect_blueprint(*args, **kwargs): return True, []
 
 ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
@@ -49,6 +64,12 @@ Format luaran yang WAJIB Anda hasilkan:
 5. INTEGRITAS ENVIRONMENT RUNTIME (WAJIB):
    - DILARANG KERAS merancang blueprint, class, atau dependency yang menggunakan API/simbol yang dinyatakan terlarang dalam ENVIRONMENT FACT CARD.
    - Patuhi versi pustaka yang terpasang aktual di runtime.
+
+PRINSIP KONSISTENSI ARSITEKTUR (WAJIB):
+- Specification Coverage: Setiap requirement yang relevan dari spesifikasi harus terwakili dalam blueprint dan contract; jangan menghilangkan requirement ketika menyederhanakan rancangan.
+- Specification Authority: Pertahankan antarmuka yang telah ditentukan oleh spesifikasi secara eksak (nama fungsi, kelas, endpoint, signature); rancang bebas hanya antarmuka yang belum ditentukan, dengan tetap menjaga konsistensi.
+- Symbol Resolvability: Setiap simbol, decorator, tipe, atau dependensi yang digunakan dalam blueprint/snippet wajib memiliki sumber resolusi yang jelas (misal: statement import atau deklarasi lokal yang lengkap).
+- Declaration ↔ Reference Consistency: Setiap deklarasi interface, constructor, atau parameter yang direncanakan wajib konsisten dengan seluruh referensi dan pemanggilannya di seluruh bagian blueprint.
 
 Gunakan Bahasa Indonesia yang profesional, presisi, dan terstruktur tanpa kata-kata pengantar berlebih.
 """
@@ -317,7 +338,12 @@ Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {t
 DILARANG KERAS merancang file tree atau struktur dalam bahasa selain {target_lang.upper()}!
 DILARANG KERAS merancang kelas, dependensi, atau pola yang dinyatakan dilarang dalam BATASAN ARSITEKTUR WAJIB di atas!
 
-Tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
+PRE-SEAL SELF-REVIEW (Sebelum menyerahkan blueprint):
+Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
+1. Specification -> Coverage: Apakah seluruh requirement dari spesifikasi sudah terwakili tanpa ada yang terlewat?
+2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
+3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
+Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
 
     messages = [
         SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
@@ -326,6 +352,43 @@ Tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS t
     
     response = llm.invoke(messages)
     arch_plan = response.content if hasattr(response, "content") else str(response)
+
+    # Architect Blueprint Validator: Generic Static Consistency Check & Self-Healing Revision Loop
+    max_blueprint_revisions = 2
+    blueprint_revision_count = 0
+    while blueprint_revision_count < max_blueprint_revisions:
+        is_bp_valid, bp_errors = validate_architect_blueprint(arch_plan, target_lang)
+        if is_bp_valid:
+            break
+
+        blueprint_revision_count += 1
+        bp_errors_str = "\n".join(f"- {e}" for e in bp_errors)
+        bp_feedback = (
+            f"\n\n[PERHATIAN: CETAK BIRU ANDA MEMILIKI INKONSISTENSI INTERNAL (Revisi {blueprint_revision_count}/{max_blueprint_revisions})]\n"
+            f"Ditemukan ketidaksesuaian resolusi simbol / deklarasi pada snippet cetak biru Anda:\n"
+            f"{bp_errors_str}\n\n"
+            "INSTRUKSI REVISI WAJIB:\n"
+            "Perbaiki cetak biru arsitektur Anda:\n"
+            "- Pastikan seluruh decorator, tipe, dan kelas yang digunakan memiliki statement import (from ... import) atau deklarasi yang lengkap pada modul bersangkutan.\n"
+            "- Pastikan argumen pemanggilan selaras dengan parameter constructor yang dideklarasikan.\n"
+            "Tuliskan kembali cetak biru arsitektur yang telah diperbaiki secara konsisten."
+        )
+
+        tracer = get_tracer(state.get("run_id"))
+        if tracer:
+            tracer.log_event(
+                stage="architect",
+                event_type="blueprint_validation_failed",
+                iteration=blueprint_revision_count,
+                data={
+                    "errors": bp_errors,
+                    "target_language": target_lang
+                }
+            )
+
+        messages.append(HumanMessage(content=bp_feedback))
+        response = llm.invoke(messages)
+        arch_plan = response.content if hasattr(response, "content") else str(response)
 
     # P0-2: Lengkapi kontrak menjadi ALIGNED
     draft_contract = state.get("contract")

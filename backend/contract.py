@@ -1,13 +1,14 @@
 """
-Machine-Readable Contract Engine (P0-2)
+Machine-Readable Contract Engine (P0-2) — v1.0.2
 ReinDev Studio — Cross-Agent Semantic Contract & Deterministic Validation Gate
 
 Modul ini mengimplementasikan kontrak machine-readable formal (JSON / Pydantic v2),
 kanonikalisasi RFC 8785 (JCS) anti-circular hashing, 4 pilar gerbang validasi deterministik,
-penguncian immutabilitas FROZEN, dan checkpoint verifikasi integritas.
+penguncian immutabilitas FROZEN, checkpoint verifikasi integritas, dan sanitasi feedback
+Pilar 4 bebas kebocoran Oracle (Oracle-Independent Evaluation).
 
 Dokumen Desain:
-dokumentasi-pengembangan/architecture/machine_readable_contract_design.md (v1.0.1)
+dokumentasi-pengembangan/architecture/machine_readable_contract_design.md (v1.0.2)
 """
 
 from __future__ import annotations
@@ -497,8 +498,8 @@ def check_oracle_interface_consistency(
             )
             if not matches:
                 return False, (
-                    f"Oracle menguji endpoint {sorted(tested_endpoints)} pada {fname}, "
-                    f"tetapi Architect mendeklarasikan endpoint berbeda: {sorted(contract_endpoints)}."
+                    f"Contract endpoint {sorted(contract_endpoints)} tidak konsisten dengan authoritative specification. "
+                    f"Tinjau kembali endpoint terhadap spesifikasi dan pertahankan path yang ditetapkan; jangan mengimprovisasi path."
                 )
 
         # 2. Kasus Python unit test (CLI / Library / Module)
@@ -516,8 +517,9 @@ def check_oracle_interface_consistency(
             common = contract_symbols.intersection(tested_symbols)
             if not common:
                 return False, (
-                    f"Oracle menguji interface {sorted(tested_symbols)} pada {fname}, "
-                    f"tetapi Architect mendeklarasikan interface tidak kompatibel: {sorted(contract_symbols)}."
+                    f"Contract interface {sorted(contract_symbols)} tidak konsisten dengan authoritative specification. "
+                    f"Tinjau kembali seluruh public interface terhadap spesifikasi dan pertahankan nama/signature yang ditetapkan; "
+                    f"jangan mengimprovisasi atau menyingkat interface."
                 )
 
     return True, None

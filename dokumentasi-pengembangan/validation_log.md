@@ -697,5 +697,24 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_summary.json`
   - `dokumentasi-pengembangan/qwen7b_vs_gemma4_comparative_report.md`
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI CAPABILITY: ARCHITECT BLUEPRINT VALIDATOR & CONTRACT GATE SANITIZATION — 2026-09-10 00:50 WIB
+## ═══════════════════════════════════════════════════════════════════════════
 
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Integritas Oracle):** Sanitasi feedback penolakan Pillar 4 di `backend/contract.py` (v1.0.2). Pesan evaluatif tidak lagi membocorkan nama simbol/endpoint uji Oracle (`tested_symbols`, `tested_endpoints`) maupun nama file test (`fname`).
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di `test_contract_p0_2_1.py`, 37/37 tests PASS).
+- **Kriteria 2 (Architect vNext Generic Invariants):** Pembaruan `ARCHITECT_SYSTEM_PROMPT` dan human prompt di `backend/agents/architect.py` (v1.1.0) dengan 3 pilar: Coverage, Symbol Resolvability, dan Declaration Consistency + Pre-Seal Self-Review non-compiler.
+  *Hasil:* ✅ Terpenuhi (Berhasil mengarahkan perancangan antarmuka pada Dart dan Python).
+- **Kriteria 3 (Architect Blueprint Validator):** Modul deterministik `backend/architect_validator.py` (v1.0.0) untuk verifikasi konsistensi AST Python dan parameter constructor Dart.
+  *Hasil:* ✅ Terpenuhi (7/7 unit tests PASS di `test_architect_validator.py`).
+- **Kriteria 4 (Self-Healing Blueprint Revision Loop):** Loop revisi otomatis di `architect_agent` (maks 2 revisi) saat validator mendeteksi inkonsistensi internal.
+  *Hasil:* ✅ Terpenuhi secara empiris pada smoke test Python: Qwen 7B berhasil merevisi `@validator` dengan menyertakannya secara lengkap pada statement import (`[PASS] 100% resolvable`).
+- **Kriteria 5 (Regresi Global & Frozen Oracle Immutability):** 67 unit tests backend lulus 100%, seluruh hash SHA-256 Frozen Oracle tetap terkunci dan murni.
+  *Hasil:* ✅ Terpenuhi (67/67 PASS, hash match 100%).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **VALIDATION PENDING (CHECKPOINT FREEZE SEBELUM 9-RUN ABLASI QWEN vNEXT)**
+- **Catatan Otoritas:** Seluruh artefak kode baru dibekukan (*freeze*) sebagai checkpoint arsitektur resmi. Seluruh variabel dikunci untuk pelaksanaan 9-run controlled ablation Qwen 7B vNext.
