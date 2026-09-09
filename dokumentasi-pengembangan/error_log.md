@@ -634,8 +634,30 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Executor v2):
-- **Diselesaikan Mandiri oleh Agen:** 17 kasus
+### Kasus E-048: Missing Import NameError pada Pydantic v2 (@field_validator) di Qwen 7B
+- **Waktu:** 2026-09-09 ~23:48 s.d. 23:54 WIB (Run 1, 2, 3 FastAPI T1 Qwen 7B)
+- **Tingkat Keparahan:** Medium (Pytest Collection Discovery Failure)
+- **Gejala:** Pytest gagal mengumpulkan tes (`E NameError: name 'field_validator' is not defined`), keluar dengan exit code 2 di seluruh 3 putaran loop.
+- **Akar Masalah:** Architect Plan menyertakan dekorator `@field_validator` sesuai Fact Card Pydantic v2, namun baris impor di contoh kodenya lupa mencantumkan `field_validator`. Developer menyalin baris impor tersebut secara mentah tanpa inisiatif mengimpor simbol yang dipakai.
+- **Tindakan Korektif (Terencana):** Penambahan aturan diagnostik semantik di `diagnostic_parser.py` untuk mengidentifikasi missing import pada error collection pytest dan menyuntikkan hint resolusi impor.
+- **Sumber Solusi:** AGEN (Analisis Forensik Ablasi Qwen 7B).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-049: Penolakan Kontrak oleh Pre-Freeze Gate P0-2.1 Akibat Interface Deviation (Run 5 & 6 Qwen 7B)
+- **Waktu:** 2026-09-10 ~00:01 s.d. 00:03 WIB (Run 5 & 6 CLI T1 Qwen 7B)
+- **Tingkat Keparahan:** Low (Preventive Gate Action)
+- **Gejala:** Pipeline berhenti di fase `contract_gate` dengan status `contract=REJECTED`, durasi ~85 detik, zero code execution.
+- **Akar Masalah:** Architect Agent berhalusinasi mendefinisikan antarmuka fungsi publik `['add', 'divide', 'multiply', 'parse_matrix', 'subtract']`, menyimpang dari kontrak antarmuka Frozen Oracle (`add_matrices`, `multiply_matrices`, `subtract_matrices`, `Matrix`).
+- **Tindakan Korektif:** Gate P0-2.1 Pilar 4 (Oracle Consistency) menolak membekukan kontrak dan menggagalkan pipeline secara preventif (*fail-fast*), membuktikan sistem proteksi bekerja 100% deterministik.
+- **Sumber Solusi:** SISTEM REINDEV (P0-2.1 Deterministic Pre-Freeze Gate).
+- **Status:** Tuntas (Working as Designed).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Ablasi 9-Run Gemma & Qwen):
+- **Diselesaikan Mandiri oleh Agen:** 18 kasus
 - **Diselesaikan atas Intervensi IA:** 4 kasus
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 6 kasus
-- **Total Galat Terdokumentasi:** 47 kasus (E-001 s/d E-047)
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 7 kasus
+- **Total Galat Terdokumentasi:** 49 kasus (E-001 s/d E-049)

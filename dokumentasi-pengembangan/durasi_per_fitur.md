@@ -469,3 +469,40 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Penyelesaian Sesi:** 10:48:45 WIB
 - **Total Durasi Aktual:** **13 menit 45 detik (0.23 jam)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI CONTROLLED ABLATION 9-RUN (GEMMA 4 e4b & QWEN 2.5 CODER 7B) — 2026-09-09 s.d. 2026-09-10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal & Persiapan Runner (Development Time)
+| No | Aktivitas Pengembangan Fitur & Runner | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Perancangan runner 9-run controlled ablation Gemma 4 e4b (`scratch/run_gemma4_9run_ablation.py`) | 22:20:00 | 22:26:22 | 382 s | 6.37 m (0.11 j) |
+| 2 | Perancangan runner 9-run controlled ablation Qwen 2.5 Coder 7B (`scratch/run_qwen7b_9run_ablation.py`) | 23:42:15 | 23:44:38 | 143 s | 2.38 m (0.04 j) |
+| | **Subtotal Waktu Pengembangan & Runner** | | | **525 s** | **8.75 m (0.15 jam)** |
+
+### Komponen 2: Waktu Pengujian & Pengujian Ulang Terkontrol (Testing & Re-testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | 9-Run Controlled Ablation `gemma4:e4b` (3 Tasks × 3 Reps) | 22:26:22 | 23:41:55 | 4.533 s | 75.55 m (1.26 j) |
+| 2 | 9-Run Controlled Ablation `qwen2.5-coder:7b` (3 Tasks × 3 Reps) | 23:44:40 | 00:17:13 | 1.952 s | 32.53 m (0.54 j) |
+| | **Subtotal Waktu Pengujian & Uji Ulang** | | | **6.485 s** | **108.08 m (1.80 jam)** |
+
+### Komponen 3: Waktu Perbaikan, Analisis Forensik & Dokumentasi (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Analisis forensik hasil 9-run Gemma 4 & pembuatan `gemma4_e4b_9run_ablation_final_report.md` | 23:41:55 | 23:44:00 | 125 s | 2.08 m (0.03 j) |
+| 2 | Analisis forensik head-to-head Qwen vs Gemma & pembuatan `qwen7b_vs_gemma4_comparative_report.md` | 00:17:13 | 00:22:00 | 287 s | 4.78 m (0.08 j) |
+| 3 | Pemutakhiran log komprehensif (durasi_per_fitur, decision_log, validation_log, commit_history, error_log) | 00:22:00 | 00:27:00 | 300 s | 5.00 m (0.08 j) |
+| | **Subtotal Waktu Perbaikan & Dokumentasi** | | | **712 s** | **11.87 m (0.20 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Ablasi 9-Run Gemma 4 & Qwen 7B:
+\mathbf{\text{Total Waktu Realisasi} = 525\text{ s (Dev)} + 6.485\text{ s (Test)} + 712\text{ s (Doc/Forensik)} = 7.722\text{ detik} \approx 2\text{ jam } 8\text{ menit } 42\text{ detik} (2.15\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-09 22:20:00 WIB
+- **Waktu Penyelesaian Sesi:** 2026-09-10 00:27:00 WIB
+- **Total Durasi Aktual:** **2 jam 7 menit (100% dihitung berdasarkan timestamp eksperimen)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.

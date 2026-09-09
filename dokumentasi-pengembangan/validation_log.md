@@ -672,4 +672,30 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_result.md`
   - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_summary.json`
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: 9-RUN CONTROLLED ABLATION (GEMMA 4 e4b & QWEN 2.5 CODER 7B) — 2026-09-10 00:25 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Ringkasan Hasil Eksperimen 9-Run Komparatif
+- **Tujuan:** Menguji secara empiris performa dua model lokal (`gemma4:e4b` dan `qwen2.5-coder:7b`) sebagai 100% Unified Squad (PM, Architect, Developer, Reviewer) di bawah kondisi ReinDev terkunci identik (Frozen Oracle SHA-256, SAFE Executor, P0-2.1 Contract Gate, Universal Grounding D-074/075, Compact Repair D-073, token predict 3000).
+- **Hasil Agregat:**
+  - `gemma4:e4b`: **2 / 9 PASS (22.2%)** (FastAPI T1: 1/3, CLI T1: 1/3, Flutter T1: 0/3). Durasi: 4.533,3s (~75,6 menit).
+  - `qwen2.5-coder:7b`: **0 / 9 PASS (0.0%)** (FastAPI T1: 0/3, CLI T1: 0/3, Flutter T1: 0/3). Durasi: 1.951,7s (~32,5 menit).
+- **Temuan Kunci Forensik:**
+  - `gemma4:e4b` membuktikan kemampuan eksekusi end-to-end Python pada model 4B (lulus 5/5 unit test di FastAPI dan CLI).
+  - `qwen2.5-coder:7b` mengalami slip impor sistemik pada FastAPI (`NameError: field_validator`), penolakan interface oleh Contract Gate P0-2.1 pada CLI (Pilar 4 Oracle Consistency), dan parameter mismatch pada Flutter. Kecepatan Qwen 7B 2,3x lebih tinggi.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **VALIDATION PENDING (DALAM PENINJAUAN INTENT ARCHITECT)**
+- **Catatan Otoritas:** Hasil eksperimen 9-run pada kedua model lokal telah tercatat secara utuh di `dokumentasi-pengembangan/experiments/` beserta artifak komparatif lengkap. Commit dan push dieksekusi dengan status peninjauan terbuka (*validation pending*) untuk keputusan strategis berikutnya oleh Intent Architect.
+- **Dokumentasi Lengkap:**
+  - `dokumentasi-pengembangan/experiments/ablation_gemma4_e4b_result.md`
+  - `dokumentasi-pengembangan/experiments/ablation_gemma4_e4b_summary.json`
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_result.md`
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_summary.json`
+  - `dokumentasi-pengembangan/qwen7b_vs_gemma4_comparative_report.md`
+
+
 

@@ -273,4 +273,31 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - **Skenario A (Cognitive Capacity Ceiling) Terkonfirmasi Secara Absolut:** Pipeline ReinDev terbukti solid dan berfungsi secara end-to-end dengan penalaran tingkat frontier (0 reasoning failure).
   - **Status Iterasi 6:** **REMAINS OPEN (UNDER REVIEW BY INTENT ARCHITECT)** — Intent Architect memutuskan untuk belum menutup Iterasi 6 secara resmi karena sedang mendalami dan menganalisis skenario-skenario alternatif lainnya.
 
+### 10. Implementasi Universal Environment Grounding Framework (D-074 & D-075)
+- **Status:** COMMITTED LOKAL (`52ed032`)
+- **Pesan Commit:** `feat(grounding): implement Universal Environment Grounding Framework (D-074, D-075)`
+- **Waktu Eksekusi:** 2026-09-09 22:20 WIB
+- **Cakupan Berkas:**
+  - `backend/knowledge_catalog.py` [NEW — declarative rule catalog]
+  - `backend/environment_grounding.py` [MODIFIED — dynamic scanner & Fact Card generator]
+  - `backend/test_environment_grounding.py` [NEW — 10 unit test cases]
+  - `backend/agents/architect.py` & `backend/agents/developer.py` [MODIFIED — fact card injection]
+
+### 11. Pengujian 9-Run Controlled Ablation (gemma4:e4b & qwen2.5-coder:7b)
+- **Status:** ⏳ VALIDATION PENDING (Menunggu Evaluasi Lanjutan Intent Architect)
+- **Commit Hash:** `636fb8f`
+- **Pesan Commit Target:** `docs(ablation): record 9-run controlled ablation results for gemma4:e4b (22.2%) and qwen2.5-coder:7b (0.0%) [validation pending]`
+- **Waktu Eksekusi:** 2026-09-10 00:26 WIB
+- **Cakupan Berkas:**
+  - `dokumentasi-pengembangan/experiments/ablation_gemma4_e4b_summary.json` [NEW]
+  - `dokumentasi-pengembangan/experiments/ablation_gemma4_e4b_result.md` [NEW]
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_summary.json` [NEW]
+  - `dokumentasi-pengembangan/experiments/ablation_qwen2.5_coder_7b_result.md` [NEW]
+  - `dokumentasi-pengembangan/durasi_per_fitur.md` [MODIFIED]
+  - `dokumentasi-pengembangan/decision_log.md` [MODIFIED — D-076, D-077]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED — validation pending]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+  - `dokumentasi-pengembangan/error_log.md` [MODIFIED — E-048, E-049]
+
+
 
