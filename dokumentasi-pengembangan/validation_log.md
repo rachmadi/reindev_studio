@@ -430,5 +430,52 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Tindak Lanjut:** Menunggu penelaahan dan arahan resmi Intent Architect terhadap desain arsitektur P0-2 Machine-Readable Contract.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## REVISI DESAIN ARSITEKTUR P0-2 v1.0.1 (MACHINE-READABLE CONTRACT) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Design Review v1.0.1)
+- **Status Desain:** DESIGN ONLY — PENDING IA VALIDATION (Nol modifikasi kode sumber, nol eksperimen LLM, Frozen Oracle tak tersentuh).
+- **Dokumen Desain:** `dokumentasi-pengembangan/architecture/machine_readable_contract_design.md` (Versi 1.0.1, 757 baris, 50.084 bytes).
+- **Penyelesaian 5 Poin Review Kritis Intent Architect (R1–R5):**
+  1. **R1 — Anti-Circular Canonical Hashing (Bagian 2.1 & 7.6):**
+     - Mengadopsi standar kanonikalisasi RFC 8785 (JSON Canonicalization Scheme - JCS).
+     - Payload hash mengecualikan atribut `provenance.contract_sha256` ($C_{\text{stripped}} = C \setminus \{\text{"provenance.contract_sha256"}\}$).
+     - Hash dihitung secara tunggal pada saat transisi status `ALIGNED` $\rightarrow$ `FROZEN`.
+     - Empat checkpoint verifikasi deterministik ditetapkan: sebelum Developer, sebelum Tester, pada setiap iterasi repair loop, dan sebelum audit Reviewer.
+     - Penanganan mismatch: *Fail-Fast Abort* instan menghentikan eksekusi squad dan mengembalikan sinyal pelanggaran integritas.
+  2. **R2 — Eliminasi Asumsi HTTP Hard-coded (Bagian 7.4 & 10):**
+     - Menghapus aturan absolut `GET -> 200` atau `POST -> 201` dari modus kegagalan `FM-C-02` dan Validation Gate.
+     - Menggantikannya dengan **Internal Contract Consistency Check** (memverifikasi kesesuaian antara endpoint yang dideklarasikan pada `interface_contracts` dengan status outcome pada `testable_assertions`).
+     - Konvensi REST diposisikan sebagai *domain advisory warnings* tanpa menggugurkan validasi kontrak.
+  3. **R3 — Pemisahan 3 Lapis Konseptual (Bagian 4):**
+     - Memformalkan pemisahan tegas 3 lapis: $\text{Contract}$ (spesifikasi deklaratif yang disepakati) $\rightarrow$ $\text{Acceptance Semantics}$ (kriteria outcome terverifikasi) $\rightarrow$ $\text{Test/Oracle Materialization}$ (kode uji eksekutabel konkret).
+     - Menegaskan kembali hierarki validitas ilmiah: pada evaluasi benchmark, **Frozen Oracle tetap memegang otoritas tertinggi mutlak** yang tidak dapat dinegosiasikan atau dilemahkan oleh kontrak runtime.
+  4. **R4 — Integritas Referensial & Validasi 4 Pilar (Bagian 3 & 7.2–7.5):**
+     - Menambahkan atribut relasi `linked_interface_id` pada skema assertion.
+     - Menegakkan aturan keunikan ID (`REQ-xx`, `AST-xx`), pelarangan referensi dangling, cakupan kebutuhan fungsional 100% ($\forall r \in \text{requirements}, |\text{assertions}(r)| \ge 1$), pelarangan orphan assertions, dan validitas `target_symbol`.
+     - Memisahkan secara tegas 4 pilar validasi:
+       - Pilar 1: *Schema Validity* (kepatuhan JSON Schema Draft 2020-12).
+       - Pilar 2: *Referential Integrity* (konsistensi relasi antar entitas kontrak).
+       - Pilar 3: *Requirement Coverage* (kelengkapan pemetaan requirement ke assertion).
+       - Pilar 4: *Assertion Verifiability & Internal Consistency* (keterukuran verifikasi dan konsistensi tipe data/status code).
+  5. **R5 — Batas Determinisme Reviewer (Bagian 6.6 & 9):**
+     - Mengklarifikasi peran Reviewer sebagai arsitektur hibrida 2-lapis:
+       $$\text{Reviewer} = \text{Deterministic Evidence Gates (Lapis 1)} + \text{Bounded LLM Review (Lapis 2)}.$$
+     - Lapis 1 (Deterministik Mesin): Verifikasi hash integritas, status test sandbox (exit code 0), inspeksi simbol AST, kepatuhan constraint terukur, dan matriks cakupan assertion.
+     - Lapis 2 (Penalaran LLM Terbatas): Analisis semantik logika bisnis, penanganan edge-case, kebersihan idiom kode, dan kepatuhan arsitektur non-mekanis.
+     - Merumuskan aksioma batas bukti: keberadaan fungsi pada AST tidak menjamin pemenuhan semantik ($\text{AST Presence} \neq \text{Semantic Compliance}$), dan kelulusan sandbox tidak menjamin pemenuhan seluruh kontrak jika cakupan pengujian tidak lengkap ($\text{Test PASS} \neq \text{Complete Contract Compliance}$).
+- **Design Verdict:** **`DESIGN ONLY — PENDING IA VALIDATION`**.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (DESIGN ONLY — PENDING IA VALIDATION)
+- **Waktu Laporan:** 2026-09-09 11:36 WIB
+- **Pelaksana Desain:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu penelaahan dan persetujuan resmi Intent Architect terhadap desain v1.0.1 sebelum melangkah ke perencanaan implementasi (P0-2 implementation plan).
+
+
 
 

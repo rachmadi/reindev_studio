@@ -882,4 +882,30 @@ P0-2 — Design Only: Machine-Readable Contract. Buat desain arsitektur P0-2: Ma
  12. Migration Strategy: Strategi adopsi bertahap 3 fase [Shadow Dual-Write -> Active Consumer -> Contract-Driven Review].
  Status desain: DESIGN ONLY — PENDING IA VALIDATION).
 
+---
+
+[PENGGUNA - 11:32]
+P0-2 Revision — Machine-Readable Contract Design v1.0.1
+Revisi DESAIN SAJA dokumen:
+dokumentasi-pengembangan/architecture/machine_readable_contract_design.md
+berdasarkan hasil IA review.
+Jangan implementasi kode. Jangan eksperimen. Jangan mengubah Frozen Oracle.
+1. Perbaiki canonical SHA-256 (hilangkan circular hashing, RFC 8785 canonicalization, field exclusion provenance.contract_sha256, titik hitung transisi ALIGNED->FROZEN, verifikasi checkpoint, fail-fast abort).
+2. Hilangkan hard-coded HTTP assumptions (revisi FM-C-02 & Validation Gate, periksa konsistensi internal deklarasi vs assertion, REST convention sebagai advisory warning).
+3. Tegaskan hubungan 3 arah (Contract vs Acceptance Semantics vs Test/Oracle Materialization, Frozen Oracle otoritas absolut tak tersentuh).
+4. Perketat validation gate & referential integrity (linked_req_id, linked_interface_id, zero orphan requirements, zero orphan assertions, valid target_symbol, diferensiasi 4 pilar: Schema Validity != Referential Integrity != Requirement Coverage != Assertion Verifiability).
+5. Batasi determinism boundary pada Reviewer (Reviewer = Deterministic Evidence Gates + Bounded LLM Review; aksioma: AST presence != semantic compliance, test PASS != complete contract compliance).
+6. Pertahankan batasan status: DESIGN ONLY — PENDING IA VALIDATION, tambahkan ringkasan revisi Bagian 0 (R1-R5 Mapping), update conversation_log & validation_log, git commit lokal.
+
+[ANTIGRAVITY - 11:36]
+(Merevisi dokumen desain arsitektur P0-2 ke Versi 1.0.1 di `dokumentasi-pengembangan/architecture/machine_readable_contract_design.md` [757 baris, 50.084 bytes]:
+ 1. Menambahkan Bagian 0: IA Revision Response yang memetakan secara komprehensif kelima poin review kritis IA (R1–R5) ke bagian dokumen spesifik.
+ 2. R1 — Anti-Circular Canonical Hashing: Menetapkan kanonikalisasi RFC 8785 (JCS), mengeluarkan field `provenance.contract_sha256` dari payload hashing, menetapkan penyegelan hash tunggal saat transisi `ALIGNED` -> `FROZEN`, menetapkan 4 checkpoint verifikasi, dan mendesain abort instan jika terjadi mismatch hash.
+ 3. R2 — Eliminasi Asumsi HTTP Hard-coded: Merevisi FM-C-02 dan Validation Gate; menghapus aturan kaku `GET -> 200` atau `POST -> 201`; menggantikannya dengan pemeriksaan konsistensi internal antara deklarasi endpoint dan assertion; mengklasifikasikan konvensi REST sebagai advisory warnings.
+ 4. R3 — Pemisahan 3 Lapis Konseptual: Memformalkan relasi `Contract` (kesepakatan yang dibangun) -> `Acceptance Semantics` (kriteria keberhasilan terverifikasi) -> `Test/Oracle Materialization` (evaluator eksekutabel ground truth); menegaskan Frozen Oracle sebagai otoritas tertinggi benchmark yang tidak boleh dinegosiasikan oleh kontrak.
+ 5. R4 — Integritas Referensial & Validasi 4 Pilar: Menambahkan skema relasi `linked_interface_id`, aturan keunikan ID (`REQ-xx`, `AST-xx`), pelarangan referensi dangling, requirement coverage 100%, anti-orphan assertions, serta membedakan 4 pilar validasi secara formal (Pilar 1: Schema Validity, Pilar 2: Referential Integrity, Pilar 3: Requirement Coverage, Pilar 4: Internal Consistency).
+ 6. R5 — Batas Determinisme Reviewer: Memperjelas peran Reviewer sebagai arsitektur hibrida 2-lapis (`Reviewer = Deterministic Evidence Gates + Bounded LLM Review`); menetapkan aksioma batas bukti bahwa keberadaan fungsi di AST tidak sama dengan pemenuhan semantik, dan test PASS tidak selalu berarti seluruh kontrak terpenuhi jika test suite tidak mencakup seluruh assertion.
+ 7. Menjaga batasan ketat: Nol perubahan kode di `backend/`, nol eksperimen LLM, nol perubahan Frozen Oracle, status desain tetap DESIGN ONLY — PENDING IA VALIDATION).
+
+
 
