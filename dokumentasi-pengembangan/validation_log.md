@@ -273,6 +273,15 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 
 ### 1. Evaluasi Internal Re-Evaluation (Micro Loop Agen)
 - **Phase 0 (Frozen Oracle Validation):**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## EKSPERIMEN TERKONTROL (Phase 0, Phase 1, Phase 2) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Micro Loop Agen)
+- **Phase 0 (Frozen Oracle Validation):**
   - SHA-256 ketiga test suite beku tervalidasi 100% identik dengan ground truth.
   - Hasil audit referensi: FastAPI T1 (5/5 PASS), CLI T1 (5/5 PASS), Flutter T1 (2/2 PASS).
 - **Phase 1 (Controlled Pilot 9 Runs):**
@@ -291,3 +300,34 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Pelaksana Eksperimen:** Antigravity (Agentic Pair-Programmer)
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Tindak Lanjut:** Menunggu penelaahan hasil audit dokumentasi-pengembangan/experiments/executor_phase2_main_experiment.md dan arahan strategis IA untuk perbaikan squad ReinDev Studio.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## IMPLEMENTASI EXECUTOR V2 (PRE-FLIGHT VALIDATION LAYER) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Micro Loop Agen)
+- **Kandidat Mode Default Baru: 'SAFE'**:
+  - Berhasil diimplementasikan pada `backend/executor_v2.py`.
+  - Berhasil menggantikan seluruh 9 aturan global regex code rewriting destruktif dengan parser AST standar Python (`ast.parse`).
+  - Hanya melakukan syntax validation dan safe missing-import resolution terbukti (`BaseModel`, `FastAPI`, `typing`, sibling classes).
+  - Dilarang keras melakukan business-logic repair, model/schema rewriting, endpoint injection, parser replacement, dan arithmetic repair.
+  - Frozen Oracle / test files dijamin 100% strictly immutable.
+- **Pencegahan Pola Kegagalan Run 10**:
+  - Terbukti 100% lulus pada `test_run10_pattern_prevention`: kode Developer yang mendefinisikan DTO `ProductCreate` tanpa `id` dan memanggil `Product(id=len(products)+1, **product.dict())` tidak dimutasi lagi dengan injeksi `id`, tidak memicu error `TypeError: got multiple values for keyword argument 'id'`, dan lulus 5/5 PASS.
+- **Penyelesaian Impor Aman Run 02 (Category B)**:
+  - Terbukti 100% lulus pada `test_run02_safe_import_resolution`: kelas model `class Product(BaseModel)` yang lupa mengimpor `BaseModel` diselesaikan secara presisi via AST dengan menambahkan `from pydantic import BaseModel`, mencatat before/after hash dan reason, serta lulus 5/5 PASS.
+- **Mekanisme Re-Validation & Rollback Otomatis**:
+  - Terbukti berfungsi: jika kandidat transformasi mendegradasi atau tidak meningkatkan hasil uji, sistem secara otomatis me-rollback file ke kode asli Developer.
+- **Regresi Keseluruhan Suite**:
+  - Seluruh 42 pengujian pada `backend/` (34 pengujian legasi + 8 pengujian unit baru `test_executor_v2.py`) lulus 100% (42 passed, 0 failed dalam 15.91s).
+- **Backward Compatibility**:
+  - File legasi `backend/executor.py` dipertahankan utuh tanpa overwrite. Mode `OFF`, `CODE_ONLY`, dan `ON` tetap didelegasikan ke runner legasi untuk menjamin reproduktifitas eksperimen Phase 1 dan Phase 2.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (PENDING VALIDATION BY INTENT ARCHITECT)
+- **Waktu Laporan:** 2026-09-09 10:48 WIB
+- **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu evaluasi dan putusan resmi Intent Architect terhadap arsitektur Executor v2 dan hasil pengujian unit anti-regresi Run 10.

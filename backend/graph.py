@@ -7,7 +7,7 @@ try:
     from .agents.developer import developer_agent
     from .agents.tester import tester_agent
     from .agents.reviewer import reviewer_agent
-    from .executor import executor_node
+    from .executor_v2 import executor_node_v2 as executor_node
     from .tracer import get_tracer, compute_dict_hashes
 except (ImportError, ValueError):
     from state import SquadState
@@ -16,7 +16,7 @@ except (ImportError, ValueError):
     from agents.developer import developer_agent
     from agents.tester import tester_agent
     from agents.reviewer import reviewer_agent
-    from executor import executor_node
+    from executor_v2 import executor_node_v2 as executor_node
     try:
         from tracer import get_tracer, compute_dict_hashes
     except ImportError:

@@ -42,7 +42,7 @@ CONFIG_STATE = {
     "max_iterations": 3,
     "target_language": "python",
     "executor_intervention_enabled": True,
-    "executor_mode": "ON",
+    "executor_mode": "SAFE",
     "frozen_oracle_path": None,
 }
 
@@ -137,12 +137,12 @@ async def update_config(req: ConfigUpdateRequest):
         CONFIG_STATE["target_language"] = req.target_language.lower()
     if req.executor_mode:
         m = req.executor_mode.upper()
-        if m in ("ON", "OFF", "CODE_ONLY"):
+        if m in ("SAFE", "ON", "OFF", "CODE_ONLY"):
             CONFIG_STATE["executor_mode"] = m
             CONFIG_STATE["executor_intervention_enabled"] = (m != "OFF")
     elif req.executor_intervention_enabled is not None:
         CONFIG_STATE["executor_intervention_enabled"] = req.executor_intervention_enabled
-        CONFIG_STATE["executor_mode"] = "ON" if req.executor_intervention_enabled else "OFF"
+        CONFIG_STATE["executor_mode"] = "SAFE" if req.executor_intervention_enabled else "OFF"
     if req.frozen_oracle_path is not None:
         CONFIG_STATE["frozen_oracle_path"] = req.frozen_oracle_path if req.frozen_oracle_path != "" else None
     return {
@@ -230,12 +230,12 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                 target_lang = data.get("target_language", CONFIG_STATE["target_language"])
                 max_iter = data.get("max_iterations", CONFIG_STATE["max_iterations"])
                 raw_mode = data.get("executor_mode")
-                if raw_mode and raw_mode.upper() in ("ON", "OFF", "CODE_ONLY"):
+                if raw_mode and raw_mode.upper() in ("SAFE", "ON", "OFF", "CODE_ONLY"):
                     executor_mode = raw_mode.upper()
                 elif "executor_intervention_enabled" in data:
-                    executor_mode = "ON" if data["executor_intervention_enabled"] else "OFF"
+                    executor_mode = "SAFE" if data["executor_intervention_enabled"] else "OFF"
                 else:
-                    executor_mode = CONFIG_STATE.get("executor_mode", "ON").upper()
+                    executor_mode = CONFIG_STATE.get("executor_mode", "SAFE").upper()
                 executor_intervention_enabled = (executor_mode != "OFF")
                 frozen_oracle_path = data.get("frozen_oracle_path", CONFIG_STATE.get("frozen_oracle_path", None))
                 if frozen_oracle_path == "":

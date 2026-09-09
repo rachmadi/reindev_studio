@@ -197,9 +197,10 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **6** | Code Explorer & Sandbox Terminal | 7.0 | 1.29 | 77.4 m | -5.71 | 5.4x |
 | **Riset 1** | Riset & Eksperimen Awal Executor & Baseline | — | 11.69 | 701.4 m | — | 2026-09-08 (11.69 jam) |
 | **Eksperimen** | Controlled Experiments (Phase 0, 1, 2 [30 Runs]) | — | 4.41 | 264.3 m | — | 2026-09-09 (4.41 jam) |
+| **Executor v2** | Pre-Flight Validation Layer & Safe Mode Implementation | — | 0.21 | 12.7 m | — | 2026-09-09 (AST validation, safe imports, anti-regression Run 10) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen s.d. Sesi Ini)** | **46.0** | **19.36** | **1.161,7 m** | **-26.64** | **Termasuk 16.10 jam riset & eksperimen terkontrol** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen + Executor v2)** | **46.0** | **19.57** | **1.174,4 m** | **-26.43** | **Termasuk 16.31 jam riset, eksperimen & penguatan arsitektur** |
 
 
 

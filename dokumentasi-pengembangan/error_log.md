@@ -623,8 +623,19 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Phase 2):
-- **Diselesaikan Mandiri oleh Agen:** 16 kasus
+### Kasus E-047: Regresi Destruktif Akibat Blind Regex Code Rewriting pada Executor v1 (Run 10 Pattern)
+- **Waktu:** 2026-09-09 ~10:45 WIB
+- **Tingkat Keparahan:** High (Self-Inflicted Code Regression)
+- **Gejala:** Kode Developer asli yang telah valid dan lulus 5/5 diubah oleh regex Executor v1 yang menyuntikkan `id: int | None = None` ke kelas DTO `ProductCreate`, menyebabkan `TypeError: got multiple values for keyword argument 'id'` saat pemanggilan `Product(id=len(products)+1, **product.dict())`, sehingga hasil uji sandbox anjlok dari 5/5 PASS menjadi 1/5 PASS.
+- **Akar Masalah:** Penggunaan regex string replacement global tanpa pemahaman struktur AST menyebabkan over-fitting dan mematahkan kode pemisahan model yang benar.
+- **Tindakan Korektif:** Mengimplementasikan Executor v2 (`backend/executor_v2.py`) dengan mode baru `SAFE` sebagai kandidat default, menghapus 9 aturan regex destruktif, menerapkan AST syntax & safe missing-import resolution murni, serta menambahkan mekanisme automatic re-validation & rollback.
+- **Sumber Solusi:** AGEN (Berdasarkan Rekomendasi Audit Forensik Level-Transformasi Phase 2).
+- **Status:** Tuntas (Resolved). Terbukti dicegah 100% pada `test_run10_pattern_prevention` di `backend/test_executor_v2.py`.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Executor v2):
+- **Diselesaikan Mandiri oleh Agen:** 17 kasus
 - **Diselesaikan atas Intervensi IA:** 4 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 6 kasus
-- **Total Galat Terdokumentasi:** 46 kasus (E-001 s/d E-046)
+- **Total Galat Terdokumentasi:** 47 kasus (E-001 s/d E-047)
