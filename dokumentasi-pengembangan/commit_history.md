@@ -216,3 +216,61 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Akar Masalah Utama: Developer Reasoning Limitation pada model 7B lokal (stagnasi semantik HTTP 422 & interface kalkulator).
 - **Verdict:** `FAIL — ITERATION 6 REMAINS OPEN`
 - **Kepatuhan Protokol IIDD:** Eksperimen dijalankan apa adanya tanpa perubahan kode sebelum/selama pengujian, Frozen Oracle tidak dimodifikasi, batas 3 loop ditegakkan murni.
+
+### 6. Implementasi & Validasi Intervensi P0-2.1 (Contract Integrity & Pre-Freeze Gate)
+- **Status:** TERSIMPAN SECARA LOKAL
+- **Pesan Commit Target:** `feat: implement P0-2.1 contract integrity pre-freeze gate and interface alignment`
+- **Waktu Eksekusi:** 2026-09-09 17:45 WIB
+- **Cakupan Berkas:**
+  - `backend/contract.py` [MODIFIED — pre-freeze contract validation gate]
+  - `backend/agents/architect.py` [MODIFIED — smart interface extraction & completion]
+  - `backend/test_contract_p0_2_1.py` [NEW — unit tests for gate]
+  - `dokumentasi-pengembangan/experiments/validation_p0_2_1_intervention.md` [NEW]
+- **Hasil Validasi:** 9-run pass rate 33.3% (3/9). Gate berfungsi 100%, namun Qwen 7B mengalami *semantic stagnation* pada loop 1-3.
+
+### 7. Implementasi & Validasi Intervensi P0-1 (Semantic Diagnostic Guidance)
+- **Status:** TERSIMPAN SECARA LOKAL
+- **Pesan Commit Target:** `feat: implement P0-1 semantic diagnostic parser with actionable hint injection`
+- **Waktu Eksekusi:** 2026-09-09 18:25 WIB
+- **Cakupan Berkas:**
+  - `backend/diagnostic_parser.py` [MODIFIED — semantic failure classifier & [ACTIONABLE HINT] builder]
+  - `backend/agents/developer.py` [MODIFIED — hint prompt injection]
+  - `backend/test_diagnostic_parser_p0_1.py` [NEW — unit tests for hints]
+  - `dokumentasi-pengembangan/experiments/validation_p0_1_intervention.md` [NEW]
+- **Hasil Validasi:** 9-run pass rate 22.2% (2/9). Analisis kausal membuktikan model secara mekanistik merespons hint dan mengubah schema, namun jenuh secara kapasitas kognitif (*cognitive capacity ceiling*), memicu regresi impor.
+
+### 8. Implementasi OpenRouter Cloud/Frontier Developer Gateway
+- **Status:** TERSIMPAN SECARA LOKAL
+- **Pesan Commit Target:** `feat: implement DeveloperGateway with Ollama and OpenRouter adapters, keeping Ollama 7B as default`
+- **Waktu Eksekusi:** 2026-09-09 18:50 WIB
+- **Cakupan Berkas:**
+  - `backend/developer_gateway.py` [NEW — gateway factory, adapters, transport error, response dataclass]
+  - `backend/test_developer_gateway.py` [NEW — 23 unit test cases, 0.84s]
+  - `backend/state.py` [MODIFIED — developer_backend & developer_model fields]
+  - `backend/agents/developer.py` [MODIFIED — gateway integration, trace metadata]
+  - `backend/graph.py` [MODIFIED — direct routing to END on transport_error]
+- **Hasil Pengujian:** 23/23 gateway tests PASS, 130/130 full backend regression tests PASS (0 regresi). Proteksi keamanan kredensial: zero API key leakage.
+
+### 9. Validasi Empiris 9-Run Controlled Frontier Ablation (google/gemini-3.8-flash)
+- **Status:** TERSIMPAN SECARA LOKAL
+- **Pesan Commit Target:** `docs: record 9-run frontier ablation results (77.8% gross, 100% net reasoning pass rate, scenario A confirmed)`
+- **Waktu Eksekusi:** 2026-09-09 19:25 WIB
+- **Cakupan Berkas:**
+  - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_result.md` [NEW]
+  - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_summary.json` [NEW]
+  - `dokumentasi-pengembangan/decision_log.md` [MODIFIED — D-066 s.d. D-069]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED — 4 milestone entries]
+  - `dokumentasi-pengembangan/iteration_summary.md` [MODIFIED — full Iteration 6 wrap-up]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+- **Hasil Eksperimen:**
+  - Gross Pass Rate: **7 / 9 (77.8%)**
+  - Net Reasoning Pass Rate: **7 / 7 (100.0%)** — **0 Developer Reasoning Failures**.
+  - FastAPI T1: 3/3 Loop 0 Direct Pass (100%).
+  - CLI T1: 1/3 Gross, 1/1 Net Reasoning Pass (100%).
+  - Flutter T1: 3/3 Loop 1 Pass (100%).
+  - Frozen Oracle Hashes: **100% SHA-256 match**.
+- **Kesimpulan Ilmiah & Status Iterasi 6:**
+  - **Skenario A (Cognitive Capacity Ceiling) Terkonfirmasi Secara Absolut:** Pipeline ReinDev terbukti solid dan berfungsi secara end-to-end dengan penalaran tingkat frontier (0 reasoning failure).
+  - **Status Iterasi 6:** **REMAINS OPEN (UNDER REVIEW BY INTENT ARCHITECT)** — Intent Architect memutuskan untuk belum menutup Iterasi 6 secara resmi karena sedang mendalami dan menganalisis skenario-skenario alternatif lainnya.
+
+

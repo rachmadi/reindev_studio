@@ -37,7 +37,9 @@ Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang strukt
 Format luaran yang WAJIB Anda hasilkan:
 1. Peta Struktur File Proyek (File Tree Structure) sesuai target bahasa pemrograman yang diminta
 2. Tanggung Jawab Komponen / Modul
-3. Kontrak Interface & Type Annotation (Nama fungsi, parameter, return type)
+3. Kontrak Interface Publik & Type Annotation Eksplisit (P0-2.1 WAJIB):
+   - Untuk setiap task non-UI (REST API, CLI, modul komputasi/matematis, Library): Anda WAJIB mendefinisikan antarmuka publik yang dapat diobservasi dan diuji secara independen (nama fungsi/kelas, signature callable, parameter input, return type).
+   - Jangan biarkan Developer menebak-nebak antarmuka publik. Pastikan antarmuka selaras dengan kebutuhan task.
 4. Panduan Implementasi untuk Developer Agent
 
 Gunakan Bahasa Indonesia yang profesional, presisi, dan terstruktur tanpa kata-kata pengantar berlebih.
@@ -160,14 +162,30 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
             }
         ]
     else:
-        # Generic CLI / Algorithm module
-        # Periksa apakah arch_plan mendefinisikan kontrak fungsi eksplisit (misal: - dot_product(...) -> float)
-        func_matches = re.findall(r"-\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\], ]+))?", arch_plan)
+        # Generic CLI / Algorithm / Computational module
+        # Ekstraksi fungsi atau method yang dirancang oleh Architect di arch_plan
+        func_matches = re.findall(
+            r"(?:def\s+|-\s*|\*\s*|`)([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\], ]+))?",
+            arch_plan
+        )
+        class_matches = re.findall(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", arch_plan)
+
+        data_models = []
+        interface_contracts = []
+        testable_assertions = []
+
+        if class_matches:
+            for cname in class_matches:
+                data_models.append({
+                    "model_name": cname,
+                    "target_file": "main.py",
+                    "fields": []
+                })
+
         if func_matches:
-            data_models = []
-            interface_contracts = []
-            testable_assertions = []
             for idx, (fn_name, params_str, ret_type) in enumerate(func_matches, 1):
+                if fn_name in ("if", "for", "while", "with", "print", "assert", "return"):
+                    continue
                 ifid = f"IFC-0{idx}" if idx < 10 else f"IFC-{idx}"
                 astid = f"AST-0{idx}" if idx < 10 else f"AST-{idx}"
                 ret = ret_type.strip() if ret_type else "float"
@@ -176,7 +194,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                     "interface_type": "FUNCTION",
                     "identifier": fn_name,
                     "http_method": None,
-                    "target_file": "vector_math.py" if "vector" in arch_plan.lower() else "main.py",
+                    "target_file": "main.py",
                     "parameters": [],
                     "expected_return": {
                         "return_type": ret,
@@ -197,12 +215,12 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                     }
                 })
         else:
-            data_models = []
+            fn_name = "calculate" if any(k in task_l for k in ["hitung", "kalkulator", "calc", "math"]) else "execute"
             interface_contracts = [
                 {
                     "interface_id": "IFC-01",
                     "interface_type": "FUNCTION",
-                    "identifier": "calculate",
+                    "identifier": fn_name,
                     "http_method": None,
                     "target_file": "main.py",
                     "parameters": [
@@ -222,8 +240,8 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                     "linked_req_id": "REQ-01",
                     "linked_interface_id": "IFC-01",
                     "test_scenario": "Calculate basic arithmetic calculation returns value",
-                    "target_symbol": "calculate",
-                    "input_fixture": "calculate(2.0, 3.0)",
+                    "target_symbol": fn_name,
+                    "input_fixture": f"{fn_name}(2.0, 3.0)",
                     "expected_outcome": {
                         "outcome_type": "VALUE_EQUALS",
                         "value": 5.0
@@ -258,6 +276,17 @@ def architect_agent(state: SquadState) -> dict:
         "- DILARANG merancang hierarki folder yang terlalu dalam (hindari app/api/, app/schemas/, app/models/). Jaga struktur tetap datar di root.\n"
     )
     
+    feedback_section = ""
+    contract_feedback = state.get("contract_feedback")
+    if contract_feedback:
+        feedback_section = (
+            f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
+            f"{contract_feedback}\n\n"
+            "INSTRUKSI REVISI WAJIB:\n"
+            "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
+            "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
+        )
+
     prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
 
 {structure_rule}
@@ -266,7 +295,7 @@ Deskripsi Tugas Pengguna:
 {user_task}
 
 Spesifikasi Product Manager:
-{specs}
+{specs}{feedback_section}
 
 ATURAN KETAT:
 Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {target_lang.upper()} murni (Maksimal 2-3 file total).

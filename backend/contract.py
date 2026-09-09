@@ -397,17 +397,146 @@ class MachineReadableContract(BaseModel):
         return compute_contract_canonical_hash(self.to_dict())
 
 
+def is_non_ui_computational_task(contract_dict: Dict[str, Any], task_text: Optional[str] = None) -> bool:
+    """
+    Menentukan apakah suatu task tergolong kategori non-UI computational/module
+    (API, CLI, Library, computational/module) yang mewajibkan interface_contracts non-kosong (P0-2.1).
+    """
+    if not isinstance(contract_dict, dict):
+        return True
+
+    # 1. Cek domain pada task_intent
+    task_intent = contract_dict.get("task_intent", {})
+    if isinstance(task_intent, dict):
+        domain = task_intent.get("domain", "")
+        if domain == "FLUTTER_WIDGET":
+            return False
+        if domain in ("REST_API", "CLI_TOOL", "ALGORITHM"):
+            return True
+
+    # 2. Cek target_ecosystem
+    target_eco = contract_dict.get("target_ecosystem", {})
+    if isinstance(target_eco, dict):
+        framework = (target_eco.get("framework") or "").lower()
+        language = (target_eco.get("language") or "").lower()
+        if "flutter" in framework or language == "dart":
+            return False
+
+    # 3. Cek teks deskripsi task
+    raw_text = ""
+    if task_text:
+        raw_text = task_text.lower()
+    elif isinstance(task_intent, dict):
+        raw_text = (str(task_intent.get("raw_intent", "")) + " " + str(task_intent.get("goal_summary", ""))).lower()
+
+    if any(k in raw_text for k in ["api", "cli", "library", "computational", "module", "matrix", "matriks", "kalkulator", "math", "fastapi", "rest"]):
+        return True
+
+    return True
+
+
+def check_oracle_interface_consistency(
+    interface_contracts: List[InterfaceContract],
+    frozen_oracle_path: str
+) -> Tuple[bool, Optional[str]]:
+    """
+    Memeriksa konsistensi interface contract terhadap Frozen Oracle (Requirement 3 - P0-2.1).
+    HANYA melakukan read-only scan untuk verifikasi keselarasan (consistency check),
+    BUKAN sebagai mekanisme generator atau pembuat contract.
+    Jika oracle menguji simbol atau endpoint tertentu, kontrak tidak boleh bertentangan
+    (misal: oracle memanggil endpoint X tapi kontrak hanya mendeklarasikan endpoint Y).
+    """
+    import os
+    from pathlib import Path
+
+    oracle_dir = Path(frozen_oracle_path)
+    if not oracle_dir.exists() or not oracle_dir.is_dir():
+        return True, None
+
+    test_contents: List[Tuple[str, str]] = []
+    for root, _, files in os.walk(oracle_dir):
+        for f in files:
+            if (f.startswith("test_") and f.endswith(".py")) or (f.endswith("_test.dart")) or (f.endswith("_test.py")):
+                try:
+                    fpath = Path(root) / f
+                    test_contents.append((f, fpath.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+
+    if not test_contents:
+        return True, None
+
+    contract_endpoints = set()
+    contract_symbols = set()
+    for iface in interface_contracts:
+        ident = iface.identifier.strip()
+        if iface.interface_type == "HTTP_ENDPOINT":
+            base_ep = re.sub(r"/\{[^}]+\}", "", ident).rstrip("/")
+            if base_ep:
+                contract_endpoints.add(base_ep)
+        else:
+            parts = re.split(r"[.\(]", ident)
+            for p in parts:
+                p_clean = p.strip(" )\"'")
+                if p_clean:
+                    contract_symbols.add(p_clean)
+
+    for fname, content in test_contents:
+        # 1. Kasus REST API (FastAPI testclient)
+        tested_endpoints = set()
+        for ep in re.findall(r"client\.(?:get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content):
+            base_ep = re.sub(r"/\{[^}]+\}", "", ep).rstrip("/")
+            if base_ep:
+                tested_endpoints.add(base_ep)
+
+        if tested_endpoints and contract_endpoints:
+            matches = any(
+                any(te == ce or te.startswith(ce) or ce.startswith(te) for ce in contract_endpoints)
+                for te in tested_endpoints
+            )
+            if not matches:
+                return False, (
+                    f"Oracle menguji endpoint {sorted(tested_endpoints)} pada {fname}, "
+                    f"tetapi Architect mendeklarasikan endpoint berbeda: {sorted(contract_endpoints)}."
+                )
+
+        # 2. Kasus Python unit test (CLI / Library / Module)
+        tested_symbols = set()
+        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
+            tested_symbols.add(sym)
+        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
+            if sym not in ("app", "main"):
+                tested_symbols.add(sym)
+        if "Matrix" in content or "Matrix" in tested_symbols:
+            for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
+                tested_symbols.add(dunder)
+
+        if tested_symbols and contract_symbols:
+            common = contract_symbols.intersection(tested_symbols)
+            if not common:
+                return False, (
+                    f"Oracle menguji interface {sorted(tested_symbols)} pada {fname}, "
+                    f"tetapi Architect mendeklarasikan interface tidak kompatibel: {sorted(contract_symbols)}."
+                )
+
+    return True, None
+
+
 # ===========================================================================
 # 5. Deterministic Contract Validation Gate (4 Pilar)
 # ===========================================================================
 
-def validate_contract_gate(contract_data: Any) -> Tuple[bool, List[str], List[str]]:
+def validate_contract_gate(
+    contract_data: Any,
+    frozen_oracle_path: Optional[str] = None,
+    task_text: Optional[str] = None
+) -> Tuple[bool, List[str], List[str]]:
     """
     Memvalidasi dokumen kontrak secara deterministik melalui empat pilar pengujian:
     Pilar 1: Schema Validity Check
     Pilar 2: Referential Integrity Check
-    Pilar 3: Requirement Coverage Check
-    Pilar 4: Assertion Verifiability & Internal Consistency Check
+    Pilar 3: Requirement Coverage Check & Mandatory Interface Contract (P0-2.1)
+    Pilar 4: Assertion Verifiability, Internal Consistency Check & Oracle Consistency (P0-2.1)
 
     Mengembalikan: (is_valid: bool, errors: List[str], warnings: List[str])
     """
@@ -539,6 +668,25 @@ def validate_contract_gate(contract_data: Any) -> Tuple[bool, List[str], List[st
     # -----------------------------------------------------------------------
     # PILAR 3: REQUIREMENT COVERAGE & ASSERTION VERIFIABILITY
     # -----------------------------------------------------------------------
+    # Mandatory Interface Contract (Requirement 1 - P0-2.1)
+    if is_non_ui_computational_task(contract_dict, task_text):
+        if not contract_obj.interface_contracts or len(contract_obj.interface_contracts) == 0:
+            structured_err = (
+                "CONTRACT_VALIDATION_FAILED\n\n"
+                "reason:\n"
+                "interface_contracts is empty for a non-UI computational task.\n\n"
+                "required_action:\n"
+                "Define the externally observable interfaces that the Developer\n"
+                "must implement and that the Frozen Oracle may invoke.\n\n"
+                "required_fields:\n"
+                "- module/function/class name\n"
+                "- callable signature\n"
+                "- expected input\n"
+                "- expected output\n"
+                "- public invocation mechanism"
+            )
+            errors.append(f"Pilar 3 (Mandatory Interface Contract): {structured_err}")
+
     # Setiap functional_requirement wajib memiliki minimal 1 assertion
     untested_reqs = set_req_ids - linked_req_seen
     if untested_reqs:
@@ -620,6 +768,22 @@ def validate_contract_gate(contract_data: Any) -> Tuple[bool, List[str], List[st
                         f"(Konvensi REST umum menyarankan 200 OK)."
                     )
 
+    # 4. Oracle Interface Consistency Check (Requirement 3 - P0-2.1)
+    if frozen_oracle_path:
+        consistent, reason_detail = check_oracle_interface_consistency(
+            contract_obj.interface_contracts,
+            frozen_oracle_path
+        )
+        if not consistent:
+            structured_err = (
+                "CONTRACT_VALIDATION_FAILED\n\n"
+                "reason:\n"
+                "Architect interface contract is inconsistent with the frozen test interface."
+            )
+            if reason_detail:
+                structured_err += f"\n\ndetails:\n{reason_detail}"
+            errors.append(f"Pilar 4 (Oracle Consistency): {structured_err}")
+
     is_valid = (len(errors) == 0)
     return is_valid, errors, warnings
 
@@ -629,11 +793,13 @@ def validate_contract_gate(contract_data: Any) -> Tuple[bool, List[str], List[st
 # ===========================================================================
 
 def seal_and_freeze_contract(
-    contract_data: Any
+    contract_data: Any,
+    frozen_oracle_path: Optional[str] = None,
+    task_text: Optional[str] = None
 ) -> Tuple[bool, Dict[str, Any], List[str], List[str]]:
     """
     Mengeksekusi transisi kritis ALIGNED -> FROZEN:
-    1. Memvalidasi kontrak melalui 4 pilar Validation Gate.
+    1. Memvalidasi kontrak melalui 4 pilar Validation Gate (termasuk P0-2.1).
     2. Jika lulus 100%:
        - Menghitung canonical hash SHA-256 (RFC 8785) dengan mengeluarkan provenance.contract_sha256.
        - Menyuntikkan hash ke provenance.contract_sha256.
@@ -651,7 +817,11 @@ def seal_and_freeze_contract(
         return False, {}, ["Input kontrak bukan dictionary atau model valid."], []
 
     # Validasi 4 Pilar
-    is_valid, errors, warnings = validate_contract_gate(c_dict)
+    is_valid, errors, warnings = validate_contract_gate(
+        c_dict,
+        frozen_oracle_path=frozen_oracle_path,
+        task_text=task_text
+    )
 
     if not is_valid:
         c_dict["status"] = ContractStatus.REJECTED.value

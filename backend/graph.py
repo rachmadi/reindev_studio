@@ -100,8 +100,12 @@ def route_after_developer(state: SquadState) -> str:
     has_tests = bool(state.get("test_files"))
     use_frozen = bool(state.get("frozen_oracle_path"))
     
+    # Jika Developer mengalami MODEL_TRANSPORT_ERROR, segera hentikan pipeline ke END
+    if state.get("status") == "transport_error":
+        decision = END
+        reason = "model_transport_error_abort"
     # Putaran awal (iteration == 0) atau belum ada file test
-    if iteration == 0 or not has_tests:
+    elif iteration == 0 or not has_tests:
         if use_frozen:
             decision = "frozen_oracle"
             reason = "initial_run_frozen_oracle_loaded"
@@ -175,11 +179,11 @@ def route_after_executor(state: SquadState) -> str:
 
 def contract_validation_node(state: SquadState) -> dict:
     """
-    Mengeksekusi Deterministic Contract Validation Gate (P0-2) antara Architect dan Developer.
+    Mengeksekusi Deterministic Contract Validation Gate (P0-2 & P0-2.1) antara Architect dan Developer.
     Jika ada kontrak pada state:
-    1. Validasi 4 pilar (Schema, Referential Integrity, Requirement Coverage, Consistency).
+    1. Validasi 4 pilar (Schema, Referential Integrity, Requirement Coverage & Mandatory Interface, Consistency).
     2. Jika lulus: hitung canonical SHA-256 (RFC 8785 anti-circular) dan segel status ke FROZEN.
-    3. Jika gagal: tetapkan status REJECTED dan catat validation errors.
+    3. Jika gagal: tetapkan status REJECTED, catat feedback terstruktur, dan naikkan contract_revision_count.
     Jika tidak ada kontrak (legacy test/mock): lewati secara aman tanpa blocking.
     """
     contract = state.get("contract")
@@ -191,14 +195,21 @@ def contract_validation_node(state: SquadState) -> dict:
         tracer.log_event(
             stage="contract_gate",
             event_type="contract_validation_started",
-            iteration=0,
+            iteration=state.get("contract_revision_count", 0),
             data={
                 "contract_id": contract.get("contract_id"),
                 "status_before": contract.get("status")
             }
         )
 
-    success, frozen_contract, errors, warnings = seal_and_freeze_contract(contract)
+    frozen_oracle_path = state.get("frozen_oracle_path")
+    user_task = state.get("task", "")
+
+    success, frozen_contract, errors, warnings = seal_and_freeze_contract(
+        contract,
+        frozen_oracle_path=frozen_oracle_path,
+        task_text=user_task
+    )
 
     if success:
         sha256_seal = frozen_contract.get("provenance", {}).get("contract_sha256", "")
@@ -206,7 +217,7 @@ def contract_validation_node(state: SquadState) -> dict:
             tracer.log_event(
                 stage="contract_gate",
                 event_type="contract_frozen",
-                iteration=0,
+                iteration=state.get("contract_revision_count", 0),
                 data={
                     "contract_id": frozen_contract.get("contract_id"),
                     "contract_sha256": sha256_seal,
@@ -221,28 +232,81 @@ def contract_validation_node(state: SquadState) -> dict:
             "contract_status": ContractStatus.FROZEN.value,
             "contract_sha256": sha256_seal,
             "contract_validation_errors": [],
+            "contract_feedback": None,
             "logs": state.get("logs", []) + [new_log]
         }
     else:
+        revision_count = state.get("contract_revision_count", 0) + 1
+        feedback_str = "\n\n".join(errors)
+
         if tracer:
             tracer.log_event(
                 stage="contract_gate",
                 event_type="contract_validation_failed",
-                iteration=0,
+                iteration=revision_count,
                 data={
                     "contract_id": contract.get("contract_id"),
                     "errors": errors,
-                    "warnings": warnings
+                    "warnings": warnings,
+                    "contract_revision_count": revision_count
                 }
             )
 
-        new_log = f"[Contract Validation Gate]: Validasi kontrak DITOLAK (REJECTED) dengan {len(errors)} galat deterministik."
-        return {
+        new_log = (
+            f"[Contract Validation Gate]: Validasi kontrak DITOLAK (REJECTED) dengan {len(errors)} galat deterministik "
+            f"(Putaran revisi {revision_count}/2)."
+        )
+        result = {
             "contract": frozen_contract,
             "contract_status": ContractStatus.REJECTED.value,
             "contract_validation_errors": errors,
+            "contract_feedback": feedback_str,
+            "contract_revision_count": revision_count,
             "logs": state.get("logs", []) + [new_log]
         }
+        if revision_count >= 2:
+            result["status"] = "contract_validation_failed"
+        return result
+
+
+def route_after_contract_gate(state: SquadState) -> str:
+    """
+    Menentukan routing pasca Deterministic Contract Validation Gate (P0-2.1):
+    1. Kontrak FROZEN (atau gate dilewati/tidak ada kontrak): lanjut ke Developer.
+    2. Kontrak REJECTED dan revision_count < 2: rute kembali ke Architect untuk revisi.
+    3. Kontrak REJECTED dan revision_count >= 2: STOP di END (FAIL). Developer TIDAK BOLEH dieksekusi.
+    """
+    contract_status = state.get("contract_status")
+    revision_count = state.get("contract_revision_count", 0)
+
+    if contract_status == ContractStatus.FROZEN.value or contract_status is None:
+        decision = "developer"
+        reason = "contract_frozen_or_absent"
+    elif contract_status == ContractStatus.REJECTED.value and revision_count < 2:
+        decision = "architect"
+        reason = f"contract_rejected_revision_{revision_count}"
+    else:
+        # REJECTED dan batas revisi (>= 2) tercapai: FAIL / STOP langsung ke END
+        decision = END
+        reason = "contract_rejected_revision_limit_reached_abort"
+
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="routing",
+            event_type="decision",
+            iteration=revision_count,
+            data={
+                "previous_stage": "contract_gate",
+                "target_node": str(decision),
+                "reason": reason,
+                "contract_status": contract_status,
+                "contract_revision_count": revision_count
+            }
+        )
+
+    return decision
+
 
 def build_squad_graph():
     """Membangun StateGraph lengkap untuk virtual software squad ReinDev Studio."""
@@ -258,11 +322,22 @@ def build_squad_graph():
     workflow.add_node("executor", executor_node)
     workflow.add_node("reviewer", reviewer_agent)
     
-    # 2. Rangkaikan Edges Sekuensial
+    # 2. Rangkaikan Edges Sekuensial & Conditional Contract Gate (P0-2.1)
     workflow.add_edge(START, "pm")
     workflow.add_edge("pm", "architect")
     workflow.add_edge("architect", "contract_gate")
-    workflow.add_edge("contract_gate", "developer")
+    
+    # Conditional edge dari contract_gate: rute ke developer jika FROZEN,
+    # rute ke architect jika REJECTED (revisi < 2), atau STOP ke END jika revisi >= 2
+    workflow.add_conditional_edges(
+        "contract_gate",
+        route_after_contract_gate,
+        {
+            "developer": "developer",
+            "architect": "architect",
+            END: END
+        }
+    )
     
     # Conditional edge dari developer: panggil tester atau frozen_oracle pada loop 0
     workflow.add_conditional_edges(
@@ -271,7 +346,8 @@ def build_squad_graph():
         {
             "tester": "tester",
             "frozen_oracle": "frozen_oracle",
-            "executor": "executor"
+            "executor": "executor",
+            END: END
         }
     )
     workflow.add_edge("tester", "executor")

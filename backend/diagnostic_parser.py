@@ -70,6 +70,7 @@ class FailingTest:
     linked_assertion_id: Optional[str] = None
     linked_req_id: Optional[str] = None
     linked_interface_id: Optional[str] = None
+    semantic_hint: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -91,7 +92,8 @@ class FailingTest:
             confidence=float(data.get("confidence", 1.0)),
             linked_assertion_id=data.get("linked_assertion_id"),
             linked_req_id=data.get("linked_req_id"),
-            linked_interface_id=data.get("linked_interface_id")
+            linked_interface_id=data.get("linked_interface_id"),
+            semantic_hint=data.get("semantic_hint")
         )
 
 
@@ -467,7 +469,7 @@ def parse_pytest_output(
         if e_lines:
             traceback_excerpt = "\n".join(e_lines[:3])
 
-        failing_tests.append(FailingTest(
+        ft = FailingTest(
             test_name=tname,
             test_file=tfile,
             test_line=test_line,
@@ -480,7 +482,9 @@ def parse_pytest_output(
             source_symbol=source_symbol,
             traceback_excerpt=traceback_excerpt,
             confidence=confidence
-        ))
+        )
+        ft.semantic_hint = infer_semantic_hint(ft)
+        failing_tests.append(ft)
         seen_tests.add(tname)
 
     # 5. Tentukan status eksekusi & kategori kegagalan utama
@@ -679,7 +683,84 @@ def parse_dart_output(
 
 
 # ===========================================================================
-# 7. Multi-Failure Top-3 Prioritization & Targeted Feedback Builder
+# 7. Semantic Diagnostic Guidance Engine (P0-1)
+# ===========================================================================
+
+HINT_HTTP_422 = (
+    "[ACTIONABLE HINT]\n"
+    "HTTP 422 indicates request validation failure.\n"
+    "Inspect the request payload against the Pydantic schema.\n"
+    "Check which required field(s) are absent or incompatible.\n"
+    "Consider whether server-generated fields should be optional or have defaults."
+)
+
+HINT_MATRIX_DIMENSIONS = (
+    "[ACTIONABLE HINT]\n"
+    "The failure indicates incompatible matrix dimensions.\n"
+    "Inspect the dimensionality/shape validation performed by the\n"
+    "operation and compare it with the expected valid and invalid cases.\n"
+    "Ensure invalid dimensions are rejected according to the contract."
+)
+
+
+def infer_semantic_hint(test: FailingTest) -> Optional[str]:
+    """
+    Menghasilkan petunjuk diagnostik semantik yang deterministik dan rule-based (P0-1).
+    Prinsip:
+    - Membantu Developer menjawab 'Apa yang harus saya periksa?', BUKAN memberikan solusi kode.
+    - Zero Solution Leak: tidak membocorkan patch atau hardcode kode spesifik (misal: Optional[int] = None).
+    - Preservasi deterministik: tidak menggunakan LLM, bebas efek samping.
+    """
+    message_str = test.message or ""
+    actual_str = test.actual or ""
+    expected_str = test.expected or ""
+    trace_str = test.traceback_excerpt or ""
+    name_str = test.test_name or ""
+
+    full_corpus = f"{name_str} {message_str} {actual_str} {expected_str} {trace_str}"
+    full_lower = full_corpus.lower()
+
+    # 1. FastAPI / HTTP 422 Request Validation Failure
+    is_422 = (
+        actual_str == "422"
+        or "422" in actual_str
+        or "assert 422 ==" in message_str
+        or "assert 422 ==" in trace_str
+        or "where 422 =" in trace_str
+        or "status 422" in full_lower
+        or "code 422" in full_lower
+        or "422 unprocessable" in full_lower
+        or "unprocessable entity" in full_lower
+        or "unprocessable content" in full_lower
+    )
+    if is_422:
+        return HINT_HTTP_422
+
+    # 2. CLI / Matrix Dimensional Validation Failure
+    is_dim_error = (
+        "dimension mismatch" in full_lower
+        or "shape mismatch" in full_lower
+        or "incompatible dimension" in full_lower
+        or "incompatible dimensions" in full_lower
+        or "incompatible_dimension" in full_lower
+        or (
+            ("valueerror" in full_lower or "did not raise valueerror" in full_lower)
+            and any(k in full_lower for k in ("dimension", "shape", "incompatible", "matrix", "column", "row"))
+        )
+        or (
+            test.failure_type in ("runtime_exception", "assertion_failure")
+            and "matrix" in full_lower
+            and any(k in full_lower for k in ("incompatible", "dimension", "shape"))
+        )
+    )
+    if is_dim_error:
+        return HINT_MATRIX_DIMENSIONS
+
+    return None
+
+
+# ===========================================================================
+# 8. Multi-Failure Top-3 Prioritization & Targeted Feedback Builder
 # ===========================================================================
 
 def prioritize_failures(failing_tests: List[FailingTest]) -> Tuple[List[FailingTest], List[FailingTest]]:
@@ -846,6 +927,12 @@ def build_targeted_feedback(
             lines.append("   - Cuplikan Bukti:")
             for tb_line in test.traceback_excerpt.splitlines():
                 lines.append(f"     {tb_line.strip()}")
+
+        # Semantic Diagnostic Guidance (P0-1)
+        hint = test.semantic_hint or infer_semantic_hint(test)
+        if hint:
+            for h_line in hint.splitlines():
+                lines.append(f"   {h_line.strip()}")
 
         lines.append("")
 

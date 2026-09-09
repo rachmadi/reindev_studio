@@ -27,4 +27,8 @@ class SquadState(TypedDict):
     contract_sha256: Optional[str]     # Hash kanonikal SHA-256 (RFC 8785) segel integritas kontrak
     contract_change_requested: Optional[bool] # Flag permintaan amandemen kontrak jika ada kontradiksi/ambiguitas
     contract_validation_errors: Optional[List[str]] # Daftar pesan galat validasi deterministik jika ditolak gate
+    contract_feedback: Optional[str]  # Umpan balik terstruktur P0-2.1 jika kontrak ditolak gate
+    contract_revision_count: int      # Penghitung putaran revisi kontrak antara gate dan architect (P0-2.1)
+    developer_backend: Optional[str]  # Backend khusus Developer: "ollama" atau "openrouter"
+    developer_model: Optional[str]    # Model khusus Developer (misal: "google/gemini-3.8-flash")
 

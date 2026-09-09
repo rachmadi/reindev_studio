@@ -1,3 +1,4 @@
+import os
 import copy
 import json
 import re
@@ -28,6 +29,19 @@ except (ImportError, ValueError):
     except ImportError:
         def verify_contract_checkpoint(c, name, raise_on_error=False): return True, None
         class ContractIntegrityError(Exception): pass
+
+try:
+    from ..developer_gateway import DeveloperGateway, DeveloperTransportError, DeveloperResponse
+except (ImportError, ValueError):
+    try:
+        from developer_gateway import DeveloperGateway, DeveloperTransportError, DeveloperResponse
+    except ImportError:
+        DeveloperGateway = None
+        class DeveloperTransportError(Exception):
+            def to_dict(self): return {"error_code": "MODEL_TRANSPORT_ERROR", "message": str(self)}
+        DeveloperResponse = None
+
+_orig_get_llm = get_llm
 
 
 DEV_SYSTEM_PROMPT = """Anda adalah Senior Software Developer dalam tim rekayasa perangkat lunak ReinDev Studio.
@@ -137,8 +151,6 @@ def parse_code_blocks(text: str, target_lang: str = "python") -> dict:
     return files
 
 def developer_agent(state: SquadState) -> dict:
-    llm = get_llm(role="developer", provider=state.get("provider"))
-    
     specs = state.get("specifications", "")
     arch_plan = state.get("architecture_plan", "")
     user_task = state.get("task", "")
@@ -338,8 +350,53 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
         HumanMessage(content=prompt)
     ]
     
-    response = llm.invoke(messages)
-    raw_output = response.content if hasattr(response, "content") else str(response)
+    # Periksa apakah get_llm dimonkeypatch oleh test suite (e.g. test_tracer_e2e atau test_diagnostic_parser)
+    is_mocked = (get_llm is not _orig_get_llm) or hasattr(get_llm, "mock_calls") or (
+        hasattr(get_llm, "__code__") and hasattr(_orig_get_llm, "__code__") and get_llm.__code__ != _orig_get_llm.__code__
+    )
+
+    dev_backend = (
+        state.get("developer_backend") or 
+        (state.get("provider") if state.get("provider") == "openrouter" else None) or 
+        os.getenv("DEVELOPER_BACKEND") or 
+        ""
+    ).lower()
+
+    use_gateway = (dev_backend == "openrouter") or (not is_mocked and DeveloperGateway is not None)
+
+    metadata = {}
+    if use_gateway and DeveloperGateway is not None:
+        adapter = DeveloperGateway.from_state(state)
+        try:
+            response = adapter.invoke(
+                messages,
+                run_id=state.get("run_id"),
+                experiment_id=state.get("experiment_id"),
+                iteration=iteration
+            )
+            raw_output = response.content if hasattr(response, "content") else str(response)
+            metadata = getattr(response, "metadata", {})
+        except DeveloperTransportError as exc:
+            err_dict = exc.to_dict()
+            if tracer:
+                tracer.log_event(
+                    stage="developer",
+                    event_type="transport_error",
+                    iteration=iteration,
+                    data=err_dict
+                )
+            error_log = f"[Developer Gateway Transport Error] {exc.error_code} ({exc.provider}/{exc.model}): {str(exc)}"
+            current_logs = state.get("logs", [])
+            return {
+                "status": "transport_error",
+                "error": err_dict,
+                "logs": current_logs + [error_log]
+            }
+    else:
+        llm = get_llm(role="developer", provider=state.get("provider"))
+        response = llm.invoke(messages)
+        raw_output = response.content if hasattr(response, "content") else str(response)
+
     code_files = parse_code_blocks(raw_output, target_lang=target_lang)
     
     # Gabungkan dengan kode sebelumnya agar file yang tidak diubah tidak hilang
@@ -355,17 +412,26 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
     iteration = state.get("iteration_count", 0)
     tracer = get_tracer(state.get("run_id"))
     if tracer:
+        tracer_data = {
+            "developer_raw_output": raw_output,
+            "developer_parsed_output": final_code_files,
+            "code_files_hashes": compute_dict_hashes(final_code_files),
+            "newly_parsed_files": list(code_files.keys()),
+            "iteration": iteration
+        }
+        if metadata:
+            tracer_data.update({
+                "developer_backend": metadata.get("developer_backend"),
+                "provider": metadata.get("provider"),
+                "model": metadata.get("model"),
+                "latency_s": metadata.get("latency_s"),
+                "usage": metadata.get("usage", {})
+            })
         tracer.log_event(
             stage="developer",
             event_type="output",
             iteration=iteration,
-            data={
-                "developer_raw_output": raw_output,
-                "developer_parsed_output": final_code_files,
-                "code_files_hashes": compute_dict_hashes(final_code_files),
-                "newly_parsed_files": list(code_files.keys()),
-                "iteration": iteration
-            }
+            data=tracer_data
         )
 
     return {

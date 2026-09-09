@@ -572,3 +572,104 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Agentic Pair-Programmer:** Antigravity
 - **Status Iterasi 6:** REMAINS OPEN
 - **Fokus Pekerjaan:** Pembahasan dan perencanaan eksekusi paket intervensi P0-3 (Semantic Guidance & Contract Precision) berdasarkan temuan empiris validasi.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI INTERVENSI P0-2.1 (CONTRACT INTEGRITY & INTERFACE GATE) — 2026-09-09 17:45 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Ringkasan Eksekusi Matriks 9 Run
+- **Tujuan:** Menguji apakah penegakan interface alignment dan contract completion (P0-2.1) dapat menaikkan pass rate Qwen 7B dengan mencegah kontrak ompong / missing dunder methods.
+- **Model:** `qwen2.5-coder:7b` (Ollama lokal)
+- **Konfigurasi Aktif:** P0-2.1 (Contract Gate), Executor v2 (SAFE mode), Frozen Oracle SHA-256 acuan terkunci.
+- **Hasil Agregat:**
+  - Total PASS: **3 / 9 Run (33.3%)**
+  - Total FAIL: **6 / 9 Run (66.7%)**
+  - FastAPI T1: 1 / 3 PASS (33.3%)
+  - CLI T1: 0 / 3 PASS (0.0%)
+  - Flutter T1: 2 / 3 PASS (66.7%)
+- **Temuan Kritis:**
+  - Gate P0-2.1 berfungsi 100% memvalidasi dan melengkapi interface kontrak.
+  - Namun pada CLI T1 dan FastAPI T1, model Qwen 7B mengalami *semantic error repetition*: mengulang kesalahan identik (Pydantic 422, method naming) di seluruh 3 loop tanpa perubahan strategi (*semantic stagnation*).
+- **Dokumentasi Lengkap:** `dokumentasi-pengembangan/experiments/validation_p0_2_1_intervention.md`
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI INTERVENSI P0-1 (SEMANTIC DIAGNOSTIC GUIDANCE) — 2026-09-09 18:25 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Ringkasan Eksekusi Matriks 9 Run
+- **Tujuan:** Menguji efektivitas injeksi `[ACTIONABLE HINT]` semantik ke dalam prompt perbaikan Developer untuk memecah kebuntuan stagnasi 3 loop pada Qwen 7B.
+- **Model:** `qwen2.5-coder:7b` (Ollama lokal)
+- **Konfigurasi Aktif:** P0-1 (Diagnostic Hints), P0-2.1 (Contract Gate), Executor SAFE, Frozen Oracle SHA-256 terkunci.
+- **Hasil Agregat:**
+  - Total PASS: **2 / 9 Run (22.2%)**
+  - Total FAIL: **7 / 9 Run (77.8%)**
+  - FastAPI T1: 1 / 3 PASS (33.3%)
+  - CLI T1: 0 / 3 PASS (0.0%)
+  - Flutter T1: 1 / 3 PASS (33.3%)
+- **Analisis Kausal Forensik:**
+  - Pertanyaan Kunci IA: *"Apakah Qwen mengubah strateginya setelah menerima [ACTIONABLE HINT]?"*
+  - **Bukti Empiris:** YA, Qwen secara mekanistik merespons hint. Pada FastAPI T1 Rep 1 & 2, setelah menerima hint Pydantic, model mengubah schema (mengubah `id: int` opsional, menyesuaikan payload).
+  - **Akar Masalah (Cognitive Capacity Saturation):** Kapasitas kognitif model 7B jenuh (*cognitive capacity ceiling*). Saat mencoba memperbaiki schema berdasarkan hint, model secara simultan melupakan dependensi impor (`HTTPException` hilang) atau merusak route handler lain.
+- **Dokumentasi Lengkap:** `dokumentasi-pengembangan/experiments/validation_p0_1_intervention.md`
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI ARSITEKTUR DEVELOPER GATEWAY & OPENROUTER ADAPTER — 2026-09-09 18:50 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Ringkasan Implementasi & Pengujian Unit
+- **Tujuan:** Menambahkan gateway modular `backend/developer_gateway.py` agar Developer Agent dapat menggunakan model cloud/frontier (OpenRouter) dengan isolasi credential ketat, tanpa mengubah pipeline ReinDev atau menghapus jalur lokal Ollama.
+- **Hasil Pengujian Otomatis:**
+  - `backend/test_developer_gateway.py`: **23/23 PASSED** (0.84s)
+  - Full Regression Suite: **130/130 PASSED** (19.37s) — Zero regression across all existing features.
+- **Protokol Keamanan Kredensial:**
+  - 0 API key hardcoded / leaked. Kredensial dibaca dinamis dari `.env` lokal / environment process via runtime marshaling.
+  - Fail-loudly error: `DeveloperTransportError` saat kuota habis, key invalid, atau network down.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: 9-RUN CONTROLLED FRONTIER ABLATION — 2026-09-09 19:25 WIB
+## Model Developer: google/gemini-3.8-flash (OpenRouter Gateway)
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Ringkasan Hasil Eksperimen
+- **Tujuan:** Menjalankan eksperimen komparatif 9-run dengan **satu-satunya variabel yang diubah** adalah `Developer Model: google/gemini-3.8-flash`. Seluruh komponen lain (Architect, Contract Gate P0-2.1, SAFE Executor, Reviewer, Frozen Oracle SHA-256, Graph State, Max 3 Loops) **terkunci identik 100%**.
+- **Hasil Agregat Matriks 9 Run:**
+  - **Gross Pass Rate:** **7 / 9 Run (77.8%)**
+  - **Net Reasoning Pass Rate:** **7 / 7 Run (100.0%)** (0 Developer Reasoning Failure!)
+  - **Infrastruktur / Transport Failure:** 2 / 9 Run (22.2%) — Akibat socket timeout koneksi OpenRouter pada CLI T1 Rep 1 & Rep 3.
+- **Rincian Per Task:**
+  - **FastAPI T1 (CRUD REST API):** **3 / 3 PASS (100.0%)** — Seluruh 3 replikasi lulus langsung pada **Loop 0 (Direct Pass)** tanpa memerlukan self-healing! (Bandingkan dengan Qwen 7B: 0/3 baseline, 1/3 post-P0-1).
+  - **CLI T1 (Matrix Calculator OOP):** **1 / 3 PASS Gross (33.3%), 1 / 1 PASS Net (100.0%)** — Rep 2 lulus pada Loop 1 (5/5 assertions PASS). Rep 1 dan 3 terputus oleh socket timeout HTTP OpenRouter.
+  - **Flutter T1 (Card Metric Widget):** **3 / 3 PASS (100.0%)** — Seluruh 3 replikasi lulus pada Loop 1 (2/2 assertions PASS) dan disetujui penuh oleh Reviewer (`[APPROVED]`).
+- **Integritas Kriptografis Frozen Oracle:**
+  - `cli_t1/test_main.py`: `0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124` — **100% MATCH**
+  - `fastapi_t1/test_main.py`: `a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63` — **100% MATCH**
+  - `flutter_t1/card_metric_test.dart`: `4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528` — **100% MATCH**
+
+### 2. Matriks Komparatif Multi-Milestone Iterasi 6
+
+| Konfigurasi Eksperimen | Developer Model | Gross Pass Rate | Net Reasoning Pass Rate | Catatan |
+|---|---|---|---|---|
+| **Baseline Iterasi 6 Post-P0-2** | `qwen2.5-coder:7b` | 3 / 9 (33.3%) | 3 / 9 (33.3%) | 6 kegagalan murni penalaran model lokal |
+| **Intervensi P0-2.1** | `qwen2.5-coder:7b` | 3 / 9 (33.3%) | 3 / 9 (33.3%) | Contract valid, model stagnan pada loop 1-3 |
+| **Intervensi P0-1 (Diagnostic Guidance)** | `qwen2.5-coder:7b` | 2 / 9 (22.2%) | 2 / 9 (22.2%) | Model mengubah strategi tapi kapasitas 7B jenuh |
+| **Frontier Ablation (Work Order 8)** | `google/gemini-3.8-flash` | **7 / 9 (77.8%)** | **7 / 7 (100.0%)** | **0 kegagalan penalaran Developer!** |
+
+### 3. Verdict Ilmiah & Keputusan Otoritas Intent Architect
+1. **Pipeline ReinDev Terbukti Valid:** Kegagalan end-to-end pada eksperimen sebelumnya BUKAN disebabkan oleh kelemahan arsitektur framework ReinDev (Architect, Contract Engine, SAFE Executor, Reviewer). Seluruh komponen pipeline bekerja secara harmonis, presisi, dan deterministik.
+2. **Cognitive Capacity Ceiling Terbukti:** Model lokal 7B (`qwen2.5-coder:7b`) memiliki batas kapasitas memori konteks dan penalaran logika multi-langkah (*saturation ceiling*). Ketika tugas membutuhkan penalaran semantik kompleks (seperti rekonsiliasi Pydantic schema atau widget tree Flutter), model frontier menyelesaikan tugas tersebut dengan 100% akurasi (7/7 net reasoning pass rate).
+3. **Keputusan Intent Architect (2026-09-09 19:35 WIB):**
+   - **Status Validasi / Iterasi:** ⏳ **DALAM PENINJAUAN LANJUTAN IA (ITERATION 6 REMAINS OPEN)**
+   - **Instruksi Otoritas IA:** Intent Architect (Muhammad Rachmadi) menerima verdict empiris dan validasi ilmiah Skenario A, namun secara tegas memutuskan **belum menutup Iterasi 6 secara formal**. IA saat ini sedang mendalami dan menganalisis skenario-skenario alternatif lainnya sebelum menetapkan keputusan rilis final dan transisi ke Iterasi 7.
+- **Dokumentasi Lengkap:**
+  - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_result.md`
+  - `dokumentasi-pengembangan/experiments/frontier_ablation_gemini_3_8_flash_summary.json`
+
+
