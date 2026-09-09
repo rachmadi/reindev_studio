@@ -169,7 +169,7 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Kepatuhan Protokol IIDD:** 100% DESIGN ONLY, nol perubahan kode backend, nol eksperimen LLM, Frozen Oracle tak tersentuh.
 
 ### 4. Implementasi P0-2: Machine-Readable Contract & Dual-Layer Reviewer
-- **Commit Hash:** (pending — menunggu validasi IA)
+- **Commit Hash:** `3e6b1d8`
 - **Status:** TERSIMPAN SECARA LOKAL (PENDING IA VALIDATION)
 - **Pesan Commit Utama:** `feat: implement P0-2 machine-readable contract, 4-pillar validation gate & dual-layer reviewer (pending validation)`
 - **Waktu Eksekusi:** 2026-09-09 11:53 WIB
