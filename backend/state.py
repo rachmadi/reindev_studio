@@ -20,3 +20,4 @@ class SquadState(TypedDict):
     executor_intervention_enabled: bool  # Mode eksperimen: apakah Executor mengintervensi/auto-heal artefak (default: True)
     executor_mode: str                 # Mode eksperimen: "ON", "OFF", atau "CODE_ONLY" (default: "ON")
     frozen_oracle_path: Optional[str]  # Path direktori frozen oracle (jika diset, bypass Tester LLM dan load test suite statis)
+    developer_feedback: Optional[str]  # Umpan balik diagnostik terstruktur P0-1 untuk Developer (Targeted Error Feedback)

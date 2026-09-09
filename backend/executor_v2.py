@@ -53,6 +53,15 @@ try:
 except (ImportError, ValueError):
     from executor import run_sandbox_tests as run_sandbox_tests_legacy, SANDBOX_DIR
 
+try:
+    from .diagnostic_parser import parse_diagnostic, build_targeted_feedback
+except (ImportError, ValueError):
+    try:
+        from diagnostic_parser import parse_diagnostic, build_targeted_feedback
+    except ImportError:
+        def parse_diagnostic(*args, **kwargs): return None
+        def build_targeted_feedback(*args, **kwargs): return ""
+
 
 # ===========================================================================
 # 1. AST & Pre-Flight Syntax Validation Engine
@@ -278,7 +287,7 @@ def run_sandbox_tests_v2(
 
     # Backward Compatibility: delegasi langsung ke implementasi legasi
     if effective_mode in ("OFF", "CODE_ONLY", "ON"):
-        return run_sandbox_tests_legacy(
+        legacy_res = run_sandbox_tests_legacy(
             code_files,
             test_files,
             target_language=target_language,
@@ -286,6 +295,19 @@ def run_sandbox_tests_v2(
             executor_intervention_enabled=executor_intervention_enabled,
             executor_mode=effective_mode
         )
+        if parse_diagnostic:
+            try:
+                diag = parse_diagnostic(
+                    legacy_res,
+                    code_files=code_files,
+                    test_files=test_files,
+                    target_language=target_language
+                )
+                if diag:
+                    legacy_res["diagnostic_evidence"] = diag.to_dict()
+            except Exception:
+                pass
+        return legacy_res
 
     # -----------------------------------------------------------------------
     # MODE 'SAFE': Pre-Flight Validation Layer
@@ -412,6 +434,18 @@ def run_sandbox_tests_v2(
 
     results["transformations"] = transformations
     results["executor_mode"] = "SAFE"
+    if parse_diagnostic:
+        try:
+            diag = parse_diagnostic(
+                results,
+                code_files=candidate_code_files,
+                test_files=test_files,
+                target_language=target_language
+            )
+            if diag:
+                results["diagnostic_evidence"] = diag.to_dict()
+        except Exception:
+            pass
     return results
 
 
@@ -542,6 +576,31 @@ def executor_node_v2(state: SquadState) -> dict:
 
     mode_label = f"Executor-{executor_mode}"
     current_logs = state.get("logs", [])
+    developer_feedback = ""
+
+    # P0-1: Structured Diagnostic Parser & Targeted Error Feedback
+    if parse_diagnostic:
+        try:
+            diag = parse_diagnostic(
+                results,
+                code_files=code_files_after,
+                test_files=test_files_after,
+                target_language=target_lang,
+                run_id=state.get("run_id"),
+                iteration=iteration
+            )
+            if diag:
+                results["diagnostic_evidence"] = diag.to_dict()
+                if not results["passed"] and build_targeted_feedback:
+                    developer_feedback = build_targeted_feedback(
+                        diag,
+                        iteration=iteration + 1,
+                        max_iterations=state.get("max_iterations", 3),
+                        run_id=state.get("run_id")
+                    )
+        except Exception:
+            pass
+
     if results["passed"]:
         log_msg = f"[Sandbox Executor ({mode_label})]: Pengujian SUKSES ✅ ({results['passed_count']} passed dalam {results['duration_sec']}s)."
         new_status = "tests_passed"
@@ -557,7 +616,8 @@ def executor_node_v2(state: SquadState) -> dict:
         "status": new_status,
         "logs": current_logs + [log_msg],
         "executor_intervention_enabled": executor_intervention_enabled,
-        "executor_mode": executor_mode
+        "executor_mode": executor_mode,
+        "developer_feedback": developer_feedback
     }
     if results.get("code_files"):
         res["code_files"] = results["code_files"]

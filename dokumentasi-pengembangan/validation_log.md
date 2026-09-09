@@ -331,3 +331,72 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Tindak Lanjut:** Menunggu evaluasi dan putusan resmi Intent Architect terhadap arsitektur Executor v2 dan hasil pengujian unit anti-regresi Run 10.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## DESAIN ARSITEKTUR P0-1 (STRUCTURED DIAGNOSTIC PARSER) — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Design Review)
+- **Status Desain:** DESIGN ONLY (Tidak ada modifikasi kode sumber atau prompt agent).
+- **Dokumen Desain:** `dokumentasi-pengembangan/architecture/structured_diagnostic_parser_design.md` (36.177 bytes, 579 baris).
+- **Cakupan 13 Aspek Desain:**
+  1. Audit pipeline eksekusi saat ini: Mengidentifikasi kebisingan 2.500–4.200 karakter terminal mentah di `backend/agents/developer.py` baris 178–197.
+  2. Diagnostic Evidence Schema: Kontrak machine-readable formal (JSON Schema terstandarisasi).
+  3. Failure Taxonomy: 8 kategori berjenjang hierarkis lintas framework (pytest & dart test).
+  4. Expected vs Actual Extraction: Pendekatan deterministik anti-halusinasi (fallback null).
+  5. Source Location Resolution: Algoritma Bottom-Up Frame Scanner memisahkan `test_file:line` dari `source_file:line:symbol`.
+  6. Developer Feedback Payload: Format Markdown terstruktur hemat token (<600 karakter).
+  7. 3-Tier Evidence Preservation: Pemisahan ketat Raw Evidence vs Structured Diagnostic vs Developer Feedback.
+  8. Multi-Failure Handling: Kebijakan "Top-3 Focus" dengan perangkuman 1 baris untuk kegagalan sekunder.
+  9. Repair Loop Integration: Integrasi node LangGraph deterministik antara Sandbox Runner dan Developer.
+  10. Failure & Fallback Handling: Mekanisme fail-safe 2 tingkat (Partial Fallback & Clean Tail Dump 15 lines).
+  11. Observability & Tracer: 4 event spesifik (`diagnostic_parse_start`, `diagnostic_parse_complete`, `diagnostic_parse_failed`, `developer_feedback_generated`).
+  12. Read-Only Boundary: Batasan absolut — dilarang memodifikasi kode produksi, berkas pengujian, dan Frozen Oracle.
+  13. Kesiapan Implementasi: 8/8 kriteria kesiapan terpenuhi.
+- **Design Verdict:** **`READY FOR IMPLEMENTATION`**.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (PENDING VALIDATION BY INTENT ARCHITECT)
+- **Waktu Laporan:** 2026-09-09 11:03 WIB
+- **Pelaksana Desain:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu penelaahan desain oleh Intent Architect sebelum memulai implementasi kode pada sprint berikutnya.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## IMPLEMENTASI P0-1: STRUCTURED DIAGNOSTIC PARSER — 2026-09-09
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal Re-Evaluation (Micro Loop Agen)
+- **Modul Baru `backend/diagnostic_parser.py`**:
+  - `DiagnosticEvidence` & `FailingTest` data models terimplementasi.
+  - Parser deterministik `pytest` & `dart test` terimplementasi.
+  - Taksonomi kegagalan 8 tingkat hierarkis terimplementasi.
+  - Ekstraksi Expected vs Actual deterministik anti-halusinasi terverifikasi.
+  - Resolver lokasi kode Bottom-Up Frame Scanner terbukti memisahkan `test_file:line` dari `source_file:line:symbol`.
+  - Top-3 multi-failure prioritization & targeted feedback builder (<600 karakter) terverifikasi.
+  - Jaring pengaman fallback Level 1 (partial) dan Level 2 (total fail-safe clean tail dump) terverifikasi.
+  - Pembersih ANSI escape sequence dan pemisah environment warnings terbukti aktif.
+- **Integrasi Pipeline**:
+  - `backend/executor_v2.py`: menyisipkan `diagnostic_evidence` ke `test_results` dan `developer_feedback` ke `state`.
+  - `backend/agents/developer.py`: repair loop mengutamakan `developer_feedback`, mengeliminasi 3.500+ karakter dump terminal dari prompt Developer.
+  - Raw evidence (`raw_stdout`, `raw_stderr`, `output`) dipertahankan 100% utuh tanpa manipulasi string.
+  - Frozen Oracle dan test files 100% strictly immutable.
+- **Pengujian Unit & Integrasi P0-1 (`backend/test_diagnostic_parser.py`)**:
+  - 17 test cases mencakup seluruh 16 aspek inti desain v1.0.0 plus data riil trace Phase 2.
+  - Hasil: **17 passed, 0 failed** dalam 0.67 detik.
+- **Regresi Keseluruhan Suite**:
+  - Seluruh pengujian backend: **59 passed, 0 failed** dalam 15.70 detik.
+  - Zero regression pada Executor SAFE, Frozen Oracle, graph routing, dan mode legasi.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU (PENDING VALIDATION BY INTENT ARCHITECT)
+- **Waktu Laporan:** 2026-09-09 11:18 WIB
+- **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Menunggu evaluasi dan putusan resmi Intent Architect terhadap implementasi P0-1 Structured Diagnostic Parser & Targeted Error Feedback.
+
+

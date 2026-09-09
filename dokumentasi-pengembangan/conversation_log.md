@@ -796,3 +796,68 @@ Implementasikan Executor v2 berdasarkan hasil phase2_transformation_level_forens
  7. Menyusun suite unit test komprehensif backend/test_executor_v2.py (8 test cases, termasuk pembuktian Run 10 anti-regression dan Run 02 safe resolution).
  8. Menjalankan full regression suite pytest melintasi seluruh sistem: 42 passed, 0 failed dalam 15.91s.
  9. Memutakhirkan seluruh dokumen log pengembangan IIDD dengan status validasi tetap PENDING).
+
+---
+
+[PENGGUNA - 10:50]
+Lakukan inspeksi read-only terhadap implementasi Executor v2 yang baru selesai. Jangan mengubah kode, jangan menjalankan eksperimen baru, dan jangan mengubah Frozen Oracle maupun konfigurasi eksperimen...
+
+[ANTIGRAVITY - 10:53]
+(Melaksanakan inspeksi arsitektur read-only menyeluruh terhadap implementasi aktual Executor v2:
+ 1. Memeriksa source code backend/executor_v2.py, backend/graph.py, backend/server.py, dan backend/test_executor_v2.py.
+ 2. Memetakan 4 aturan aktif pada mode SAFE (Syntax Check, Pydantic/FastAPI Import Resolution, Typing Import Resolution, Sibling Class Resolution) dan mengonfirmasi bahwa keempatnya murni berbasis AST read-only tanpa potensi mengubah business logic.
+ 3. Memverifikasi satu per satu penghapusan 9 aturan regex destruktif dari mode SAFE (Pydantic ID injection, plain model rewriting, ProductStore injection, status-code 201 injection, delete endpoint mutation, dict/object mutation, missing endpoint auto-injection, Matrix parser replacement, arithmetic division operator repair).
+ 4. Memverifikasi mekanisme re-validation & rollback otomatis serta penguncian Frozen Oracle immutability.
+ 5. Menyusun laporan formal lengkap di dokumentasi-pengembangan/experiments/executor_v2_architecture_inspection.md dengan status kesesuaian: 100% SESUAI / FULLY VERIFIED).
+
+---
+
+[PENGGUNA - 10:54]
+Buat dokumentasi diagnosis arsitektur pasca-Phase 2. Tujuan: Menentukan arah perbaikan ReinDev berdasarkan seluruh bukti yang sudah diperoleh dari Phase 1, Phase 2, Forensic Audit, dan Executor v2 Inspection...
+
+[ANTIGRAVITY - 10:58]
+(Menyusun dokumen diagnosis arsitektur pasca-Phase 2 secara komprehensif di dokumentasi-pengembangan/architecture/improvement_direction_after_phase2.md:
+ 1. Mensintesis bukti empiris dari 4 eksperimen/audit sebelumnya tanpa membuat eksperimen atau run baru.
+ 2. Mengidentifikasi Root Cause kegagalan dominan: Developer 7B context poisoning & noise distraction akibat dump terminal mentah 2.500–4.200 karakter.
+ 3. Merumuskan 4 inisiatif perbaikan arsitektur berjenjang:
+    - P0-1: Structured Diagnostic Parser & Targeted Error Feedback (mereduksi 80% noise, menyajikan <600 karakter actionable diagnostics).
+    - P0-2: Test & Requirement Alignment Layer (Architect/Tester interface contract).
+    - P1: Selective Historical Context & Anti-Loop Memory (mencegah amnesia iterasi dan perulangan kode identik).
+    - P2: Hardened Verification & Sandbox Guardrails.
+ 4. Menentukan kriteria keberhasilan dan kriteria henti eksplisit untuk Phase 3).
+
+---
+
+[PENGGUNA - 10:59]
+Rancang P0-1 — Structured Diagnostic Parser & Targeted Error Feedback. Ini DESIGN ONLY. Jangan mengubah source code, jangan menjalankan eksperimen LLM, jangan membuat run baru, jangan mengubah Frozen Oracle, prompt agent, atau konfigurasi eksperimen...
+
+[ANTIGRAVITY - 11:03]
+(Menuntaskan desain arsitektur P0-1 Structured Diagnostic Parser & Targeted Error Feedback di dokumentasi-pengembangan/architecture/structured_diagnostic_parser_design.md:
+ 1. Mengaudit pipeline eksekusi saat ini: mengidentifikasi titik suntikan dump terminal mentah pada developer.py baris 178–197.
+ 2. Mendefinisikan Diagnostic Evidence Schema formal machine-readable (JSON Schema & atribut lapangan).
+ 3. Merumuskan Taksonomi Kegagalan lintas framework (pytest & dart test) berjenjang 8 prioritas.
+ 4. Merancang mesin ekstraksi deterministik Expected vs Actual anti-halusinasi.
+ 5. Merancang algoritma Bottom-Up Frame Scanner untuk memisahkan berkas pengujian (test_file:line) dari kode aplikasi (source_file:line:symbol).
+ 6. Merancang payload Markdown terstruktur hemat token (<600 karakter) untuk prompt Developer.
+ 7. Menetapkan arsitektur pemisahan 3 lapis bukti (Raw Evidence, Structured Diagnostic, Developer Feedback).
+ 8. Menerapkan kebijakan multi-failure "Top-3 Focus".
+ 9. Merancang integrasi repair-loop LangGraph, strategi fallback 2 tingkat (fail-safe), event tracer observabilitas, dan penguncian batasan read-only murni.
+ 10. Memberikan Design Verdict formal: READY FOR IMPLEMENTATION).
+
+---
+
+[PENGGUNA - 11:04]
+Implementasikan P0-1: Structured Diagnostic Parser & Targeted Error Feedback berdasarkan desain v1.0.0 yang telah disetujui...
+
+[ANTIGRAVITY - 11:18]
+(Mengimplementasikan P0-1 Structured Diagnostic Parser & Targeted Error Feedback secara penuh:
+ 1. Membuat modul baru `backend/diagnostic_parser.py` (kontrak DiagnosticEvidence, parser pytest & dart test, taksonomi kegagalan 8 tingkat, Bottom-Up Frame Scanner, builder targeted feedback, fallback 2 tingkat, dan pembersih ANSI/warning).
+ 2. Memutakhirkan `backend/state.py` dengan menambahkan field `developer_feedback: Optional[str]` pada `SquadState`.
+ 3. Mengintegrasikan pemanggilan parser pada `backend/executor_v2.py` (pada runner mode SAFE dan legacy, serta pada `executor_node_v2`), memasukkan `diagnostic_evidence` ke `test_results` dan `developer_feedback` ke `state`.
+ 4. Mengintegrasikan repair loop pada `backend/agents/developer.py` untuk mengutamakan `developer_feedback`, mengeliminasi dump terminal mentah 3.500+ karakter dari prompt Developer.
+ 5. Menjaga 100% integritas raw evidence (`raw_stdout`, `raw_stderr`, dan `output` tetap utuh pada `test_results` untuk trace forensik).
+ 6. Menjaga 100% integritas Frozen Oracle dan test files (strictly immutable).
+ 7. Menyusun suite unit test komprehensif `backend/test_diagnostic_parser.py` (17 test cases, mencakup seluruh 16 aspek inti desain plus data riil trace Phase 2; lulus 17/17).
+ 8. Menjalankan full regression test backend: 59 passed, 0 failed dalam 15.70s.
+ 9. Menyusun laporan formal lengkap di `dokumentasi-pengembangan/implementation/structured_diagnostic_parser_implementation.md`).
+

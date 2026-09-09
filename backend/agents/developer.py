@@ -176,7 +176,25 @@ def developer_agent(state: SquadState) -> dict:
     
     feedback_section = ""
     if iteration > 0 and test_results:
-        output_err = test_results.get("output", "")
+        # P0-1: Utamakan targeted developer_feedback dari diagnostic parser
+        targeted_feedback = state.get("developer_feedback")
+        if not targeted_feedback and isinstance(test_results.get("diagnostic_evidence"), dict):
+            try:
+                from ..diagnostic_parser import build_targeted_feedback_from_dict
+            except (ImportError, ValueError):
+                try:
+                    from diagnostic_parser import build_targeted_feedback_from_dict
+                except ImportError:
+                    build_targeted_feedback_from_dict = None
+            if build_targeted_feedback_from_dict:
+                targeted_feedback = build_targeted_feedback_from_dict(
+                    test_results["diagnostic_evidence"],
+                    iteration=iteration,
+                    max_iterations=state.get("max_iterations", 3),
+                    run_id=state.get("run_id")
+                )
+
+        output_err = targeted_feedback if targeted_feedback else test_results.get("output", "")
         
         # Sediakan konteks kode yang sudah ditulis sebelumnya
         prev_code_blocks = []
