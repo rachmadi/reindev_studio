@@ -146,7 +146,9 @@ def route_after_executor(state: SquadState) -> str:
     test_results = state.get("test_results", {})
     passed = test_results.get("passed", False)
     iteration = state.get("iteration_count", 0)
-    max_iter = state.get("max_iterations", 3)
+    max_it = state.get("max_iterations")
+    max_iter = 3 if max_it is None else int(max_it)
+
     
     if not passed and iteration < max_iter:
         decision = "developer"
@@ -252,9 +254,11 @@ def contract_validation_node(state: SquadState) -> dict:
                 }
             )
 
+        max_cr = state.get("max_contract_revisions")
+        max_contract_rev = 2 if max_cr is None else int(max_cr)
         new_log = (
             f"[Contract Validation Gate]: Validasi kontrak DITOLAK (REJECTED) dengan {len(errors)} galat deterministik "
-            f"(Putaran revisi {revision_count}/2)."
+            f"(Putaran revisi {revision_count}/{max_contract_rev})."
         )
         result = {
             "contract": frozen_contract,
@@ -264,7 +268,7 @@ def contract_validation_node(state: SquadState) -> dict:
             "contract_revision_count": revision_count,
             "logs": state.get("logs", []) + [new_log]
         }
-        if revision_count >= 2:
+        if revision_count >= max_contract_rev:
             result["status"] = "contract_validation_failed"
         return result
 
@@ -273,20 +277,22 @@ def route_after_contract_gate(state: SquadState) -> str:
     """
     Menentukan routing pasca Deterministic Contract Validation Gate (P0-2.1):
     1. Kontrak FROZEN (atau gate dilewati/tidak ada kontrak): lanjut ke Developer.
-    2. Kontrak REJECTED dan revision_count < 2: rute kembali ke Architect untuk revisi.
-    3. Kontrak REJECTED dan revision_count >= 2: STOP di END (FAIL). Developer TIDAK BOLEH dieksekusi.
+    2. Kontrak REJECTED dan revision_count < max_contract_revisions: rute kembali ke Architect untuk revisi.
+    3. Kontrak REJECTED dan revision_count >= max_contract_revisions: STOP di END (FAIL). Developer TIDAK BOLEH dieksekusi.
     """
     contract_status = state.get("contract_status")
     revision_count = state.get("contract_revision_count", 0)
+    max_cr = state.get("max_contract_revisions")
+    max_contract_rev = 2 if max_cr is None else int(max_cr)
 
     if contract_status == ContractStatus.FROZEN.value or contract_status is None:
         decision = "developer"
         reason = "contract_frozen_or_absent"
-    elif contract_status == ContractStatus.REJECTED.value and revision_count < 2:
+    elif contract_status == ContractStatus.REJECTED.value and revision_count < max_contract_rev:
         decision = "architect"
         reason = f"contract_rejected_revision_{revision_count}"
     else:
-        # REJECTED dan batas revisi (>= 2) tercapai: FAIL / STOP langsung ke END
+        # REJECTED dan batas revisi (>= max_contract_rev) tercapai: FAIL / STOP langsung ke END
         decision = END
         reason = "contract_rejected_revision_limit_reached_abort"
 

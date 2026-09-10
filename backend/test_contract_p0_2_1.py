@@ -401,4 +401,22 @@ def test_p0_2_1_frozen_oracles_hash_immutability():
         content = p.read_bytes()
         actual_hash = hashlib.sha256(content).hexdigest().lower()
         assert actual_hash == expected_hash.lower()
+
+
+def test_dynamic_max_contract_revisions():
+    """14. Verifikasi bahwa batas revisi kontrak dapat dikonfigurasikan secara dinamis via state."""
+    state_rev3: SquadState = {
+        "contract_status": ContractStatus.REJECTED.value,
+        "contract_revision_count": 3,
+        "max_contract_revisions": 5
+    }  # type: ignore
+    assert route_after_contract_gate(state_rev3) == "architect"
+
+    state_rev5: SquadState = {
+        "contract_status": ContractStatus.REJECTED.value,
+        "contract_revision_count": 5,
+        "max_contract_revisions": 5
+    }  # type: ignore
+    assert route_after_contract_gate(state_rev5) == END
+
 

@@ -333,6 +333,30 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Failure Transition: Fatal crash collection Python (`NameError`) berhasil dieliminasi 100% pada fase awal; 1/5 unit test lulus pada FastAPI Rep 1; kelolosan Contract Gate meningkat dari 66.7% ke 77.8% (7/9 run berhasil eksekusi sandbox); Dart/Flutter 100% konsisten internal.
   - Keterbatasan Kausal: Model 7B lokal memiliki *cognitive capacity ceiling* dalam mematuhi seluruh instruksi revisi secara simultan pada konteks panjang, membuktikan bahwa intervensi arsitektural berhasil membuka jalur eksekusi (unblocking pipeline) namun penalaran sintesis solusi akhir tetap membutuhkan model berkemampuan penalaran lebih tinggi.
 
+### 14. Pelaksanaan Eksperimen Repair-Depth (Architect 5 + Developer 5) pada Qwen 7B & Pembuktian Diminishing Returns
+- **Status:** ⏳ VALIDATION PENDING (Hasil Empiris 9-Run Selesai — Menunggu Putusan Strategis Intent Architect)
+- **Pesan Commit Target:** `feat(experiment): execute repair-depth ablation A5+D5 on qwen 7b and record empirical recovery metrics [validation pending]`
+- **Waktu Eksekusi:** 2026-09-10 07:27 WIB
+- **Total Waktu Realisasi Sesi:** 5.245,0 detik (~87 menit 25 detik / 1,46 jam)
+- **Cakupan Berkas:**
+  - `backend/state.py` [MODIFIED — decoupled revision counters & dynamic max limits]
+  - `backend/agents/architect.py` [MODIFIED — dynamic blueprint revisions counter handling]
+  - `backend/graph.py` [MODIFIED — dynamic contract revisions gate & routing]
+  - `backend/test_contract_p0_2_1.py` [MODIFIED — dynamic revision limit verification test]
+  - `dokumentasi-pengembangan/experiments/repair_depth_a5_d5_summary.json` [NEW]
+  - `dokumentasi-pengembangan/experiments/repair_depth_a5_d5_result.md` [NEW]
+  - `dokumentasi-pengembangan/decision_log.md` [MODIFIED — D-079]
+  - `dokumentasi-pengembangan/durasi_per_fitur.md` [MODIFIED]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+- **Hasil Eksperimen & Analisis Kunci:**
+  - Gross Pass Rate: **1 / 9 (11,1%)** dalam total durasi 4.437,0s (~73,95 menit).
+  - Terobosan Pemulihan (*Slow-Convergent*): Qwen 7B berhasil pulih pada Loop 4 di FastAPI T1 Rep 1 (5/5 unit tests PASS, Reviewer APPROVED), membuktikan hipotesis bahwa budget 3 loop sebelumnya memutus pemulihan model terlalu dini.
+  - Pembuktian Batas Stagnasi (*Diminishing Returns*): Pada 5 dari 9 run (FastAPI Rep 2-3, Flutter Rep 1-3), model terjebak dalam attractor state / kode identik pada loop 3–5, membuktikan penambahan iterasi di atas loop 4 menghasilkan marginal gain 0,0%.
+  - Efisiensi Contract Gate (*Gated*): 3 dari 3 run CLI T1 tertahan di Contract Gate (5 revisi ditolak tanpa kebocoran Oracle), menghemat 100% komputasi Developer (Dev depth: 0).
+  - Integritas Kriptografis & Regresi: Seluruh 157 unit test backend lulus 100%, hash SHA-256 Frozen Oracle 100% cocok.
+
+
 
 
 

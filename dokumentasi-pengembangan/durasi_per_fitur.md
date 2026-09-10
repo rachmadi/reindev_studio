@@ -589,4 +589,48 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Total Durasi Aktual:** **46 menit 38 detik (100% dihitung berdasarkan timestamp eksperimen)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI REPAIR-DEPTH EXPERIMENT (ARCHITECT 5 + DEVELOPER 5) — 2026-09-10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan Awal & Persiapan Decoupled Budgets (Development Time)
+| No | Aktivitas Pengembangan Fitur & Runner | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Refactoring schema state, decoupled revision counters (blueprint vs contract), dan dynamic max limits di `backend/state.py`, `backend/agents/architect.py`, `backend/graph.py` | 06:00:30 | 06:04:15 | 225 s | 3.75 m (0.06 j) |
+| 2 | Pembuatan runner pengujian repair-depth 9-run `scratch/run_repair_depth_a5_d5_ablation.py` dan unit test regresi dinamis | 06:04:15 | 06:09:21 | 306 s | 5.10 m (0.08 j) |
+| | **Subtotal Waktu Pengembangan & Runner** | | | **531 s** | **8.85 m (0.15 jam)** |
+
+### Komponen 2: Waktu Pengujian Terkontrol 9 Runs (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Run 1/9 — FastAPI T1 Rep 1 (Loops: 4, Tests: 5/5 PASS, BP: 5, Gate: 0, Trajectory: slow-convergent, Reviewer: APPROVED) | 06:09:21 | 06:19:08 | 587.5 s | 9.79 m (0.16 j) |
+| 2 | Run 2/9 — FastAPI T1 Rep 2 (Loops: 5, Tests: 0/5, BP: 5, Gate: 0, Trajectory: stagnant, Dev Depth: 5) | 06:19:08 | 06:28:28 | 559.3 s | 9.32 m (0.16 j) |
+| 3 | Run 3/9 — FastAPI T1 Rep 3 (Loops: 5, Tests: 0/5, BP: 5, Gate: 0, Trajectory: stagnant, Dev Depth: 5) | 06:28:28 | 06:38:53 | 625.1 s | 10.42 m (0.17 j) |
+| 4 | Run 4/9 — CLI T1 Rep 1 (Loops: 0, Gate: 5/5 Rejected, BP: 5, Trajectory: gated, Dev Depth: 0) | 06:38:53 | 06:55:18 | 985.5 s | 16.42 m (0.27 j) |
+| 5 | Run 5/9 — CLI T1 Rep 2 (Loops: 0, Gate: 5/5 Rejected, BP: 0, Trajectory: gated, Dev Depth: 0) | 06:55:18 | 07:00:31 | 312.5 s | 5.21 m (0.09 j) |
+| 6 | Run 6/9 — CLI T1 Rep 3 (Loops: 0, Gate: 5/5 Rejected, BP: 1, Trajectory: gated, Dev Depth: 0) | 07:00:31 | 07:06:45 | 374.1 s | 6.23 m (0.10 j) |
+| 7 | Run 7/9 — Flutter T1 Rep 1 (Loops: 5, Tests: 0/2, BP: 0, Gate: 0, Trajectory: stagnant, Dev Depth: 5) | 07:06:45 | 07:12:25 | 340.4 s | 5.67 m (0.09 j) |
+| 8 | Run 8/9 — Flutter T1 Rep 2 (Loops: 5, Tests: 0/2, BP: 0, Gate: 0, Trajectory: stagnant, Dev Depth: 5) | 07:12:25 | 07:17:55 | 329.4 s | 5.49 m (0.09 j) |
+| 9 | Run 9/9 — Flutter T1 Rep 3 (Loops: 5, Tests: 0/2, BP: 0, Gate: 0, Trajectory: stagnant, Dev Depth: 5) | 07:17:55 | 07:23:18 | 322.7 s | 5.38 m (0.09 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **4.437,0 s** | **73.95 m (1.23 jam)** |
+
+### Komponen 3: Waktu Analisis Forensik, Uji Regresi, & Dokumentasi (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Verifikasi regresi 157 unit tests (`pytest backend -q`), verifikasi SHA-256 Frozen Oracle | 07:23:18 | 07:24:26 | 68 s | 1.13 m (0.02 j) |
+| 2 | Penyusunan laporan ilmiah komparatif A5/D5, pemutakhiran decision_log D-079, validation_log, durasi_per_fitur, commit_history | 07:24:26 | 07:27:55 | 209 s | 3.48 m (0.06 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **277 s** | **4.62 m (0.08 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Repair-Depth Experiment A5/D5:
+\mathbf{\text{Total Waktu Realisasi} = 531\text{ s (Dev)} + 4.437,0\text{ s (Test)} + 277\text{ s (Doc/Forensik)} = 5.245,0\text{ detik} \approx 87\text{ menit } 25\text{ detik} (1.46\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-10 06:00:30 WIB
+- **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 07:27:55 WIB
+- **Total Durasi Aktual:** **87 menit 25 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+
 

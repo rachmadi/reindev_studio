@@ -743,3 +743,36 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   2. *Batas Re-generation Prompting*: Ketika validator memberikan umpan balik revisi AST, model 7B memerlukan bimbingan struktural yang presisi; pada `max_revisions = 2`, model terkadang belum berhasil memasukkan seluruh import ke header file.
   3. *Integritas Frozen Oracle*: Seluruh SHA-256 Frozen Oracle terbukti 100% utuh sebelum dan sesudah eksekusi 9 runs.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: REPAIR-DEPTH EXPERIMENT (ARCHITECT 5 + DEVELOPER 5) — 2026-09-10 07:27 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Decoupled Revision Budgets):** Schema `SquadState` memisahkan `blueprint_revision_count` (`max_blueprint_revisions = 5`) dan `contract_revision_count` (`max_contract_revisions = 5`), serta Developer `max_iterations = 5` secara dinamis tanpa kanibalisasi antar-counter.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di `test_contract_p0_2_1.py::test_dynamic_max_contract_revisions` dan empiris Run 4 di mana BP 5/5 dan Gate 5/5 berjalan penuh independen).
+- **Kriteria 2 (Pengujian Terkontrol 9-Run Matrix):** 9-run matrix (FastAPI T1, CLI T1, Flutter T1 x 3 repetisi) dieksekusi 100% tuntas menggunakan `qwen2.5-coder:7b` dengan mode SAFE executor.  
+  *Hasil:* ✅ Terpenuhi (Total durasi: 4.437,0s / 73,95 menit, 1/9 PASS, 8/9 FAIL).
+- **Kriteria 3 (Penemuan Trajektori Slow-Convergent):** Membuktikan secara empiris bahwa kedalaman perbaikan Developer 5 loop mampu memulihkan task yang sebelumnya kekurangan iterasi pada budget 3 loop.  
+  *Hasil:* ✅ Terpenuhi (FastAPI T1 Rep 1 lulus 5/5 unit test pada Loop 4 dan disetujui penuh oleh Reviewer `[APPROVED]`).
+- **Kriteria 4 (Pemetaan Batas Diminishing Returns & Stagnasi):** Mengidentifikasi titik jenuh di mana penambahan kedalaman loop tidak lagi memberikan pemulihan tambahan.  
+  *Hasil:* ✅ Terpenuhi (5/9 run mengalami stagnasi kode identik pada loop 3–5; 3/9 run tertahan di Contract Gate dengan 0 pemborosan compute Developer).
+- **Kriteria 5 (Regresi Backend & Frozen Oracle Immutability):** 157 unit test backend lulus 100%, seluruh hash SHA-256 Frozen Oracle tetap terkunci dan tidak bermutasi.  
+  *Hasil:* ✅ Terpenuhi (157/157 PASS in 18.73s, hash match 100%).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **VALIDATION PENDING (HASIL EMPIRIS REPAIR-DEPTH SELESAI — MENUNGGU PUTUSAN STRATEGIS INTENT ARCHITECT)**
+- **Catatan Otoritas:** Hasil pengujian empiris repair-depth A5/D5 telah memetakan secara presisi potensi pemulihan dan batas stagnasi model lokal 7B. Seluruh artefak, telemetri, dan laporan ilmiah tersimpan secara deterministik untuk diputuskan oleh Intent Architect.
+
+### 3. Ringkasan Temuan Empiris Repair-Depth A5/D5
+- **Gross Pass Rate:** **1 / 9 (11,1%)** (FastAPI T1: 1/3, CLI T1: 0/3, Flutter T1: 0/3).
+- **Taksonomi Trajektori:**
+  1. `slow-convergent` (11,1% / 1 run): FastAPI Rep 1 pulih pada Loop 4 setelah mengatasi schema mismatch.
+  2. `stagnant` (55,6% / 5 runs): Model mengalami *semantic deadlock* (FastAPI Rep 2 & 3 pada missing import, Flutter Rep 1, 2, 3 pada parameter constructor Dart) di mana loop 3, 4, dan 5 menghasilkan kode identik.
+  3. `gated` (33,3% / 3 runs): Contract Gate P0-2.1 menolak halusinasi test methods pada interface publik CLI T1 sebanyak 5x revisi, berhasil menghemat 100% komputasi Developer (Dev depth: 0).
+- **Dokumentasi Lengkap:**
+  - `dokumentasi-pengembangan/experiments/repair_depth_a5_d5_result.md`
+  - `dokumentasi-pengembangan/experiments/repair_depth_a5_d5_summary.json`
+
+

@@ -29,6 +29,9 @@ class SquadState(TypedDict):
     contract_validation_errors: Optional[List[str]] # Daftar pesan galat validasi deterministik jika ditolak gate
     contract_feedback: Optional[str]  # Umpan balik terstruktur P0-2.1 jika kontrak ditolak gate
     contract_revision_count: int      # Penghitung putaran revisi kontrak antara gate dan architect (P0-2.1)
+    blueprint_revision_count: Optional[int] # Akumulasi putaran revisi Blueprint Validator AST (P0-2.2)
+    max_blueprint_revisions: Optional[int] # Batas maksimal revisi AST internal Architect Blueprint Validator (default: 2)
+    max_contract_revisions: Optional[int]  # Batas maksimal putaran revisi Contract Validation Gate (default: 2)
     developer_backend: Optional[str]  # Backend khusus Developer: "ollama" atau "openrouter"
     developer_model: Optional[str]    # Model khusus Developer (misal: "google/gemini-3.8-flash")
 

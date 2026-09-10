@@ -354,7 +354,8 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
     arch_plan = response.content if hasattr(response, "content") else str(response)
 
     # Architect Blueprint Validator: Generic Static Consistency Check & Self-Healing Revision Loop
-    max_blueprint_revisions = 2
+    max_bp = state.get("max_blueprint_revisions")
+    max_blueprint_revisions = 2 if max_bp is None else int(max_bp)
     blueprint_revision_count = 0
     while blueprint_revision_count < max_blueprint_revisions:
         is_bp_valid, bp_errors = validate_architect_blueprint(arch_plan, target_lang)
@@ -435,11 +436,16 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
     )
     current_logs = state.get("logs", [])
     
+    prev_bp_count = state.get("blueprint_revision_count") or 0
+    total_bp_count = prev_bp_count + blueprint_revision_count
+
     return {
         "architecture_plan": arch_plan,
         "contract": aligned_contract,
         "contract_status": "ALIGNED",
+        "blueprint_revision_count": total_bp_count,
         "status": "architect_done",
         "logs": current_logs + [new_log]
     }
+
 
