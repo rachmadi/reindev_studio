@@ -390,6 +390,7 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `backend/test_repentance_guidance.py` [NEW — 13 unit tests for 7-step guidance, state serialization, and parsing]
   - `dokumentasi-pengembangan/experiments/repair_rehabilitation_d10_summary.json` [NEW]
   - `dokumentasi-pengembangan/experiments/repair_rehabilitation_d10_result.md` [NEW]
+  - `dokumentasi-pengembangan/experiment_repair_rehabilitation_d10_investigation.md` [NEW — Laporan Investigasi Forensik Lengkap Eksperimen D10 & Semantic Deadlock Triad]
   - `dokumentasi-pengembangan/decision_log.md` [MODIFIED — D-080]
   - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md` [MODIFIED — Bagian 21]
   - `dokumentasi-pengembangan/error_log.md` [MODIFIED — E-053 s.d. E-055]
