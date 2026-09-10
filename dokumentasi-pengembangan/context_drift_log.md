@@ -135,4 +135,62 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Minor** — Peningkatan kenyamanan pengguna (*developer experience*) dan proteksi batasan konteks tanpa deviasi dari spesifikasi fungsional REQ-019 s.d. REQ-022.
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 5 — 2026-09-07 22:45
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penambahan Visual Thought Stream dengan Collapsible Card & Filter | Positif (Memungkinkan pemantauan penalaran internal agen per peran secara transparan) | Agen |
+| Otomasi Eksekusi Toolchain Nyata Dart/Flutter di Backend | Positif (Menggantikan tiruan mock Python dengan eksekusi compiler `dart test` subproses aktual) | Intent Architect |
+| Penerapan Role-Based Token Budget (`num_predict: 300-1000`) | Positif (Memangkas latensi PM/Architect dari >120s menjadi ~24s, mencegah timeout browser) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Menerapkan mekanisme agent heartbeat interval 2.5 detik pada WebSocket untuk mencegah timeout UI saat LLM berpikir panjang.
+  - Memotong `OLLAMA_NUM_CTX` dari 8192 ke 2048 agar 100% layer model berjalan di VRAM GPU 6GB tanpa thrashing PCIe.
+- **B2 (Keputusan Teknis):**
+  - Mengintegrasikan paket `flutter_markdown` adaptif untuk merender teks pemikiran Markdown secara kaya (*rich text*).
+
+### Ringkasan Distribusi Sumber Drift Iterasi 5:
+- **Intent Architect:** 50.0% (Otorisasi real toolchain execution, batasan token latensi)
+- **Agen:** 50.0% (Thought stream collapsible, heartbeat interval, optimasi VRAM GPU)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor** — Peningkatan drastis integritas eksekusi dan responsivitas UI tanpa mengubah spesifikasi REQ-023 s.d. REQ-026.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ITERASI 6 — 2026-09-08 s.d. 2026-09-10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Protokol Pengujian Frozen Oracle Terkunci (Phase 0, 1, 2) | Positif (Mengeliminasi bias evaluasi semu dan mengisolasi variabel intervensi secara ilmiah) | Intent Architect |
+| Eliminasi Total Mode ON (Oracle Dilution) dari Protokol Utama | Positif (Menjamin test suite acuan tidak dapat dimutasi atau direlaksasi oleh runtime) | Intent Architect |
+| Arsitektur Pre-Freeze Contract Integrity Gate P0-2.1 | Positif (Mencegah kontrak antarmuka ompong atau menyimpang sebelum diserahkan ke Developer) | Intent Architect |
+| Developer Gateway Abstraction Layer (OpenRouter Cloud/Frontier Support) | Positif (Mendukung pengujian komparatif frontier tanpa mengubah 100% squad pipeline lokal) | Intent Architect |
+| Universal Environment Grounding Framework (D-074 & D-075) | Positif (Mencegah halusinasi API usang/deprecated secara proaktif sejak hulu PM & Architect) | Intent Architect & Agen |
+| Generic Static Architect Blueprint Validator AST (D-078) | Positif (Menjamin konsistensi internal blueprint sintaksis dan parameter sebelum contract gate) | Intent Architect & Agen |
+| Decoupled Dynamic Repair-Depth Budgets (A5/D5) | Positif (Memisahkan counter revisi AST dan Contract Gate, membuka pemulihan slow-convergent Loop 4) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Implementasi sensor sintaksis resolusi tinggi `analyze_dart_bracket_balance()` di `diagnostic_parser.py` (P0-1.1) untuk mendiagnosis baris akar cascade compiler Dart.
+- **B2 (Keputusan Teknis):**
+  - Merancang Executor v2 (`backend/executor_v2.py`) dengan mode baru `SAFE` sebagai kandidat default, menggantikan 9 aturan global regex destruktif dengan AST pre-flight linter murni dan rollback otomatis.
+  - Menerapkan fallback semantik yang aman (`val if val is not None else default`) pada graph routing dan agent state.
+
+### Ringkasan Distribusi Sumber Drift Iterasi 6:
+- **Intent Architect:** 70.0% (Desain eksperimen terkontrol, arsitektur kontrak, grounding, batasan independen)
+- **Agen:** 30.0% (Sensor kurung P0-1.1, implementasi AST validator, fallback semantik safe)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Major (Positive Architectural Hardening)** — Transformasi arsitektural substansial yang mengalihkan sistem dari manipulasi runtime reaktif (regex rewriting) menuju pertahanan deterministik proaktif berbasis kontrak, AST validator, dan isolasi kriptografis murni.

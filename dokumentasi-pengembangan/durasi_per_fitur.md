@@ -621,16 +621,18 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 |---|---|---|---|---|---|
 | 1 | Verifikasi regresi 157 unit tests (`pytest backend -q`), verifikasi SHA-256 Frozen Oracle | 07:23:18 | 07:24:26 | 68 s | 1.13 m (0.02 j) |
 | 2 | Penyusunan laporan ilmiah komparatif A5/D5, pemutakhiran decision_log D-079, validation_log, durasi_per_fitur, commit_history | 07:24:26 | 07:27:55 | 209 s | 3.48 m (0.06 j) |
-| | **Subtotal Waktu Analisis & Dokumentasi** | | | **277 s** | **4.62 m (0.08 jam)** |
+| 3 | Pemutakhiran menyeluruh catatan riset (Bagian 13-20), human_intervention (63-77), conversation_log, error_log, context_drift | 08:07:53 | 08:15:53 | 480 s | 8.00 m (0.13 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **757 s** | **12.62 m (0.21 jam)** |
 
 ---
 
 ### Rekapitulasi Formula Waktu Realisasi Sesi Repair-Depth Experiment A5/D5:
-\mathbf{\text{Total Waktu Realisasi} = 531\text{ s (Dev)} + 4.437,0\text{ s (Test)} + 277\text{ s (Doc/Forensik)} = 5.245,0\text{ detik} \approx 87\text{ menit } 25\text{ detik} (1.46\text{ jam})}
+\mathbf{\text{Total Waktu Realisasi} = 531\text{ s (Dev)} + 4.437,0\text{ s (Test)} + 757\text{ s (Doc/Forensik)} = 5.725,0\text{ detik} \approx 95\text{ menit } 25\text{ detik} (1.59\text{ jam})}
 - **Waktu Mulai Sesi:** 2026-09-10 06:00:30 WIB
-- **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 07:27:55 WIB
-- **Total Durasi Aktual:** **87 menit 25 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
+- **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 08:15:53 WIB
+- **Total Durasi Aktual:** **95 menit 25 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
 
 
 

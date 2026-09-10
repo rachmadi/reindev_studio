@@ -656,8 +656,41 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Ablasi 9-Run Gemma & Qwen):
-- **Diselesaikan Mandiri oleh Agen:** 18 kasus
-- **Diselesaikan atas Intervensi IA:** 4 kasus
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 7 kasus
-- **Total Galat Terdokumentasi:** 49 kasus (E-001 s/d E-049)
+### Kasus E-050: Kebocoran Nama File & Simbol Uji Oracle pada Pesan Feedback Penolakan Pilar 4 Contract Gate
+- **Waktu:** 2026-09-10 ~00:30 WIB
+- **Tingkat Keparahan:** High (Benchmark Contamination / Oracle Leakage)
+- **Gejala:** Pesan penolakan Contract Gate pada Pilar 4 memuat nama fungsi uji spesifik (`tested_symbols`), nama endpoint (`tested_endpoints`), dan nama file uji (`test_main.py`), membocorkan kunci jawaban Frozen Oracle kepada Architect.
+- **Akar Masalah:** Format string umpan balik di `backend/contract.py` (v1.0.1) menyertakan variabel internal evaluasi Oracle ke dalam pesan `details`.
+- **Tindakan Korektif:** Menyusun sanitasi feedback di `backend/contract.py` (v1.0.2): hanya menyatakan jenis pelanggaran interface terhadap authoritative specification tanpa membocorkan nama fungsi atau file test Oracle.
+- **Sumber Solusi:** INTERVENSI (Diarahkan oleh Intent Architect).
+- **Status:** Tuntas (Resolved). Terverifikasi pada `test_contract_p0_2_1.py`.
+
+---
+
+### Kasus E-051: Halusinasi Self-Review Konsisten pada Autoregressive Token Generation Model Lokal (Blueprint Inconsistency)
+- **Waktu:** 2026-09-10 ~00:41 WIB (Smoke Test Python Architect vNext)
+- **Tingkat Keparahan:** Medium (Autoregressive Generation Blindspot)
+- **Gejala:** Model LLM menghasilkan deklarasi tertulis di akhir respons: `Self-Review: Semua simbol dan import 100% konsisten`, padahal di blok kode sebelumnya model menggunakan dekorator `@field_validator` tanpa statement import.
+- **Akar Masalah:** Karakteristik model autoregresif tidak dapat merevisi token yang telah di-generate di atasnya (*single-pass forward generation*), sehingga self-review berbasis teks dalam prompt tunggal tidak memadai untuk menjamin konsistensi sintaksis.
+- **Tindakan Korektif:** Membangun modul deterministik `backend/architect_validator.py` (v1.0.0) berbasis parser AST (`ast.parse`) dan siklus perbaikan otomatis di `architect_agent` (maks 2 revisi) sebelum kontrak diajukan ke Contract Gate.
+- **Sumber Solusi:** INTERVENSI & AGEN (Rekomendasi Strategis IA Opsi B).
+- **Status:** Tuntas (Resolved).
+
+---
+
+### Kasus E-052: Stagnasi Fatal Kode Identik (Zero Entropy Attractor State) pada Developer Multi-Loop Repair Depth 5
+- **Waktu:** 2026-09-10 ~06:19 s.d. 07:23 WIB (Run 2, 3, 7, 8, 9 Eksperimen A5/D5)
+- **Tingkat Keparahan:** Medium (Cognitive Saturation / Diminishing Returns Boundary)
+- **Gejala:** Pada 5 dari 9 run, Developer menghasilkan file kode dengan hash identik (*zero entropy diff*) pada loop 3, 4, dan 5 meskipun menerima umpan balik error compiler/pytest yang sama persis.
+- **Akar Masalah:** Ketika model mengalami kebuntuan pemahaman semantik (seperti parameter constructor Dart `CardMetric`), model mencapai attractor state jenuh di mana penambahan kedalaman loop tidak memberikan perubahan probabilitas token (marginal gain 0.0%).
+- **Tindakan Korektif:** Menetapkan rekomendasi batas optimal perbaikan `max_iterations = 4` dan mempertimbangkan sensor deteksi stagnasi hash (early stopping jika diff kode antar loop bernilai 0).
+- **Sumber Solusi:** AGEN (Analisis Forensik Eksperimen Repair-Depth A5/D5).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Repair-Depth A5/D5):
+- **Diselesaikan Mandiri oleh Agen:** 19 kasus
+- **Diselesaikan atas Intervensi IA:** 5 kasus
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 8 kasus
+- **Total Galat Terdokumentasi:** 52 kasus (E-001 s/d E-052)
