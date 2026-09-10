@@ -1161,20 +1161,290 @@ def map_evidence_to_contract(
     return None, None, None
 
 
+# ===========================================================================
+# 8.5. Improved Repentance & Diagnostic Guidance Engine
+# ===========================================================================
+
+def infer_root_cause_and_direction(
+    test: FailingTest,
+    framework: str = "pytest",
+    contract: Optional[Dict[str, Any]] = None
+) -> Tuple[str, str, str, str]:
+    """
+    Menyimpulkan secara deterministik:
+    (root_cause, affected_constraint, required_direction, preservation_rule)
+    mengikuti Rule 1 (Root-cause aligned), Rule 2 (Terminology aligned),
+    Rule 3 (Single-sin focus), dan Rule 4 (Global constraint preservation).
+    """
+    msg = (test.message or "").strip()
+    tb = (test.traceback_excerpt or "").strip()
+    full_text = f"{msg}\n{tb}".lower()
+    tname = (test.test_name or "").lower()
+
+    # Kontrak referensi jika ada
+    contract_ref = ""
+    c_aid = test.linked_assertion_id
+    c_rid = test.linked_req_id
+    c_ifid = test.linked_interface_id
+    if not c_aid and contract:
+        c_aid, c_rid, c_ifid = map_evidence_to_contract(test, contract)
+    if c_aid:
+        contract_ref = f" [Kontrak: Assertion {c_aid}"
+        if c_rid:
+            contract_ref += f" / Req {c_rid}"
+        if c_ifid:
+            contract_ref += f" / Interface {c_ifid}"
+        contract_ref += "]"
+
+    # 1. Missing Type / Class Declaration (Dart MetricData or similar)
+    if (
+        "method not found: 'metricdata'" in full_text
+        or "isn't a type and can't be used as a type" in full_text
+        or ("not found" in full_text and "metricdata" in full_text)
+        or ("undefined class" in full_text and "metricdata" in full_text)
+        or "the getter 'data' isn't defined" in full_text
+    ):
+        root_cause = "Tipe data 'MetricData' digunakan oleh consumer/widget tetapi deklarasi kelas tersebut belum tersedia atau belum terdefinisi dalam scope file."
+        affected_constraint = f"Model data 'MetricData' dan widget 'CardMetric(data: MetricData)'{contract_ref}"
+        required_direction = "Deklarasikan kelas 'MetricData' secara lengkap dengan atribut yang dibutuhkan (seperti title, value, change, isPositive) dan pastikan dapat diakses oleh widget 'CardMetric'."
+        preservation_rule = "Pertahankan nama kelas 'CardMetric', nama parameter 'data', dan tipe 'MetricData'. DILARANG mengubah konstruktor menjadi CardMetric({super.key}) atau mengganti nama tipe!"
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 2. Dart Constructor Parameter Mismatch (e.g. 'No named parameter with the name color')
+    m_named_param = re.search(r"no named parameter with the name ['\"]([a-zA-Z0-9_]+)['\"]", full_text)
+    if m_named_param:
+        param_name = m_named_param.group(1)
+        root_cause = f"Konstruktor dipanggil dengan named parameter '{param_name}', namun deklarasi konstruktor tidak menerima parameter tersebut."
+        affected_constraint = f"Parameter konstruktor '{param_name}'{contract_ref}"
+        required_direction = f"Tambahkan parameter bernama '{param_name}' ke dalam tanda tangan konstruktor dengan tipe yang sesuai dan simpan ke field instance."
+        preservation_rule = f"Pertahankan seluruh parameter konstruktor yang sudah ada sebelumnya. DILARANG menghapus parameter yang sudah didukung!"
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 3. Dart Delimiter / Bracket Cascade
+    if (
+        "bracket" in full_text or "delimiter" in full_text
+        or "can't find '}' to match '{" in full_text
+        or "expected to find '}'" in full_text
+        or "expected to find ')'" in full_text
+        or "unbalanced bracket" in full_text
+    ):
+        root_cause = "Terdapat ketidakseimbangan tanda kurung (curly braces/parentheses) yang menyebabkan kegagalan kompilasi sintaksis Dart."
+        affected_constraint = f"Struktur blok sintaksis kode Dart{contract_ref}"
+        required_direction = "Periksa dan hitung kesesuaian setiap kurung pembuka '(', '{', '[' dengan kurung penutup ')', '}', ']'. Tutup semua blok widget dengan presisi."
+        preservation_rule = "Pertahankan seluruh implementasi method build dan logika widget tanpa menghapus method/kelas secara sembarangan."
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 4. Python Missing Import (e.g. field_validator, BaseModel, FastAPI)
+    m_name_err = re.search(r"name ['\"]([a-zA-Z0-9_]+)['\"] is not defined", full_text)
+    if "nameerror" in full_text and m_name_err:
+        sym = m_name_err.group(1)
+        if sym == "field_validator":
+            root_cause = f"Dekorator '@{sym}' digunakan untuk validasi model Pydantic v2, tetapi simbol '{sym}' belum diimpor dari modul 'pydantic'."
+            affected_constraint = f"Validasi skema DTO Pydantic v2 (@{sym}){contract_ref}"
+            required_direction = f"Tambahkan '{sym}' ke dalam statement impor: 'from pydantic import BaseModel, {sym}, ...'."
+            preservation_rule = "Pertahankan seluruh aturan validasi field dan tipe data pada DTO Pydantic tanpa menghapus dekorator validasi."
+            return root_cause, affected_constraint, required_direction, preservation_rule
+        elif sym in ("app", "fastapi"):
+            root_cause = f"Simbol '{sym}' digunakan sebagai instance aplikasi FastAPI tetapi belum diinisialisasi atau diimpor."
+            affected_constraint = f"Inisialisasi aplikasi FastAPI{contract_ref}"
+            required_direction = "Pastikan 'from fastapi import FastAPI' dan inisialisasi 'app = FastAPI()' berada di level root file sebelum route didefinisikan."
+            preservation_rule = "Pertahankan nama instance 'app' dan seluruh route endpoint HTTP yang telah dideklarasikan."
+            return root_cause, affected_constraint, required_direction, preservation_rule
+        elif sym == "Field":
+            root_cause = f"Simbol '{sym}' digunakan untuk mendefinisikan batasan field model Pydantic tetapi belum diimpor."
+            affected_constraint = f"Definisi model field Pydantic{contract_ref}"
+            required_direction = "Tambahkan 'Field' ke dalam statement import pydantic: 'from pydantic import BaseModel, Field, ...'."
+            preservation_rule = "Pertahankan batasan validasi field (misal: gt=0, min_length=1)."
+            return root_cause, affected_constraint, required_direction, preservation_rule
+        else:
+            root_cause = f"Simbol '{sym}' digunakan namun belum diimpor atau dideklarasikan secara lokal."
+            affected_constraint = f"Resolusi simbol '{sym}'{contract_ref}"
+            required_direction = f"Periksa apakah '{sym}' berasal dari pustaka standar atau kelas lokal, dan tambahkan statement import/deklarasi yang sesuai."
+            preservation_rule = f"Pertahankan pemanggilan simbol '{sym}' pada titik kode yang membutuhkannya."
+            return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 5. HTTP 422 Unprocessable Entity (FastAPI Schema Validation Failure)
+    if "422" in full_text or "unprocessable" in full_text:
+        root_cause = "Data payload JSON yang dikirimkan test runner ditolak oleh validasi skema Pydantic (HTTP 422 Unprocessable Entity)."
+        affected_constraint = f"Skema validasi DTO input (Pydantic model) dan deserialisasi request body{contract_ref}"
+        required_direction = "Periksa field-field DTO (misal: nama field, tipe integer/float/string, optional vs required). Pastikan payload uji (seperti name, quantity, price) dapat diparse tanpa menimbulkan ValidationError."
+        preservation_rule = "Pertahankan path routing endpoint, HTTP status code sukses (201 untuk create, 200 untuk read/update), dan struktur response model."
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 6. Matrix / Dimensional Validation Error (CLI T1)
+    if "dimension" in full_text or "shape" in full_text or ("matrix" in full_text and "valueerror" in full_text):
+        root_cause = "Operasi matriks gagal memvalidasi kesesuaian dimensi operand (baris vs kolom) atau gagal memicu ValueError pada dimensi yang tidak kompatibel."
+        affected_constraint = f"Validasi dimensi aljabar linear pada kelas 'Matrix'{contract_ref}"
+        required_direction = "Pastikan perkalian matriks memvalidasi cols(A) == rows(B), dan penjumlahan memvalidasi rows(A) == rows(B) serta cols(A) == cols(B). Naikkan ValueError jika dimensi tidak sesuai."
+        preservation_rule = "Pertahankan nama kelas 'Matrix', method dunder (__add__, __mul__, dll.) dan method publik (rows, cols, add, multiply) sesuai kontrak spesifikasi."
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 7. Assertion Failure (Expected vs Actual)
+    if test.expected is not None and test.actual is not None:
+        root_cause = f"Hasil eksekusi logika fungsi mengembalikan '{test.actual}', padahal nilai yang diekspektasikan adalah '{test.expected}'."
+        affected_constraint = f"Logika nilai kembalian pada {test.source_symbol or test.test_name}{contract_ref}"
+        required_direction = f"Sesuaikan alur komputasi atau format luaran agar menghasilkan nilai yang tepat sesuai ekspektasi pengujian ('{test.expected}')."
+        preservation_rule = "Pertahankan signature fungsi dan penanganan kasus batas (edge cases) yang sudah benar."
+        return root_cause, affected_constraint, required_direction, preservation_rule
+
+    # 8. Generic Fallback Root Cause
+    root_cause = f"Eksekusi pengujian '{test.test_name}' gagal dengan galat tipe '{test.failure_type}'."
+    affected_constraint = f"Pengujian '{test.test_name}'{contract_ref}"
+    required_direction = "Analisis pesan galat dan cuplikan traceback berikut untuk mengidentifikasi baris kode yang mengalami kegagalan."
+    preservation_rule = "Pertahankan antarmuka publik dan integrasi modul yang sudah sesuai spesifikasi."
+    return root_cause, affected_constraint, required_direction, preservation_rule
+
+
+def build_repentance_guidance(
+    evidence: DiagnosticEvidence,
+    iteration: int,
+    max_iterations: int = 10,
+    contract: Optional[Dict[str, Any]] = None,
+    repair_history: Optional[List[Dict[str, Any]]] = None,
+    known_good_constraints: Optional[List[str]] = None,
+    failed_strategies: Optional[List[Dict[str, Any]]] = None,
+    run_id: Optional[str] = None
+) -> str:
+    """
+    Menyusun Improved Repentance Guidance 7-langkah:
+    1. Actual Error
+    2. Root Cause
+    3. Affected Constraint
+    4. Required Direction
+    5. Preservation Rule
+    6. Previous Failed Attempt
+    7. Verification
+    """
+    if evidence.execution_status == "passed":
+        return ""
+
+    failing_tests = evidence.failing_tests or []
+    top_failure = failing_tests[0] if failing_tests else FailingTest(
+        test_name="general_execution_failure",
+        test_file="unknown",
+        message=evidence.summary_line or "Test suite execution failed."
+    )
+
+    root_cause, affected_constraint, required_direction, preservation_rule = infer_root_cause_and_direction(
+        top_failure,
+        framework=evidence.framework,
+        contract=contract
+    )
+
+    # 1. ACTUAL ERROR
+    err_desc = top_failure.message or evidence.summary_line or "Execution failed"
+    if len(err_desc) > 300:
+        err_desc = err_desc[:290] + "..."
+
+    actual_error_block = (
+        f"Uji '{top_failure.test_name}' ({top_failure.test_file}) GAGAL pada framework {evidence.framework}.\n"
+        f"Detail: {err_desc}"
+    )
+    if top_failure.expected is not None and top_failure.actual is not None:
+        actual_error_block += f"\nEkspektasi: {top_failure.expected} | Aktual: {top_failure.actual}"
+
+    # 6. PREVIOUS FAILED ATTEMPT
+    previous_attempt_block = ""
+    if repair_history and len(repair_history) > 0:
+        last_rep = repair_history[-1]
+        last_loop = last_rep.get("loop", iteration - 1)
+        last_res = last_rep.get("result", "FAILED")
+        last_err = last_rep.get("error_message", "")
+
+        # Cek apakah ada pengulangan kegagalan yang sama (Rule 5)
+        is_repeated = False
+        if last_err and (last_err[:50] in err_desc or err_desc[:50] in last_err):
+            is_repeated = True
+        if last_res == "STAGNANT":
+            is_repeated = True
+
+        if is_repeated:
+            previous_attempt_block = (
+                f"⚠️ PERINGATAN REPETISI / STAGNASI (Loop {last_loop}): Pendekatan yang Anda coba pada "
+                f"Loop {last_loop} menghasilkan error/kondisi yang persis sama. Strategi sebelumnya TIDAK "
+                f"menyelesaikan masalah. DILARANG mengulangi kode atau pola yang sama persis! Anda WAJIB "
+                f"mengubah strategi perbaikan sesuai [REQUIRED DIRECTION] di atas."
+            )
+        elif last_res == "REGRESSED":
+            previous_attempt_block = (
+                f"⚠️ PERINGATAN REGRESI (Loop {last_loop}): Perubahan terakhir justru menyebabkan penurunan "
+                f"jumlah test yang lolos ({last_rep.get('test_passed_count', 0)} passed -> {evidence.passed_tests} passed). "
+                f"Periksa kembali perubahan Anda dan kembalikan bagian yang sebelumnya sudah benar!"
+            )
+        elif last_res == "IMPROVED":
+            previous_attempt_block = (
+                f"ℹ️ PROGRES POSITIF (Loop {last_loop}): Terjadi kemajuan ({evidence.passed_tests}/{evidence.total_tests} passed). "
+                f"Pertahankan perbaikan yang berhasil dan selesaikan sisa masalah di atas tanpa mengubah fungsionalitas yang sudah hijau."
+            )
+        else:
+            previous_attempt_block = (
+                f"ℹ️ Loop {last_loop} belum menyelesaikan seluruh constraint ({evidence.passed_tests}/{evidence.total_tests} passed). "
+                f"Evaluasi perbedaan antara ekspektasi dan aktual secara saksama."
+            )
+    else:
+        previous_attempt_block = (
+            "ℹ️ Ini adalah putaran perbaikan pertama (Loop 1). Analisis akar masalah secara presisi sebelum menulis kode."
+        )
+
+    # 5. PRESERVATION RULE (Tambahkan known-good constraints jika ada)
+    preservation_block = preservation_rule
+    if known_good_constraints:
+        kg_str = ", ".join(known_good_constraints[:3])
+        preservation_block += f"\nConstraint/interface yang telah terbukti benar: {kg_str}."
+
+    # 7. VERIFICATION
+    verification_block = (
+        "- [ ] Apakah seluruh simbol, kelas, fungsi, dan dekorator sudah diimpor dan terdefinisi?\n"
+        "- [ ] Apakah tanda tangan konstruktor/fungsi cocok persis dengan pemanggil (caller)?\n"
+        "- [ ] Apakah nama antarmuka, kelas, dan Target File Authoritative tetap sesuai spesifikasi?\n"
+        "- [ ] Apakah perbaikan lokal ini TIDAK merusak bagian kode lain yang sudah benar (bebas regresi)?"
+    )
+
+    feedback_text = f"""[IMPROVED REPENTANCE GUIDANCE - SIKLUS PERBAIKAN {iteration}/{max_iterations}]
+
+1. [ACTUAL ERROR]
+{actual_error_block}
+
+2. [ROOT CAUSE]
+{root_cause}
+
+3. [AFFECTED CONSTRAINT]
+{affected_constraint}
+
+4. [REQUIRED DIRECTION]
+{required_direction}
+
+5. [PRESERVATION RULE]
+{preservation_block}
+
+6. [PREVIOUS FAILED ATTEMPT]
+{previous_attempt_block}
+
+7. [VERIFICATION - CEK MANDIRI SEBELUM OUTPUT]
+{verification_block}"""
+
+    return feedback_text.strip()
+
+
 def build_targeted_feedback(
     evidence: DiagnosticEvidence,
     iteration: int = 1,
     max_iterations: int = 3,
     run_id: Optional[str] = None,
-    contract: Optional[Dict[str, Any]] = None
+    contract: Optional[Dict[str, Any]] = None,
+    repair_history: Optional[List[Dict[str, Any]]] = None,
+    known_good_constraints: Optional[List[str]] = None,
+    failed_strategies: Optional[List[Dict[str, Any]]] = None,
+    use_repentance: bool = True
 ) -> str:
     """
-    Menyusun payload Markdown umpan balik diagnostik yang ringkas, hemat token (<600 karakter),
+    Menyusun payload Markdown umpan balik diagnostik yang ringkas, hemat token,
     dan bebas dari kebisingan terminal mentah.
     
     KRUSIAL: Non-preskriptif! Menjelaskan apa yang gagal dan buktinya,
     TIDAK mendikte baris perbaikan kode spesifik.
     Jika mapping kontrak tersedia secara deterministik, sertakan referensi assertion/klausul.
+    Jika use_repentance aktif, sertakan Improved Repentance Guidance 7-langkah.
     """
     if evidence.execution_status == "passed":
         return ""
@@ -1251,6 +1521,22 @@ def build_targeted_feedback(
             f"Selesaikan 3 masalah prioritas di atas terlebih dahulu."
         )
 
+    # Improved Repentance Guidance (P0-1 & D10)
+    if use_repentance and evidence.execution_status != "passed":
+        repentance_text = build_repentance_guidance(
+            evidence=evidence,
+            iteration=iteration,
+            max_iterations=max_iterations,
+            contract=contract,
+            repair_history=repair_history,
+            known_good_constraints=known_good_constraints,
+            failed_strategies=failed_strategies,
+            run_id=run_id
+        )
+        if repentance_text:
+            lines.append("")
+            lines.append(repentance_text)
+
     feedback_text = "\n".join(lines).strip()
 
     # Observability event logging
@@ -1276,12 +1562,26 @@ def build_targeted_feedback_from_dict(
     iteration: int = 1,
     max_iterations: int = 3,
     run_id: Optional[str] = None,
-    contract: Optional[Dict[str, Any]] = None
+    contract: Optional[Dict[str, Any]] = None,
+    repair_history: Optional[List[Dict[str, Any]]] = None,
+    known_good_constraints: Optional[List[str]] = None,
+    failed_strategies: Optional[List[Dict[str, Any]]] = None,
+    use_repentance: bool = True
 ) -> str:
     """Helper untuk menyusun targeted feedback langsung dari dictionary diagnostic_evidence."""
     try:
         evidence = DiagnosticEvidence.from_dict(evidence_dict)
-        return build_targeted_feedback(evidence, iteration, max_iterations, run_id, contract)
+        return build_targeted_feedback(
+            evidence,
+            iteration=iteration,
+            max_iterations=max_iterations,
+            run_id=run_id,
+            contract=contract,
+            repair_history=repair_history,
+            known_good_constraints=known_good_constraints,
+            failed_strategies=failed_strategies,
+            use_repentance=use_repentance
+        )
     except Exception:
         # Fail-safe jika deserialisasi dictionary gagal
         return ""

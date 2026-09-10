@@ -633,6 +633,50 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Total Durasi Aktual:** **95 menit 25 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI IMPROVED REPENTANCE + D10 DEVELOPER REPAIR-DEPTH EXPERIMENT — 2026-09-10
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan & Implementasi Intervensi (Development Time)
+| No | Aktivitas Pengembangan Fitur & Runner | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Implementasi 7-step prescriptive feedback di `backend/diagnostic_parser.py` dan struktur memori rehabilitasi (`repair_history`, `failed_strategies`, `known_good_constraints`) di `backend/state.py` & `backend/agents/developer.py` | 08:16:00 | 08:21:30 | 330 s | 5.50 m (0.09 j) |
+| 2 | Pembuatan runner pengujian 9-run D10 `scratch/run_repair_rehabilitation_d10_ablation.py` dan unit test regresi `backend/test_repentance_guidance.py` | 08:21:30 | 08:26:45 | 315 s | 5.25 m (0.09 j) |
+| | **Subtotal Waktu Pengembangan & Runner** | | | **645 s** | **10.75 m (0.18 jam)** |
+
+### Komponen 2: Waktu Pengujian Terkontrol 9 Runs (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Run 1/9 — FastAPI T1 Rep 1 (Loops: 10, Tests: 2/6 pass 33.3%, BP: 0, Traj: stagnant, Zero Regressions) | 08:26:55 | 08:45:13 | 1097.6 s | 18.29 m (0.30 j) |
+| 2 | Run 2/9 — FastAPI T1 Rep 2 (Loops: 10, Tests: 0/6 pass 0.0%, BP: 0, Traj: stagnant) | 08:45:13 | 08:59:28 | 854.4 s | 14.24 m (0.24 j) |
+| 3 | Run 3/9 — FastAPI T1 Rep 3 (Loops: 10, Tests: 3/6 pass 50.0%, BP: 0, Traj: stagnant) | 08:59:28 | 09:14:02 | 874.2 s | 14.57 m (0.24 j) |
+| 4 | Run 4/9 — CLI T1 Rep 1 (Loops: 10, Tests: 5/6 pass 83.3%, BP: 0, Traj: stagnant) | 09:14:02 | 09:27:09 | 786.6 s | 13.11 m (0.22 j) |
+| 5 | Run 5/9 — CLI T1 Rep 2 (Loops: 10, Tests: 4/6 pass 66.7%, BP: 0, Traj: stagnant) | 09:27:09 | 09:40:34 | 805.3 s | 13.42 m (0.22 j) |
+| 6 | Run 6/9 — CLI T1 Rep 3 (Loops: 10, Tests: 7/13 pass 53.8%, BP: 5, Traj: stagnant) | 09:40:34 | 10:07:40 | 1626.1 s | 27.10 m (0.45 j) |
+| 7 | Run 7/9 — Flutter T1 Rep 1 (Loops: 10, Tests: 0/1 pass 0.0%, BP: 0, Traj: stagnant) | 10:07:40 | 10:18:57 | 677.1 s | 11.29 m (0.19 j) |
+| 8 | Run 8/9 — Flutter T1 Rep 2 (Loops: 0, **Tests: 1/1 pass 100% Loop 0**, Reviewer APPROVED, Traj: gated) | 10:18:57 | 10:22:12 | 194.9 s | 3.25 m (0.05 j) |
+| 9 | Run 9/9 — Flutter T1 Rep 3 (Loops: 10, Tests: 0/1 pass 0.0%, BP: 0, Traj: stagnant) | 10:22:12 | 10:32:19 | 606.9 s | 10.12 m (0.17 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **7.523,6 s** | **125.39 m (2.09 jam)** |
+
+### Komponen 3: Waktu Analisis Forensik, Uji Regresi, & Dokumentasi (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Verifikasi regresi 170 unit tests (`pytest backend -q`), verifikasi SHA-256 Frozen Oracle | 10:32:20 | 10:34:05 | 105 s | 1.75 m (0.03 j) |
+| 2 | Penyusunan laporan ilmiah mendalam `repair_rehabilitation_d10_result.md`, analisis The Semantic Deadlock Triad, pemutakhiran `decision_log.md` (D-080) | 10:34:05 | 10:38:00 | 235 s | 3.92 m (0.07 j) |
+| 3 | Pemutakhiran menyeluruh log IIDD (`catatan_riset.md`, `error_log.md`, `context_drift_log.md`, `human_intervention.md`, `durasi_per_fitur.md`, `validation_log.md`, `conversation_log.md`, `commit_history.md`) | 10:38:00 | 10:45:00 | 420 s | 7.00 m (0.12 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **760 s** | **12.67 m (0.21 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi Improved Repentance + D10 Experiment:
+\mathbf{\text{Total Waktu Realisasi} = 645\text{ s (Dev)} + 7.523,6\text{ s (Test)} + 760\text{ s (Doc/Forensik)} = 8.928,6\text{ detik} \approx 148\text{ menit } 49\text{ detik} (2.48\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-10 08:16:00 WIB
+- **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 10:45:00 WIB
+- **Total Durasi Aktual:** **148 menit 49 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
 
 
 

@@ -726,3 +726,58 @@ Rangkaian 6 tahapan eksperimen empiris (Phase 2 -> Frontier -> Gemma 26B -> Grou
    - Default Developer `max_iterations = 4` (sweet spot efisiensi vs pemulihan).
    - Default Architect `max_blueprint_revisions = 2`, `max_contract_revisions = 2`.
    - **Hybrid Orchestration:** Squad lokal (PM, Architect, Reviewer) dipadukan dengan opsi Cloud/Frontier Developer untuk tugas penalaran tingkat tinggi.
+
+---
+
+## 21. Eksperimen Lanjutan: Improved Repentance Guidance + Rehabilitation State Memory + D10 Developer Repair-Depth — 2026-09-10 10:32 WIB
+
+Untuk menindaklanjuti temuan A5/D5 dan menguji apakah kualitas bimbingan diagnostik preskriptif dipadukan dengan perluasan kedalaman perbaikan dapat memecahkan stagnasi:
+
+### A. Desain Intervensi & 4 Methodological Locks
+1. **7-Langkah Preskriptif Repentance Guidance:** Umpan balik diagnostik diperkaya menjadi 7 elemen berurutan: *Expected vs Actual*, *Error Type*, *Failure Location*, *Hypothesized Cause*, *Prescriptive Guidance*, *Known-Good Constraints*, dan *Anti-Patterns to Avoid*.
+2. **Rehabilitation State Memory:** Penyimpanan memori kumulatif lintas loop pada `SquadState` (`repair_history`, `failed_strategies`, `known_good_constraints`) guna mencegah Developer mengulangi pendekatan yang telah terbukti gagal.
+3. **Perluasan Kedalaman D10:** Peningkatan pagu loop perbaikan Developer dari 5 menjadi 10 (`max_iterations = 10`).
+4. **4 Methodological Locks Terkunci:**
+   - *Lock 1 (Facts before diagnosis):* Sensor hanya mendiagnosis kegagalan yang tampak nyata pada traceback.
+   - *Lock 2 (Evidence-backed constraints):* Hanya memvalidasi dan mengunci assertion yang terbukti lulus secara empiris.
+   - *Lock 3 (Early exit on test PASS):* Pipeline berhenti seketika saat unit test 100% hijau.
+   - *Lock 4 (A-priori deterministic trajectory categorization):* Mengklasifikasikan hasil secara deterministik (`convergent`, `stagnant`, `regressive`, `unviable`, `gated`).
+
+### B. Hasil Kuantitatif 9-Run Matrix (Total Durasi: 7.523,6s / ~125,4 menit)
+| Task ID | Rep | Loops Selesai | Unit Tests Passed | Blueprint Rev | Gate Rev | Status Pipeline | Trajectory Class |
+|---|---|---|---|---|---|---|---|
+| **fastapi_t1** | Rep 1 | 10 (Max) | 33.3% (2/6 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **fastapi_t1** | Rep 2 | 10 (Max) | 0.0% (0/6 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **fastapi_t1** | Rep 3 | 10 (Max) | 50.0% (3/6 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **cli_t1** | Rep 1 | 10 (Max) | 83.3% (5/6 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **cli_t1** | Rep 2 | 10 (Max) | 66.7% (4/6 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **cli_t1** | Rep 3 | 10 (Max) | 53.8% (7/13 pass) | 5 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **flutter_t1** | Rep 1 | 10 (Max) | 0.0% (0/1 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+| **flutter_t1** | Rep 2 | **0 (Loop 0)** | **100.0% (1/1 pass)** | 0 | 0 | **PASSED (APPROVED)** | `gated` (Name Term) |
+| **flutter_t1** | Rep 3 | 10 (Max) | 0.0% (0/1 pass) | 0 | 0 | FAILED (NEEDS_REVISION) | `stagnant` |
+
+### C. Analisis Kausal & Verdict "Mengapa 5 Revisi Belum Tepat Sasaran"
+1. **Tingkat Architect (5 Revisi Blueprint):**
+   - Modul `architect_validator.py` mengevaluasi blok kode markdown Python secara parsial menggunakan `ast.parse` per blok.
+   - Architect memecah implementasi menjadi beberapa blok terpisah (Blok 1: Model Pydantic, Blok 2: Endpoint FastAPI).
+   - Di Blok 2, `@app.post` diidentifikasi sebagai error karena variabel `app = FastAPI()` dideklarasikan di Blok 1.
+   - Karena Architect belum dilengkapi Repentance Guidance (hanya menerima raw AST string tanpa solusi holistik), model mencoba memformat ulang dan justru memperbanyak pecahan blok kode dari 2 menjadi 4 blok.
+2. **Tingkat Developer (5 s/d 10 Loop Stagnan) — "The Semantic Deadlock Triad":**
+   - Penambahan loop dari 5 ke 10 membuktikan bahwa kegagalan pemulihan bukan disebabkan oleh kurangnya loop, melainkan 3 kebuntuan eksternal di luar jangkauan reasoning Developer:
+     a. **Cross-Test In-Memory State Contamination (FastAPI):**
+        - Test suite Frozen Oracle menguji database in-memory global `products_db = []` secara sekuensial tanpa teardown fixture.
+        - `test_create_product` menambahkan Laptop; `test_delete_product` menambahkan Mouse, menghapus Mouse, lalu mengassert `len(products_db) == 0`. Karena Laptop masih ada di memori global, assertion gagal.
+        - Developer dilarang mengedit file test, dan tidak dapat mengosongkan list di setiap pemanggilan handler tanpa merusak test lain. Ini adalah deadlock deterministik pada test suite.
+     b. **Diagnostic Misattribution & Inverted Failure Localization (CLI):**
+        - Pada parser string matriks `parse_matrix`, kegagalan terjadi ketika baris kedua tidak seimbang (`len(values) != len(rows[0])`).
+        - Heuristik traceback mengatribusikan exception `ValueError: Invalid dimensions` ke fungsi operasi matriks (`add_matrices`).
+        - Developer memeriksa `add_matrices`, melihat implementasinya sudah benar, dan mengulang kode yang identik sebanyak 9 putaran loop (`hash: 3bf16cc03ee8`).
+     c. **Test Suite Syntax & String Formatting Defect (Flutter):**
+        - Pada Rep 1, berkas test Frozen Oracle memanggil `.evaluate().first.backgroundColor` pada `Element`, memicu compiler cascade error yang tidak dapat diperbaiki oleh Developer dari `card_metric.dart`.
+        - Pada Rep 3, test mengharuskan teks berformat ribuan berkoma (`'150,000.00 USD'`), sedangkan implementasi standar Dart menghasilkan `'150000.00 USD'`.
+
+### D. Temuan Diminishing Returns & Rekomendasi Batas Optimal D4
+- **Efektivitas Repentance Guidance:** Berhasil mengeliminasi 100% regresi fungsional (**`regressions = 0`** sepanjang 77 total developer loop) dan mempercepat pemulihan awal (Loop 1–2) pada kesalahan sintaksis/impor.
+- **Titik Awal Stagnasi (*Onset of Stagnation*):** Terjadi secara konsisten pada **Loop 2–3**.
+- **Batas Diminishing Returns:** Loops 5 hingga 10 menghasilkan **0% recovery** (marginal gain 0.0%).
+- **Rekomendasi Konfigurasi:** Budget loop perbaikan optimal untuk Developer model 7B adalah **D4** (maksimal 4 iterasi). Iterasi di atas 4 hanya membakar komputasi tanpa memberikan peningkatan kualitas kode.

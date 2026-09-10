@@ -580,7 +580,17 @@ def executor_node_v2(state: SquadState) -> dict:
     current_logs = state.get("logs", [])
     developer_feedback = ""
 
-    # P0-1: Structured Diagnostic Parser & Targeted Error Feedback
+    # P0-1 & Improved Repentance: Structured Diagnostic Parser, History & Targeted Error Feedback
+    code_hashes = compute_dict_hashes(code_files_after)
+    current_code_hash = compute_sha256("".join(f"{k}:{code_hashes[k]}" for k in sorted(code_hashes.keys())))[:16]
+
+    repair_history = list(state.get("repair_history") or [])
+    failed_strategies = list(state.get("failed_strategies") or [])
+    known_good_constraints = list(state.get("known_good_constraints") or [])
+    contract = state.get("contract")
+    max_iterations = state.get("max_iterations") if state.get("max_iterations") is not None else 10
+
+    diag = None
     if parse_diagnostic:
         try:
             diag = parse_diagnostic(
@@ -589,27 +599,122 @@ def executor_node_v2(state: SquadState) -> dict:
                 test_files=test_files_after,
                 target_language=target_lang,
                 run_id=state.get("run_id"),
-                iteration=iteration
+                iteration=iteration,
+                contract=contract
             )
             if diag:
                 results["diagnostic_evidence"] = diag.to_dict()
-                if not results["passed"] and build_targeted_feedback:
-                    developer_feedback = build_targeted_feedback(
-                        diag,
-                        iteration=iteration + 1,
-                        max_iterations=state.get("max_iterations", 3),
-                        run_id=state.get("run_id")
-                    )
         except Exception:
             pass
 
-    if results["passed"]:
+    passed_count = results.get("passed_count", 0)
+    failed_count = results.get("failed_count", 0)
+    is_passed = results.get("passed", False)
+    curr_err_msg = ""
+    curr_cat = "unknown"
+    if diag and diag.failing_tests:
+        curr_err_msg = diag.failing_tests[0].message
+        curr_cat = diag.primary_failure_category
+    elif not is_passed:
+        curr_err_msg = results.get("summary_line") or "Execution failed"
+
+    if repair_history:
+        prev_entry = repair_history[-1]
+        prev_hash = prev_entry.get("code_hash", "")
+        prev_passed = prev_entry.get("test_passed_count", 0)
+        prev_cat = prev_entry.get("primary_category", "unknown")
+        prev_err = prev_entry.get("error_message", "")
+
+        is_valid_test_run = curr_cat not in ("compilation_error", "syntax_parse_error", "collection_test_discovery_error")
+        prev_valid_run = prev_cat not in ("compilation_error", "syntax_parse_error", "collection_test_discovery_error")
+
+        if current_code_hash == prev_hash and not is_passed:
+            transition = "STAGNANT"
+        elif is_passed:
+            transition = "PASSED"
+        elif is_valid_test_run and passed_count > prev_passed:
+            transition = "IMPROVED"
+        elif is_valid_test_run and prev_valid_run and passed_count < prev_passed:
+            transition = "REGRESSED"
+        elif curr_err_msg and prev_err and (curr_err_msg[:40] == prev_err[:40]):
+            transition = "STAGNANT"
+        else:
+            transition = "FAILED"
+    else:
+        transition = "PASSED" if is_passed else "FAILED"
+
+    # Record loop history
+    history_entry = {
+        "loop": iteration + 1,
+        "code_hash": current_code_hash,
+        "result": transition,
+        "test_passed_count": passed_count,
+        "test_failed_count": failed_count,
+        "error_message": curr_err_msg,
+        "primary_category": curr_cat
+    }
+    repair_history.append(history_entry)
+
+    if transition in ("STAGNANT", "REGRESSED"):
+        failed_strategies.append({
+            "loop": iteration + 1,
+            "code_hash": current_code_hash,
+            "reason": transition,
+            "error": curr_err_msg
+        })
+
+    # Populate known_good_constraints strictly based on validated execution evidence (Principle 2)
+    # Never infer known-good if no tests passed or if the suite crashed at compilation/collection
+    if contract and isinstance(contract, dict):
+        failing_aids = set()
+        if diag and diag.failing_tests:
+            for ft in diag.failing_tests:
+                if ft.linked_assertion_id:
+                    failing_aids.add(ft.linked_assertion_id)
+
+        # Evict any constraint that has now failed (regression detection)
+        known_good_constraints = [
+            c for c in known_good_constraints
+            if not any(f_aid in c for f_aid in failing_aids)
+        ]
+
+        # Only add new known-good constraints if the test suite actually ran and tests passed
+        is_valid_test_run = (
+            passed_count > 0
+            and curr_cat not in ("compilation_error", "syntax_parse_error", "collection_test_discovery_error")
+        )
+        if is_valid_test_run:
+            for a in contract.get("testable_assertions", []):
+                aid = a.get("assertion_id")
+                if aid and aid not in failing_aids:
+                    desc = a.get("description") or aid
+                    entry_str = f"{aid} ({desc})"
+                    if entry_str not in known_good_constraints:
+                        known_good_constraints.append(entry_str)
+
+    if not is_passed and build_targeted_feedback and diag:
+        try:
+            developer_feedback = build_targeted_feedback(
+                diag,
+                iteration=iteration + 1,
+                max_iterations=max_iterations,
+                run_id=state.get("run_id"),
+                contract=contract,
+                repair_history=repair_history,
+                known_good_constraints=known_good_constraints,
+                failed_strategies=failed_strategies,
+                use_repentance=True
+            )
+        except Exception:
+            pass
+
+    if is_passed:
         log_msg = f"[Sandbox Executor ({mode_label})]: Pengujian SUKSES ✅ ({results['passed_count']} passed dalam {results['duration_sec']}s)."
         new_status = "tests_passed"
         new_iteration = iteration
     else:
         new_iteration = iteration + 1
-        log_msg = f"[Sandbox Executor ({mode_label})]: Pengujian GAGAL ❌ ({results['failed_count']} failed / exit code {results['exit_code']}). Putaran iterasi perbaikan: {new_iteration}."
+        log_msg = f"[Sandbox Executor ({mode_label})]: Pengujian GAGAL ❌ ({results['failed_count']} failed / exit code {results['exit_code']}). Putaran iterasi perbaikan: {new_iteration} (Transisi: {transition})."
         new_status = "tests_failed"
 
     res = {
@@ -619,7 +724,10 @@ def executor_node_v2(state: SquadState) -> dict:
         "logs": current_logs + [log_msg],
         "executor_intervention_enabled": executor_intervention_enabled,
         "executor_mode": executor_mode,
-        "developer_feedback": developer_feedback
+        "developer_feedback": developer_feedback,
+        "repair_history": repair_history,
+        "failed_strategies": failed_strategies,
+        "known_good_constraints": known_good_constraints
     }
     if results.get("code_files"):
         res["code_files"] = results["code_files"]

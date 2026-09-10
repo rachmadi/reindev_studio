@@ -179,18 +179,21 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 | Universal Environment Grounding Framework (D-074 & D-075) | Positif (Mencegah halusinasi API usang/deprecated secara proaktif sejak hulu PM & Architect) | Intent Architect & Agen |
 | Generic Static Architect Blueprint Validator AST (D-078) | Positif (Menjamin konsistensi internal blueprint sintaksis dan parameter sebelum contract gate) | Intent Architect & Agen |
 | Decoupled Dynamic Repair-Depth Budgets (A5/D5) | Positif (Memisahkan counter revisi AST dan Contract Gate, membuka pemulihan slow-convergent Loop 4) | Intent Architect |
+| Improved Repentance Guidance (7-Step) & Rehabilitation State Memory (D10) | Positif (Menyediakan umpan balik diagnostik preskriptif dan melacak strategi gagal guna memutus perulangan error) | Intent Architect & Agen |
 
 ### Bagian B: Keputusan Mandiri Agen
 - **B1 (Penambahan di luar spesifikasi):**
   - Implementasi sensor sintaksis resolusi tinggi `analyze_dart_bracket_balance()` di `diagnostic_parser.py` (P0-1.1) untuk mendiagnosis baris akar cascade compiler Dart.
+  - Implementasi struktur memori rehabilitasi multi-loop (`repair_history`, `failed_strategies`, `known_good_constraints`) pada `SquadState`.
 - **B2 (Keputusan Teknis):**
   - Merancang Executor v2 (`backend/executor_v2.py`) dengan mode baru `SAFE` sebagai kandidat default, menggantikan 9 aturan global regex destruktif dengan AST pre-flight linter murni dan rollback otomatis.
   - Menerapkan fallback semantik yang aman (`val if val is not None else default`) pada graph routing dan agent state.
+  - Penegakan proteksi Blueprint Validator terhadap halusinasi lintas-task (mencegah impor `@app` FastAPI pada tugas kalkulator CLI Run 6).
 
 ### Ringkasan Distribusi Sumber Drift Iterasi 6:
-- **Intent Architect:** 70.0% (Desain eksperimen terkontrol, arsitektur kontrak, grounding, batasan independen)
-- **Agen:** 30.0% (Sensor kurung P0-1.1, implementasi AST validator, fallback semantik safe)
+- **Intent Architect:** 68.0% (Desain eksperimen terkontrol, arsitektur kontrak, grounding, batasan independen, repentance work order)
+- **Agen:** 32.0% (Sensor kurung P0-1.1, implementasi AST validator, repentance guidance 7-step, memori rehabilitasi, fallback semantik safe)
 - **Eksternal:** 0.0%
 
 ### Severity Drift Keseluruhan:
-**Major (Positive Architectural Hardening)** — Transformasi arsitektural substansial yang mengalihkan sistem dari manipulasi runtime reaktif (regex rewriting) menuju pertahanan deterministik proaktif berbasis kontrak, AST validator, dan isolasi kriptografis murni.
+**Major (Positive Architectural Hardening)** — Transformasi arsitektural substansial yang mengalihkan sistem dari manipulasi runtime reaktif (regex rewriting) menuju pertahanan deterministik proaktif berbasis kontrak, AST validator, bimbingan preskriptif 7-elemen, dan isolasi kriptografis murni.

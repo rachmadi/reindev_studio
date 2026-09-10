@@ -34,4 +34,7 @@ class SquadState(TypedDict):
     max_contract_revisions: Optional[int]  # Batas maksimal putaran revisi Contract Validation Gate (default: 2)
     developer_backend: Optional[str]  # Backend khusus Developer: "ollama" atau "openrouter"
     developer_model: Optional[str]    # Model khusus Developer (misal: "google/gemini-3.8-flash")
+    repair_history: Optional[List[Dict[str, Any]]] # Riwayat perbaikan per loop untuk Rehabilitation State (D10)
+    failed_strategies: Optional[List[Dict[str, Any]]] # Strategi gagal yang pernah dicoba
+    known_good_constraints: Optional[List[str]] # Constraint yang sudah terverifikasi benar dan harus dipertahankan
 

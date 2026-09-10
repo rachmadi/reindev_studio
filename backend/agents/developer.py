@@ -228,8 +228,9 @@ def developer_agent(state: SquadState) -> dict:
 
     feedback_section = ""
     if iteration > 0 and test_results:
-        # P0-1 & Intervensi 2: Compact Repair Context (<= 1.000 karakter)
+        # P0-1 & Improved Repentance: Compact Repair Context (<= 2.500 karakter untuk num_ctx=8192)
         targeted_feedback = state.get("developer_feedback")
+        dev_max_iter = state.get("max_iterations") if state.get("max_iterations") is not None else 10
         if not targeted_feedback and isinstance(test_results.get("diagnostic_evidence"), dict):
             try:
                 from ..diagnostic_parser import build_targeted_feedback_from_dict
@@ -242,9 +243,13 @@ def developer_agent(state: SquadState) -> dict:
                 targeted_feedback = build_targeted_feedback_from_dict(
                     test_results["diagnostic_evidence"],
                     iteration=iteration,
-                    max_iterations=state.get("max_iterations", 3),
+                    max_iterations=dev_max_iter,
                     run_id=state.get("run_id"),
-                    contract=contract
+                    contract=contract,
+                    repair_history=state.get("repair_history"),
+                    known_good_constraints=state.get("known_good_constraints"),
+                    failed_strategies=state.get("failed_strategies"),
+                    use_repentance=True
                 )
 
         if targeted_feedback:
@@ -258,9 +263,9 @@ def developer_agent(state: SquadState) -> dict:
             else:
                 compact_err = "\n".join(lines[:6])
 
-        # Pastikan compact feedback <= 1000 chars
-        if len(compact_err) > 1000:
-            compact_err = compact_err[:980] + "\n...(dipotong untuk efisiensi konteks)"
+        # Pastikan compact feedback <= 2500 chars (Aman untuk num_ctx=8192)
+        if len(compact_err) > 2500:
+            compact_err = compact_err[:2450] + "\n...(dipotong untuk efisiensi konteks)"
 
         # Sediakan konteks kode yang sudah ditulis sebelumnya - prioritaskan authoritative target file
         prev_code_blocks = []
@@ -285,8 +290,8 @@ def developer_agent(state: SquadState) -> dict:
 
         feedback_section = f"""
 
-[PERHATIAN KRUSIAL - SIKLUS PERBAIKAN SELF-HEALING (LOOP {iteration}/{state.get('max_iterations', 3)})]:
-DIAGNOSTIK KEGAGALAN TERARAH (COMPACT FEEDBACK <= 1000 CHARS):
+[PERHATIAN KRUSIAL - SIKLUS PERBAIKAN SELF-HEALING (LOOP {iteration}/{dev_max_iter})]:
+DIAGNOSTIK KEGAGALAN TERARAH & REPENTANCE GUIDANCE:
 {compact_err}
 
 BERKAS KODE TERAKHIR ANDA:
@@ -296,9 +301,10 @@ BERKAS TEST RUNNER:
 {qa_test_str}
 
 INSTRUKSI PERBAIKAN:
-1. Analisis diagnostik terarah di atas dan perbaiki fungsi atau logika kode.
-2. Pastikan antarmuka kode memenuhi ekspektasi test runner dan kontrak resmi.
-3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!
+1. Analisis diagnostik terarah dan ikuti langkah-langkah [IMPROVED REPENTANCE GUIDANCE] di atas secara disiplin.
+2. Periksa [ROOT CAUSE], patuhi [REQUIRED DIRECTION], dan jaga [PRESERVATION RULE] agar tidak terjadi regresi.
+3. Pastikan antarmuka kode memenuhi ekspektasi test runner dan kontrak resmi.
+4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!
 """
 
     contract_section = ""

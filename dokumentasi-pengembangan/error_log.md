@@ -689,8 +689,41 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Repair-Depth A5/D5):
-- **Diselesaikan Mandiri oleh Agen:** 19 kasus
+### Kasus E-053: Cross-Test In-Memory State Contamination pada FastAPI CRUD Benchmark (Run 1, 2, 3 D10)
+- **Waktu:** 2026-09-10 ~08:30 s.d. 09:15 WIB
+- **Tingkat Keparahan:** High (Structural Benchmark Defect)
+- **Gejala:** Assertion `assert len(products_db) == 0` pada `test_delete_product` selalu gagal (`AssertionError: assert 1 == 0` atau `assert 2 == 0`) meskipun implementasi DELETE endpoint berfungsi 100%.
+- **Akar Masalah:** Berkas uji Frozen Oracle mengeksekusi tes berurutan terhadap state memori global yang sama (`products_db = []`) tanpa isolasi fixture (`autouse` teardown). Item dari tes sebelumnya (Laptop) masih menetap di memori saat tes berikutnya memeriksa keadaan kosong pasca-delete Mouse. Developer dilarang mengubah file test dan tidak dapat mereset database dari dalam handler HTTP tanpa merusak fungsionalitas multi-item.
+- **Tindakan Korektif:** Mengidentifikasi kebutuhan isolasi state pengujian (database fixture teardown per test) pada harness uji benchmark masa depan.
+- **Sumber Solusi:** AGEN (Forensic Triad Analysis D10).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-054: Diagnostic Misattribution & Inverted Failure Localization pada CLI Matrix String Parsing (Run 4, 5, 6 D10)
+- **Waktu:** 2026-09-10 ~09:20 s.d. 10:00 WIB
+- **Tingkat Keparahan:** Medium (Diagnostic Heuristic Inversion)
+- **Gejala:** Developer terjebak mengulang kode yang identik 9x berturut-turut pada CLI task, dengan keyakinan penuh bahwa kode sudah benar (`hash: 3bf16cc03ee8`).
+- **Akar Masalah:** Parser string matriks `parse_matrix` gagal saat baris kedua memiliki jumlah kolom berbeda (`len(values) != len(rows[0])`). Traceback pytest melaporkan `ValueError: Invalid dimensions`. Heuristik diagnostik salah mengarahkan failure location ke fungsi operasi matriks (`add_matrices`) alih-alih `parse_matrix`. Developer memverifikasi fungsi `add_matrices`, melihat implementasi sudah benar, dan tidak mengubah kode sama sekali.
+- **Tindakan Korektif:** Memperbaiki resolusi penentuan `failure_location` pada `diagnostic_parser.py` agar mengutamakan frame fungsi lokal pemanggil daripada fungsi bantuan.
+- **Sumber Solusi:** AGEN (Analisis Forensik D10).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-055: Frozen Oracle Test Suite Syntax Defect & Assertion Formatting Mismatch pada Flutter Benchmark (Run 7 & 9 D10)
+- **Waktu:** 2026-09-10 ~10:05 s.d. 10:30 WIB
+- **Tingkat Keparahan:** High (Test Suite Compilation & Assertion Incompatibility)
+- **Gejala:** Pada Rep 1, eksekusi sandbox gagal kompilasi Dart pada file test (`The getter 'backgroundColor' isn't defined for the class 'Element'`). Pada Rep 3, widget test gagal assertion teks karena mengharuskan koma pemisah ribuan (`'150,000.00 USD'`).
+- **Akar Masalah:** Test suite acuan Frozen Oracle memanggil properti internal yang tidak valid pada `Element` di SDK Flutter modern, serta menguji string formatting lokal tanpa menyediakan utilitas pemformatan angka baku pada kontrak interface.
+- **Tindakan Korektif:** Mengunci temuan bahwa kegagalan bukan pada kemampuan model menulis widget, melainkan pada diskrepansi spesifikasi test suite acuan.
+- **Sumber Solusi:** AGEN (Analisis Forensik D10).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Improved Repentance + D10):
+- **Diselesaikan Mandiri oleh Agen:** 22 kasus
 - **Diselesaikan atas Intervensi IA:** 5 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 8 kasus
-- **Total Galat Terdokumentasi:** 52 kasus (E-001 s/d E-052)
+- **Total Galat Terdokumentasi:** 55 kasus (E-001 s/d E-055)
