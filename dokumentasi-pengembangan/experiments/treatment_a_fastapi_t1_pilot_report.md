@@ -1,12 +1,12 @@
 # Laporan Hasil Eksperimen Treatment A (fastapi_t1)
-## Validasi Empiris Staged Causal Evidence: Konvergensi Self-Healing Penuh (5/5 Tests Pass) dengan Generic Runtime Evidence Enrichment
+## Validasi Kasus Empiris: Replikasi Sistemik Kapasitas Self-Healing Model pada `fastapi_t1` melalui Generic Runtime Evidence Enrichment & Clean Repair Context
 
 **Tanggal Eksperimen:** 12 September 2026  
 **Pelaksana Eksperimen:** Antigravity AI Engineering Squad  
 **Otoritas Tata Kelola (Intent Architect):** Muhammad Rachmadi  
 **Objek Eksperimen:** Pilot Run `pv_pilot_fastapi_t1_rep1_20260912_051508` (`fastapi_t1`), Telemetri 43 Event  
 **Model Subjek Uji:** `qwen2.5-coder:7b` (Unified Local Squad via Ollama, `num_ctx=8192`, `num_predict=3000`)  
-**Status Evaluasi Epistemik:** **BERHASIL MUTLAK — HIPOTESIS TREATMENT A TERVALIDASI EMPIRIS (PASS 100%)**
+**Status Evaluasi Epistemik:** **VALIDASI KASUS BERHASIL — AUTONOMOUS REPAIR PADA KASUS fastapi_t1 TERBUKTI EMPIRIS**
 
 ---
 
@@ -19,8 +19,8 @@
 | **Frozen Oracle SHA-256** | `a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63` | **100% INTACT & TIDAK BERMUTASI** |
 | **Status Kontrak Akhir** | **`FROZEN`** (Segel SHA-256: `594901130d24...`) | Lolos Gate V2 pada Repair 1 |
 | **Pemanggilan QA Tester LLM** | **0 pemanggilan** | Bypass mutlak via Frozen Oracle |
-| **Treatment A (Evidence)** | **AKTIF** (R-1 Runtime Enricher + R-2 Schema Compat) | Terpasang & diverifikasi |
-| **Treatment B (Constraint)** | **NONAKTIF** (`REINDEV_TREATMENT_B_R3="0"`) | **Terisolasi murni** |
+| **Treatment Aktual (Bundle)** | **R-1 + R-2 + B3 Delivery Fix + Compact Repair Context** | Terpasang & diverifikasi |
+| **Treatment B (Constraint / R-3)** | **NONAKTIF** (`REINDEV_TREATMENT_B_R3="0"`) | **Terisolasi murni (terbukti tidak diperlukan untuk kasus ini)** |
 | **Hasil Eksekusi Sandbox** | **5/5 PASS (100%)** | `test_create_product`, `test_get_all_products`, `test_get_product_by_id`, `test_delete_product`, `test_delete_nonexistent_product` |
 | **Jumlah Putaran (Loops)** | **2 loops** | **Konvergen cepat (≤ 3 loops)** |
 | **Vonis Reviewer (B6)** | **APPROVED (verdict = PASS)** | Validasi deterministik Release Gate |
@@ -28,20 +28,50 @@
 
 ---
 
-## 2. Matriks Komparasi Kausal: Pra-Treatment vs Post-Treatment A
+## 2. Dekomposisi Metodologis Perlakuan Aktual vs Isolasi Kausal Komponen
 
-| Parameter Evaluasi | Baseline Pra-Treatment (`20260911_224623`) | Post-Treatment A (`20260912_051508`) |
-| :--- | :--- | :--- |
-| **Sinyal Diagnostik Sandbox** | Simtom numerik mentah: `assert 422 == 201` / `assert 405 == 200` tanpa payload response | Terstruktur: status code, response body, validation detail, actual vs expected via generic pytest enricher |
-| **Preskripsi Diagnostik** | Kosong / generik | Actionable non-solver: `RX-B5-HTTP-STATUS-MISMATCH` menyatakan disparitas antarmuka & method handler |
-| **Prompt Konteks Developer** | Terkontaminasi kode scaffold arsitektur usang yang memuat error yang sama | **Compact Repair Architecture**: scaffold usang dieliminasi, fokus pada bukti perbaikan deterministik |
-| **Respons Developer Turn 1** | Mengulang kode identik karena instruksi kontradiktif | Mengimplementasikan rute GET lengkap (`/products`, `/products/{id}`) dan model Pydantic valid |
-| **Hasil Eksekusi Sandbox** | **FAIL (0/5 PASS)** | **PASS (5/5 PASS, 100%)** |
-| **Status Akhir Sistem** | Terminal failure / budget exhausted | **CONVERGENT PASS (2 Loops)** |
+Secara metodologis, perlakuan aktual yang diuji pada pilot ini bukan semata-mata $R-1 + R-2$ secara murni dan terisolasi, melainkan sebuah bundel perbaikan pada *Evidence & Context Delivery Layer*:
+
+$$\text{Treatment Aktual} = \text{R-1} + \text{R-2} + \text{Repair Feedback Delivery Fix} + \text{Compact Repair Context}$$
+
+### A. Kontribusi Kausal Teramati pada Kasus Ini:
+1. **R-1 (Generic Runtime Evidence Enrichment):**
+   - Plugin generik [`backend/conftest_runtime_enricher.py`](file:///D:/Pekerjaan/Antigravity/reindev_studio/backend/conftest_runtime_enricher.py) menangkap `HTTP 405 Method Not Allowed` beserta response body `{"detail":"Method Not Allowed"}`.
+   - Context Assembler menyintesis preskripsi non-solver `RX-B5-HTTP-STATUS-MISMATCH`.
+   - **Status Kausal:** Terbukti secara langsung berperan aktif dalam trajectory perbaikan (Developer menambahkan endpoint GET yang hilang).
+2. **Repair Feedback Delivery Fix (Gate B3):**
+   - Perbaikan kondisi `iteration > 0` pada [`backend/agents/developer.py`](file:///D:/Pekerjaan/Antigravity/reindev_studio/backend/agents/developer.py) menjadi `is_repair_mode`, menjamin feedback penolakan AST pre-execution tersampaikan saat `iteration == 0`.
+3. **Compact Repair Context:**
+   - Menghilangkan kode scaffold arsitektur usang dari prompt perbaikan, mencegah instruksi kontradiktif bagi model.
+
+### B. Status R-2 (Non-Solver Schema Compatibility):
+- Skema audit caller–callee pada [`backend/context_assembler.py`](file:///D:/Pekerjaan/Antigravity/reindev_studio/backend/context_assembler.py) telah lolos validasi deterministik unit test (26/26 passed).
+- Namun, kontribusi kausalnya terhadap keberhasilan perbaikan run ini **belum diuji secara langsung** melalui trajectory ini, karena kegagalan Turn 1 yang muncul di sandbox adalah `HTTP 405 Method Not Allowed` (rute/method mismatch), bukan `HTTP 422 Unprocessable Content` (payload schema mismatch).
+- **Kesimpulan Metodologis:** Evidence Layer yang diimplementasikan (bersama konteks perbaikan yang bersih) berhasil menyediakan bukti yang cukup untuk pemulihan mandiri pada kasus ini. Kontribusi individual R-2 belum dapat diisolasi secara terpisah pada run ini.
 
 ---
 
-## 3. Analisis Trajectory Kausal 43 Event Telemetri
+## 3. Rangkaian Epistemik: Dari Studi Ablasi Menuju Treatment A Pipeline
+
+Eksperimen ini merupakan replikasi sistemik dari temuan studi ablasi sebelumnya dalam lingkungan pipeline nyata:
+
+```
+[Studi Ablasi Terkontrol]
+Symptom Only (assert 422 == 201)  --> Qwen FAIL
+Explicit Causal Diagnosis         --> Qwen SUCCESS (Membuktikan kapasitas self-repair jika ada bukti kausal)
+
+[Treatment A Pipeline Aktual]
+Runtime Sandbox Execution         --> R-1 Evidence Enrichment (HTTP 405 + Response Body)
+                                  --> Contextual Evidence Package (CEP) + Compact Context
+                                  --> Qwen 7B (1 Repair Turn)
+                                  --> 5/5 PASS (Konvergensi Pipeline Lengkap)
+```
+
+Ini membuktikan bahwa temuan studi ablasi dapat direplikasi secara sistemik dalam arsitektur ReinDev: ketika sistem menyajikan bukti kausal yang tepat dan tidak kontradiktif, model mampu melakukan pemulihan secara mandiri.
+
+---
+
+## 4. Analisis Trajectory Kausal 43 Event Telemetri
 
 ```mermaid
 sequenceDiagram
@@ -76,27 +106,17 @@ sequenceDiagram
     Note over System: EXPERIMENT CONVERGED SUCCESSFULLY
 ```
 
-### Milestone Kausal:
-1. **Event 0–9 (Upstream Pipeline):** PM dan Architect menyelesaikan kontrak formal yang disegel `FROZEN` dengan SHA-256 valid.
-2. **Event 10–16 (Initial Development & Oracle Lock):** Developer Turn 0 menghasilkan kode awal yang lolos sintaks AST. Frozen Oracle dimuat tanpa alterasi.
-3. **Event 17–24 (Sandbox Diagnostics Harvest):** Pytest sandbox mengeksekusi 5 pengujian. 2 lolos, 3 gagal. Plugin `conftest_runtime_enricher` menangkap diagnosis HTTP 405 dan response payload, diekstrak menjadi preskripsi non-solver `RX-B5-HTTP-STATUS-MISMATCH`.
-4. **Event 25–30 (Autonomous Causal Repair):** Developer menerima CEP bersih. Developer menambahkan endpoint GET yang hilang dan menstandarkan model data. Lolos validasi AST Gate B3.
-5. **Event 31–39 (Sandbox Verification):** Pengujian dijalankan ulang di sandbox: 5 dari 5 pengujian lulus 100%. Tidak ada regresi invarian yang sudah lulus.
-6. **Event 40–42 (Release & Reviewer Gate):** Reviewer memvalidasi integritas kode dan meloloskan artefak. Eksperimen konvergen pada loop 2.
-
 ---
 
-## 4. Kesimpulan Ilmiah & Dampak Arsitektur
+## 5. Kesimpulan Epistemik & Batasan Klaim
 
-1. **Pembatalan Hipotesis Ketidakmampuan Model:**
-   Bukti empiris membuktikan bahwa `qwen2.5-coder:7b` memiliki kemampuan self-healing otonom yang sangat baik. Hambatan pemulihan pada iterasi sebelumnya murni disebabkan oleh:
-   - *Information Deficit:* Sinyal kegagalan disembunyikan sebagai kode status numerik mentah tanpa konteks semantik.
-   - *Contextual Contradiction:* Scaffold arsitektur usang mengaburkan arahan perbaikan deterministik.
-2. **Kecukupan Treatment A (Evidence Layer):**
-   Dengan R-1 (Generic Runtime Evidence Enrichment), R-2 (Non-Solver Schema Compatibility), dan perbaikan konteks perbaikan Developer:
-   - Masalah teratasi penuh tanpa mengaktifkan Treatment B (relaksasi boundary).
-   - Seluruh batasan kontrak dan Frozen Oracle dipertahankan 100% mutlak tanpa kompromi (*zero dilution*).
-3. **Generalisasi Arsitektur:**
-   Solusi yang diimplementasikan sepenuhnya bersifat generic:
-   - `conftest_runtime_enricher.py` bekerja untuk semua framework Python yang menggunakan response object standar.
-   - Preskripsi B5 tidak memuat template solusi kaku, melainkan menyajikan disparitas antarmuka caller–callee secara faktual.
+1. **Klaim yang Tervalidasi:**  
+   Pada konfigurasi dan kasus `fastapi_t1` yang diuji, `qwen2.5-coder:7b` berhasil melakukan autonomous repair dalam **satu repair turn** ketika menerima bukti diagnostik kausal yang terstruktur dan tidak kontradiktif.
+2. **Koreksi Terhadap Klaim Berlebih (Avoid Overclaiming):**  
+   - Keberhasilan ini adalah pembuktian pada kasus/kelas kegagalan yang diuji, bukan pembuktian universal tentang kapasitas penuh model 7B di segala kondisi.
+   - Hasil ini memberikan bukti kuat bahwa *evidence deficiency* dan polusi konteks arsitektur usang merupakan faktor kausal penting pada kegagalan self-healing yang diamati sebelumnya untuk kelas kegagalan ini, bukan kesimpulan absolut untuk seluruh ReinDev.
+   - Keberhasilan perbaikan dicapai oleh bundel Treatment A (Evidence Layer + perbaikan pengiriman umpan balik dan konteks), bukan atribusi murni terisolasi dari R-1+R-2 saja.
+3. **Keputusan Terhadap Treatment B (R-3):**  
+   Karena Treatment A telah berhasil menghasilkan 100% PASS dan konvergen dalam 2 loops (≤ 3 loops), maka **R-3 tidak diperlukan untuk recovery pada kasus `fastapi_t1` dalam konfigurasi Treatment A tersebut**. Treatment B tidak perlu dijalankan.
+4. **Temuan Rekayasa Sistemik:**  
+   Nilai utama dari iterasi ini bukan sekadar keberhasilan satu kasus uji, melainkan pembongkaran dan perbaikan dua bottleneck transmisi umpan balik internal pada ReinDev: penghalang umpan balik Gate B3 dan polusi prompt scaffold usang.
