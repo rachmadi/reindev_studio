@@ -200,14 +200,28 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **Executor v2** | Pre-Flight Validation Layer & Safe Mode Implementation | — | 0.21 | 12.7 m | — | 2026-09-09 (AST validation, safe imports, anti-regression Run 10) |
 | **P0-1 & P0-2** | Machine-Readable Contract, Frontier & Dynamic Depth | — | 22.00 | 1.320,0 m | — | 2026-09-10 (P0-2, Frontier 9-Run, Gemma 4, A5/D5, D10) |
 | **Deterministic CEP** | Phase-End Validation Pilot & Controlled Runs 1–5.1 | — | 5.21 | 312.7 m | — | 2026-09-11 (B1–B6, CEP, Runs 3, 4, 5, 5.1) |
+| **JSON & V5 Hardening** | JSON Migration, V5 Evidence & Forensic Ablation Study | — | 6.50 | 390.0 m | — | 2026-09-11 s.d. 2026-09-12 (6.50 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **46.78** | **2.806,8 m** | **+0.78** | **Termasuk 43.52 jam riset, eksperimen, validasi formal & autopsi kausal** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **53.28** | **3.196,8 m** | **+7.28** | **Termasuk 50.02 jam riset, eksperimen, validasi formal & autopsi kausal** |
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RISET & HARDENING: JSON Migration, V5 Evidence & Forensik Ablasi — 2026-09-11 s.d. 2026-09-12
+## ═══════════════════════════════════════════════════════════════════════════
 
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Migrasi Canonical JSON Blueprint (Architect -> JSON -> V2) | — | 2.50 | 150.0 m | — | Schema Pydantic, penghapusan inner loop, unit tests & regression |
+| Hardening V5 Evidence Delivery & V3 Resolvability (V5-1 s.d. V5-4) | — | 1.50 | 90.0 m | — | Preservasi bukti, perenderan anti-shadowing, resep generik, 13 unit tests |
+| Eksekusi Pilot fastapi_t1 & Rekonstruksi Trajectory Forensik | — | 1.00 | 60.0 m | — | Run ID pv_pilot_fastapi_t1, ekstraksi prompt 12 KB, 62 event trace |
+| Controlled Ablation Study Test A vs Test B & Formulasi Solusi | — | 1.50 | 90.0 m | — | Pengujian model independen, pembatalan kesimpulan awal, 4 rekomendasi |
+| **Total Sesi Riset & Forensik (2026-09-11 s.d. 2026-09-12)** | **—** | **6.50** | **390.0 m** | **—** | **JSON Migration + V5 Hardening + Pilot + Forensic Ablation** |
 
-
-
-
-
+*Rincian Formula Sesi 2026-09-11 s.d. 2026-09-12:*
+- Waktu Pengembangan & Hardening (Dev): 2.400 detik (40.00 menit / 0.67 jam)
+- Total Waktu Pengujian & Uji Ulang (Test): 9.600 detik (160.00 menit / 2.67 jam)
+- Total Waktu Perbaikan, Forensik & Dokumentasi (Fix): 11.400 detik (190.00 menit / 3.16 jam)
+- **TOTAL WAKTU REALISASI SESI:** **23.400 detik (~6 jam 30 menit / 6.50 jam)**
+- Status: **✅ SELESAI & DIVERIFIKASI (Dokumentasi Tersinkronisasi Penuh)**

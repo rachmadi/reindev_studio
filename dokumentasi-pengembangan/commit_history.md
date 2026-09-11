@@ -443,10 +443,21 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Causal Return cascade revalidation terbukti tanpa Reviewer shortcut.
   - Frozen Oracle baseline SHA-256 `0bd5b598...` 100% utuh dan tidak tersentuh.
 
+---
 
-
-
-
-
-
-
+### Commit: 9919736 — 2026-09-12
+- **Commit Hash:** `9919736`
+- **Status:** TERVERIFIKASI PENUH (Gates A–I PASS, 381/381 tests PASS, Zero Regression)
+- **Tipe:** `docs(research)` / `feat(blueprint)`
+- **Pesan Commit:** `docs(research): forensic autopsy of pilot fastapi_t1, ablation study, model capability vindication, and JSON migration`
+- **Cakupan Perubahan:**
+  - `backend/blueprint_schema.py`: Pydantic schema kanonikal File-Centric Scaffold JSON.
+  - `backend/agents/architect.py`: Penghapusan inner Architect loop, emisi raw JSON blueprint.
+  - `backend/architect_validator.py`: Validasi native JSON schema, relational integrity, dan generic B2 prescriptions.
+  - `backend/context_assembler.py`: Preservasi bukti deterministik sandbox V5-1 dan preskripsi generik V5-3.
+  - `backend/contextual_evidence.py`: Perenderan bukti deterministik V5-2 dan doktrin rekayasa.
+  - `backend/phase_validators.py`: Deteksi statis simbol modul/body kelas pra-eksekusi V5-4.
+  - `backend/agents/developer.py`: Eliminasi context shadowing berkas uji Frozen Oracle.
+  - `backend/tests/`: Penambahan suite pengujian `test_blueprint_json.py` dan `test_v5_evidence_delivery.py`.
+  - `dokumentasi-pengembangan/experiments/`: Penambahan laporan forensik komprehensif `fastapi_t1_v5_forensic_investigation_and_ablation_report.md` dan data ringkasan `fastapi_t1_v5_ablation_summary.json`.
+  - `dokumentasi-pengembangan/`: Sinkronisasi menyeluruh 9 berkas log tata kelola IIDD (`catatan_riset_pengujian_preset.md`, `decision_log.md`, `human_intervention.md`, `validation_log.md`, `error_log.md`, `context_drift_log.md`, `conversation_log.md`, `waktu_estimasi_vs_realisasi.md`, `commit_history.md`).

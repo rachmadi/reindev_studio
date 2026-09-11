@@ -49,8 +49,9 @@ DEVELOPER_BACKEND = "ollama"
 PROVIDER = "ollama"
 SQUAD_MODEL = ALL_AGENTS_MODEL
 
-MAX_BLUEPRINT_REVISIONS = 5
-MAX_CONTRACT_REVISIONS = 5
+MAX_PHASE_REPAIR_ATTEMPTS = 2
+MAX_BLUEPRINT_REVISIONS = 2
+MAX_CONTRACT_REVISIONS = 2
 MAX_ITERATIONS = 10
 
 def configure_squad_model(model_name: Optional[str] = None, num_predict: Optional[int] = None):
@@ -198,8 +199,9 @@ def run_preflight_gates() -> bool:
     # Inspect graph wiring to confirm tester node is not in active edges for frozen oracle
     graph = phase_validated_squad_graph
     nodes = list(graph.nodes.keys())
-    gate_d_ok = ("tester" not in nodes) or ("frozen_oracle" in nodes and "oracle_validator" in nodes)
-    print(f"  ✓ Graph routes via 'frozen_oracle' & 'oracle_validator'. QA Tester bypassed.")
+    has_v4 = ("test_suite_validator" in nodes or "oracle_validator" in nodes)
+    gate_d_ok = ("tester" not in nodes) or ("frozen_oracle" in nodes and has_v4)
+    print(f"  ✓ Graph routes via 'frozen_oracle' & 'test_suite_validator'. QA Tester bypassed.")
     print(f"Gate D Status: {'PASS' if gate_d_ok else 'FAIL'}")
     all_passed = all_passed and gate_d_ok
 
@@ -222,7 +224,7 @@ def run_preflight_gates() -> bool:
         "pm_validator",
         "architect_validator",
         "developer_validator",
-        "oracle_validator",
+        "test_suite_validator" if "test_suite_validator" in nodes else "oracle_validator",
         "executor_validator",
         "reviewer_validator"
     ]
@@ -323,6 +325,7 @@ def execute_single_pilot_run(task: dict, run_index: int) -> dict:
             "model": ALL_AGENTS_MODEL,
             "provider": PROVIDER,
             "max_iterations": MAX_ITERATIONS,
+            "max_phase_repair_attempts": MAX_PHASE_REPAIR_ATTEMPTS,
             "max_contract_revisions": MAX_CONTRACT_REVISIONS,
             "max_blueprint_revisions": MAX_BLUEPRINT_REVISIONS,
             "oracle_path": task["oracle_path"],
@@ -339,6 +342,7 @@ def execute_single_pilot_run(task: dict, run_index: int) -> dict:
         "developer_backend": DEVELOPER_BACKEND,
         "developer_model": DEVELOPER_MODEL,
         "max_iterations": MAX_ITERATIONS,
+        "max_phase_repair_attempts": MAX_PHASE_REPAIR_ATTEMPTS,
         "max_contract_revisions": MAX_CONTRACT_REVISIONS,
         "max_blueprint_revisions": MAX_BLUEPRINT_REVISIONS,
         "frozen_oracle_path": task["oracle_path"],

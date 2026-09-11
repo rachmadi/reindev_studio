@@ -734,8 +734,47 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Pencatatan Checkpoint:** 2026-09-11 17:55:16 WIB
 - **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RESTORASI V1–V6, MIGRASI JSON BLUEPRINT, V5 HARDENING & FORENSIK FASTAPI_T1 — 2026-09-11 s.d. 2026-09-12
+## ═══════════════════════════════════════════════════════════════════════════
 
+### Komponen 1: Waktu Pengembangan & Implementasi Arsitektur (Development Time)
+| No | Aktivitas Pengembangan Fitur & Modul | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Restorasi 6 End-Phase Quality Boundaries StateGraph & eliminasi kebocoran V5 -> Reviewer | 18:35:00 | 19:40:00 | 900 s | 15.00 m (0.25 j) |
+| 2 | Perancangan Pydantic canonical schema `ArchitectScaffoldBlueprint` di `backend/blueprint_schema.py` | 21:15:00 | 21:25:00 | 600 s | 10.00 m (0.17 j) |
+| 3 | Refactoring `architect.py` (emisi raw JSON & penghapusan inner loop) & `architect_validator.py` (native JSON validation) | 21:25:00 | 21:40:00 | 450 s | 7.50 m (0.12 j) |
+| 4 | Hardening V5 Evidence Delivery: V5-1 (preservasi), V5-2 (rendering), V5-3 (resep generik B5), dan V5-4 (V3 AST static symbol resolvability) | 23:25:00 | 23:50:00 | 450 s | 7.50 m (0.12 j) |
+| | **Subtotal Waktu Pengembangan & Arsitektur** | | | **2.400 s** | **40.00 m (0.67 jam)** |
 
+### Komponen 2: Waktu Pengujian Terkontrol & Verifikasi Suite (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi 88 unit tests hardening V1–V6 & full backend regression (187 passed) | 19:41:00 | 20:34:00 | 3.180 s | 53.00 m (0.88 j) |
+| 2 | Eksekusi 11 unit tests `test_blueprint_json.py` & verifikasi V2 (PASS 100%) | 21:40:00 | 21:45:00 | 300 s | 5.00 m (0.08 j) |
+| 3 | Eksekusi 13 unit tests `test_v5_evidence_delivery.py` & full pre-flight Gates A–I (381 passed) | 23:50:00 | 00:15:00 | 1.500 s | 25.00 m (0.42 j) |
+| 4 | Eksekusi Controlled Pilot `fastapi_t1` (`pv_pilot_fastapi_t1_rep1_20260911_224623`, 5 loops, 1/5 tests passed, 0 QA calls) | 22:46:23 | 22:49:33 | 189,35 s | 3.15 m (0.05 j) |
+| 5 | Eksekusi Controlled Ablation Study Test A vs Test B pada model lokal `qwen2.5-coder:7b` via Ollama | 04:00:00 | 04:15:00 | 4.430,65 s | 73.85 m (1.23 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **9.600 s** | **160.00 m (2.67 jam)** |
 
+### Komponen 3: Waktu Analisis Forensik & Dokumentasi Riset (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Moratorium & bedah forensik trajectory `fastapi_t1` (62 event telemetri, inspeksi status kontrak FROZEN) | 22:50:00 | 23:10:00 | 1.200 s | 20.00 m (0.33 j) |
+| 2 | Rekonstruksi prompt lengkap Developer (12.324 karakter) ke `scratch/captured_dev_prompt.txt` | 03:50:00 | 04:05:00 | 900 s | 15.00 m (0.25 j) |
+| 3 | Analisis dekonstruksi kegagalan Pytest response body truncation, negative priming, dan evaluasi hasil ablasi Test A vs Test B | 04:15:00 | 04:22:00 | 1.500 s | 25.00 m (0.42 j) |
+| 4 | Perumusan pembatalan resmi klaim ketidakmampuan model & penyusunan 4 rekomendasi sistemik R-1 s.d. R-4 | 04:22:00 | 04:30:00 | 1.800 s | 30.00 m (0.50 j) |
+| 5 | Penyusunan laporan forensik komprehensif `fastapi_t1_v5_forensic_investigation_and_ablation_report.md` & ringkasan JSON | 04:30:00 | 04:40:00 | 2.400 s | 40.00 m (0.67 j) |
+| 6 | Pemutakhiran menyeluruh 9 berkas log tata kelola IIDD, verifikasi integritas git, dan persiapan commit | 04:40:00 | 04:48:00 | 3.600 s | 60.00 m (1.00 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **11.400 s** | **190.00 m (3.16 jam)** |
 
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 2026-09-11 s.d. 2026-09-12:
+\mathbf{	ext{Total Waktu Realisasi} = 2.400	ext{ s (Dev)} + 9.600	ext{ s (Test)} + 11.400	ext{ s (Doc/Forensik)} = 23.400	ext{ detik} pprox 390	ext{ menit} (6.50	ext{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-11 18:35:00 WIB
+- **Waktu Pencatatan Checkpoint:** 2026-09-12 04:48:00 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.

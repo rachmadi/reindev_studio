@@ -1,0 +1,42 @@
+{
+  "experiment": "fastapi_t1_v5_forensic_ablation",
+  "date": "2026-09-12T04:15:00+07:00",
+  "subject_model": "qwen2.5-coder:7b",
+  "pilot_run_id": "pv_pilot_fastapi_t1_rep1_20260911_224623",
+  "target_task": "fastapi_t1",
+  "frozen_oracle_sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+  "oracle_sha_intact": true,
+  "ablation_results": {
+    "test_a_raw_pytest_422": {
+      "signal_type": "Raw Pytest Status Code Failure",
+      "signal_content": "assert 422 == 201 (no response body)",
+      "model_diagnosis": "Product ID assignment missing",
+      "model_action": "Modify product.id = len(products) + 1",
+      "outcome": "FAIL",
+      "one_turn_recovery_rate": 0.0
+    },
+    "test_b_causal_schema_explanation": {
+      "signal_type": "Causal Field-Level Schema Disparity",
+      "signal_content": "Payload sends quantity; Product requires price, stock without defaults",
+      "model_diagnosis": "Schema mismatch between request payload and Pydantic model",
+      "model_action": "Add quantity: int, price: float = 0.0, stock: int = 0",
+      "outcome": "PASS",
+      "one_turn_recovery_rate": 100.0
+    }
+  },
+  "epistemic_verdict": {
+    "initial_claim_model_incapable_self_healing": "INVALID_AND_REVOKED",
+    "root_causes": [
+      "Pytest runtime testclient response body truncation",
+      "Negative constraint priming on frozen contracts",
+      "Absence of static AST payload-to-model cross-auditor",
+      "Upstream epistemic ambiguity between PM, Architect, and Oracle"
+    ],
+    "remediation_recommendations": [
+      "R-1: Sandbox Runtime Diagnostic Harvester",
+      "R-2: Static AST Payload-to-Model Cross-Auditor in B5",
+      "R-3: Developer Prompt Constraint Harmonization",
+      "R-4: Upstream Epistemic Alignment & Defensive Pydantic Scaffolding"
+    ]
+  }
+}

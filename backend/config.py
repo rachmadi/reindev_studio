@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -15,8 +16,28 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
                 "# Spesifikasi Sistem\n## User Stories\n- Sebagai pengguna, saya ingin modul kalkulator vektor matematika.\n## Acceptance Criteria\n- Menghitung dot product dua vektor dengan benar.\n- Menghitung magnitude vektor."
             ])
         elif role == "architect":
+            mock_bp = {
+                "schema_version": "1.0.0",
+                "task_id": "vector_math",
+                "target_language": "python",
+                "authoritative_target_file": "vector_math.py",
+                "file_tree": ["vector_math.py"],
+                "architecture_summary": "Modul operasi vektor matematika",
+                "files": {
+                    "vector_math.py": {
+                        "file_path": "vector_math.py",
+                        "module_role": "Authoritative Single Module",
+                        "imports": ["import math"],
+                        "code_scaffold": "import math\n\ndef dot_product(v1: list[float], v2: list[float]) -> float:\n    return sum(a * b for a, b in zip(v1, v2))\n\ndef magnitude(v: list[float]) -> float:\n    return math.sqrt(sum(a * a for a in v))\n"
+                    }
+                },
+                "interface_contracts": [
+                    {"identifier": "dot_product", "target_file": "vector_math.py"},
+                    {"identifier": "magnitude", "target_file": "vector_math.py"}
+                ]
+            }
             return FakeListChatModel(responses=[
-                "# Rencana Arsitektur\n## File Tree:\n- vector_math.py: Modul utama operasi vektor\n## Interface Contract:\n- dot_product(v1: list[float], v2: list[float]) -> float\n- magnitude(v: list[float]) -> float"
+                f"=== BLUEPRINT JSON ===\n{json.dumps(mock_bp, indent=2)}\n=== END BLUEPRINT JSON ==="
             ])
         elif role == "tester":
             return FakeListChatModel(responses=[

@@ -379,7 +379,7 @@ class ContextualEvidencePackage:
 # 3. Markdown Renderer — Single-Unit Repair Directive
 # ===========================================================================
 
-_MAX_RENDER_CHARS = 4500   # Batas kompaktasi untuk num_ctx=8192 pada model 7B (parameter engineering terukur)
+_MAX_RENDER_CHARS = 5500   # Batas kompaktasi untuk num_ctx=8192 pada model 7B (parameter engineering terukur)
 
 def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MAX_RENDER_CHARS) -> str:
     """
@@ -387,6 +387,7 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
 
     Urutan kanonikal linier penentu tindakan (Evidence Priority):
       1. Deterministic Facts & Failure Summary (failure)
+      1B. Deterministic Sandbox Failure Evidence (failing tests, assertions, traceback)
       2. Derived Deterministic Diagnosis / Root Cause (causal evidence)
       3. Complete Violation Roster & Causal Evidence (causal evidence)
       4. Actionable Repair Prescriptions — Deterministic (prescription)
@@ -411,6 +412,43 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
     # 1. Failure Summary (failure)
     lines.append("\n[1. DETERMINISTIC FACTS & FAILURE SUMMARY]")
     lines.append(pkg.failure_summary)
+
+    # 1B. Deterministic Sandbox Failure Evidence (if available in evidence)
+    sandbox_ev = None
+    failing_tests_ev = None
+    for ev in getattr(pkg, "evidence", []):
+        if isinstance(ev, dict):
+            if ev.get("item") == "sandbox_failing_tests":
+                failing_tests_ev = ev.get("observed")
+            elif ev.get("item") == "sandbox_error_excerpt":
+                sandbox_ev = ev.get("observed")
+
+    if failing_tests_ev or sandbox_ev:
+        lines.append("\n[DETERMINISTIC SANDBOX FAILURE EVIDENCE]")
+        if failing_tests_ev and isinstance(failing_tests_ev, list):
+            lines.append(f"Failing Tests ({len(failing_tests_ev)} failing):")
+            for ft in failing_tests_ev:
+                if isinstance(ft, dict):
+                    tname = ft.get("test_name", "unknown")
+                    ftype = ft.get("failure_type", "failure")
+                    msg = ft.get("message", "")
+                    lines.append(f"  ✗ {tname} [{ftype}]")
+                    if msg:
+                        lines.append(f"    Assertion / Message: {msg}")
+                    exp = ft.get("expected")
+                    act = ft.get("actual")
+                    if exp or act:
+                        lines.append(f"    Expected: {exp} | Actual: {act}")
+                    sfile = ft.get("source_file")
+                    sline = ft.get("source_line")
+                    if sfile or sline:
+                        lines.append(f"    Location: {sfile or ''}:{sline or ''}")
+                    tb = ft.get("traceback_excerpt")
+                    if tb:
+                        lines.append(f"    Traceback: {tb.strip()}")
+        if sandbox_ev:
+            lines.append("\nRaw Test Runner Output Excerpt:")
+            lines.append(str(sandbox_ev).strip())
 
     # 2. Root Cause (causal evidence)
     lines.append("\n[2. DERIVED DETERMINISTIC DIAGNOSIS (ROOT CAUSE)]")

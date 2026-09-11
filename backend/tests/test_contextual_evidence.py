@@ -984,7 +984,7 @@ class TestArea15_B5ActionableRepairPrescriptions:
         assert "IMPLEMENTATION SYMBOL:" in rendered
         assert "EVIDENCE BASIS:" in rendered
         assert "REQUIRED CHANGE (CONTRACT):" in rendered
-        assert len(rendered) <= 4600
+        assert len(rendered) <= 5600
 
     def test_b5_isolation_b1_b2_b3_do_not_emit_b5_prescriptions(self):
         """Uji isolasi eksperimental: B1, B2, B3 tidak menghasilkan B5 prescriptions."""

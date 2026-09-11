@@ -970,7 +970,85 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Catatan Rilis:** Seluruh arsitektur End-Phase Validation Engine (v2.2) telah terkunci, terdokumentasi, dan siap dideploy ke branch utama repositori.
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI ARSITEKTUR: MIGRASI CANONICAL JSON BLUEPRINT & V2 CONSOLIDATION — 2026-09-11 21:30 WIB
+## ═══════════════════════════════════════════════════════════════════════════
 
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (File-Centric Scaffold JSON Schema):** Schema Pydantic `ArchitectScaffoldBlueprint` (`backend/blueprint_schema.py`) terimplementasi penuh dengan dukungan validasi format JSON murni, relasi data model, dan pencegahan degradasi scaffold per-file.  
+  *Hasil:* ✅ Terpenuhi (11/11 tests PASS di `test_blueprint_json.py`).
+- **Kriteria 2 (Penghapusan Inner Loop Architect):** Node Architect tidak lagi menjalankan self-repair internal; aliran kontrol didelegasikan 100% ke Outer Gate V2.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 3 (Kinerja Gate V2 Single Repair Authority):** Gate V2 memvalidasi schema JSON secara native, mengevaluasi relational integrity, dan membekukan kontrak dengan status `FROZEN` jika valid.  
+  *Hasil:* ✅ Terpenuhi (13/13 tests PASS di `test_v2_architect_hardening.py`).
 
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ✅ **PASS — MIGRATION VERIFIED**
+- **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI HARDENING V5 EVIDENCE DELIVERY & STATIC SYMBOL RESOLVABILITY — 2026-09-11 22:40 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (V5-1 Evidence Preservation):** `assemble_b5_evidence` di `backend/context_assembler.py` mempertahankan failing test names, line numbers, dan traceback excerpt.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 2 (V5-2 Evidence Rendering & Anti-Shadowing):** `render_repair_directive` merender seksi `[DETERMINISTIC SANDBOX FAILURE EVIDENCE]`. Context shadowing dihilangkan pada prompt Developer.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 3 (V5-3 Generic Actionable Prescriptions):** Sintesis resep generik untuk `RX-B5-HTTP-422-SCHEMA`, `RX-B5-NAME-ERROR`, `RX-B5-COLLECTION-ERROR`, `RX-B5-VALUE-ASSERTION-MISMATCH` aktif dan teruji.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 4 (V5-4 V3 Static Symbol Resolvability):** `audit_python_module_symbol_resolvability` mendeteksi simbol tak terdefinisi di kelas/modul sebelum kode dieksekusi.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 5 (Pengujian Unit & Preflight Gates A–I):** 13/13 unit tests di `test_v5_evidence_delivery.py` PASS; seluruh 381 tes regresi backend lulus (Gates A–I 100% PASS).  
+  *Hasil:* ✅ Terpenuhi (381 passed, 1 warning).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ✅ **PASS — GATES A–I CLEARED**
+- **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: CONTROLLED PILOT FASTAPI_T1 (POST-V5 HARDENING) — 2026-09-11 22:49 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal & Telemetri Run
+- **Run ID:** `pv_pilot_fastapi_t1_rep1_20260911_224623`
+- **Model:** `qwen2.5-coder:7b` (Unified Local Squad)
+- **Integritas Frozen Oracle:** `a1db9bb1...` **100% INTACT & MATCH**.
+- **Hasil Eksekusi Sandbox:** 1/5 PASS, 4/5 FAIL (HTTP 422). Divergent trajectory (5 loops consumed). Final verdict: **`FAIL`**.
+- **Hasil Gate V2 & V3:** Gate V2 meloloskan kontrak pada Repair 2 (Status `FROZEN`). Gate V3 mendeteksi error `ConfigDict` pada Loop 4 via V5-4.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **INVESTIGATION OPEN (MORATORIUM DIKELUARKAN IA UNTUK FORENSIK KAUSAL)**
+- **Pelaksana Eksperimen:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI FORENSIK & CONTROLLED ABLATION STUDY (PEMBATALAN KLAIM INKAPASITAS MODEL) — 2026-09-12 04:20 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal & Studi Ablasi Terkontrol
+- **Objek:** Rekonstruksi prompt 12.324 karakter & Controlled Ablation Test A vs Test B pada `qwen2.5-coder:7b`.
+- **Hasil Test A (Raw Pytest 422):** Model misatribusi ke baris `id`, tidak menyentuh field `Product`. OTRR: **0.0% (FAIL)**.
+- **Hasil Test B (Causal Schema Disparity):** Model langsung menambahkan `quantity: int`, `price: float = 0.0`, `stock: int = 0`. OTRR: **100.0% (PASS)**.
+- **Temuan Kunci Forensik:**
+  1. Pytest TestClient memotong isi body response `response.json()` yang memuat detail penolakan Pydantic (`Field required: price`, `stock`).
+  2. Direktif prompt membekukan kontrak dengan larangan keras memodifikasi, memicu *negative priming* dan *double-bind* pada model.
+  3. Ketiadaan komparator AST statis antara payload Oracle dan definisi model di B5.
+  4. Disparitas epistemik hulu antara PM Spec, Architect Blueprint, dan Frozen Oracle.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ✅ **CONFIRMED & VALIDATED — KESIMPULAN AWAL KETIDAKMAMPUAN MODEL RESMI BATAL (INVALID)**
+- **Waktu Ketetapan:** 2026-09-12 04:22 WIB
+- **Pelaksana Audit:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Dokumentasi hasil riset tuntas dan persiapan eksekusi Roadmap Rekomendasi R-1 s.d. R-4.

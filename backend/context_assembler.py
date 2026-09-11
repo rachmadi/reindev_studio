@@ -63,11 +63,11 @@ def _get_authoritative_target_file(state: SquadState) -> str:
             if atf:
                 return atf
         for ifc in contract.get("interface_contracts", []):
-            tf = ifc.get("target_file")
+            tf = getattr(ifc, "target_file", None) or (ifc.get("target_file") if isinstance(ifc, dict) else None)
             if tf:
                 return tf
         for dm in contract.get("data_models", []):
-            tf = dm.get("target_file")
+            tf = getattr(dm, "target_file", None) or (dm.get("target_file") if isinstance(dm, dict) else None)
             if tf:
                 return tf
 
@@ -312,6 +312,115 @@ def assemble_b1_evidence(
 # 3. B2: Architect Context Assembler
 # ===========================================================================
 
+def synthesize_b2_actionable_prescriptions(
+    violations: List[ViolationItem],
+    auth_file: str,
+    target_lang: str,
+) -> List[ActionableRepairPrescription]:
+    """
+    Menghasilkan deterministic actionable repair prescriptions khusus untuk Gate B2 (Architect Phase-End).
+    Agnostik terhadap framework (dilarang keras menyebut FastAPI/Flutter atau hardcoding implementasi solusi).
+    Prinsip: Python menentukan fakta realitas; LLM menentukan implementasinya.
+    """
+    prescriptions: List[ActionableRepairPrescription] = []
+    rx_count = 1
+
+    for v in violations:
+        crit = v.criterion.lower()
+        obs = v.observed_state
+        sym = v.observed_symbol or ""
+
+        # Case 1: Unresolved decorator
+        if "decorator" in obs.lower() or "decorator" in crit or (sym and sym.startswith("@")):
+            dec_sym = sym.lstrip("@") if sym else "decorator"
+            if not sym:
+                m_dec = re.search(r"@([A-Za-z_][A-Za-z0-9_]*)", obs)
+                if m_dec:
+                    dec_sym = m_dec.group(1)
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-DEC-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="ARCHITECT_BLUEPRINT_AST_CHECK",
+                implementation_symbol=f"decorator '@{dec_sym}' in '{auth_file}'",
+                evidence_basis="PYTHON_AST_MODULE_SCOPE_CHECK",
+                required_change=(
+                    f"Decorator reference '@{dec_sym}' is unresolved within authoritative file scope ('{auth_file}'). "
+                    f"The target file must contain a valid declaration or import path that resolves this symbol "
+                    f"in files['{auth_file}'].imports or files['{auth_file}'].code_scaffold prior to use."
+                ),
+                repair_boundary_allowed=[
+                    f"Add necessary import or declaration for '@{dec_sym}' in files['{auth_file}']",
+                    f"Ensure declaration appears before the line where '@{dec_sym}' is used",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT invent unrelated public interfaces",
+                    "Do NOT alter contract_status if already FROZEN",
+                ],
+                expected_post_repair_state=f"Decorator '@{dec_sym}' resolves without error during Python AST parsing.",
+                verification_evidence=f"validate_architect_blueprint passes with 0 errors for '{auth_file}'.",
+            )
+            prescriptions.append(rx)
+            rx_count += 1
+
+        # Case 2: Unresolved base class (inheritance)
+        elif "kelas basis" in obs.lower() or "base class" in obs.lower() or "base_class" in crit:
+            base_sym = sym if sym else "BaseClass"
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-BASE-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="ARCHITECT_BLUEPRINT_AST_CHECK",
+                implementation_symbol=f"class inheritance '{base_sym}' in '{auth_file}'",
+                evidence_basis="PYTHON_AST_INHERITANCE_SCOPE_CHECK",
+                required_change=(
+                    f"Base class '{base_sym}' is unresolved within authoritative file scope ('{auth_file}'). "
+                    f"The target file must define or import '{base_sym}' in files['{auth_file}'] "
+                    f"to establish a valid type hierarchy before inheritance."
+                ),
+                repair_boundary_allowed=[
+                    f"Add import or definition for base class '{base_sym}' in files['{auth_file}']",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT invent unrelated public interfaces",
+                    "Do NOT alter contract_status if already FROZEN",
+                ],
+                expected_post_repair_state=f"Base class '{base_sym}' resolves without error during Python AST parsing.",
+                verification_evidence=f"validate_architect_blueprint passes with 0 errors for '{auth_file}'.",
+            )
+            prescriptions.append(rx)
+            rx_count += 1
+
+        # Case 3: Schema violation / malformed JSON
+        elif "schema" in obs.lower() or "schema_violation" in obs.lower() or "json" in obs.lower() or "skema" in obs.lower():
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-SCHEMA-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="ARCHITECT_BLUEPRINT_SCHEMA_VALIDATOR",
+                implementation_symbol=f"blueprint structure for '{auth_file}'",
+                evidence_basis="PYDANTIC_ARCHITECTURAL_BLUEPRINT_SCHEMA_CHECK",
+                required_change=(
+                    f"Blueprint output must strictly conform to ArchitecturalBlueprint canonical JSON schema "
+                    f"wrapped in '=== BLUEPRINT JSON ===' markers. Every file in 'file_tree' must have a matching "
+                    f"entry in 'files' with a valid, non-empty 'code_scaffold'."
+                ),
+                repair_boundary_allowed=[
+                    "Emit valid JSON conforming to ArchitecturalBlueprint schema",
+                    "Ensure files dictionary contains valid scaffold for each file in file_tree",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT emit plain narrative markdown without a canonical JSON blueprint block",
+                ],
+                expected_post_repair_state="ArchitecturalBlueprint validates successfully against Pydantic schema.",
+                verification_evidence="validate_architect_blueprint returns True with 0 schema violations.",
+            )
+            prescriptions.append(rx)
+            rx_count += 1
+
+    return prescriptions
+
+
 def assemble_b2_evidence(
     state: SquadState,
     violations: List[ViolationItem],
@@ -377,6 +486,9 @@ def assemble_b2_evidence(
     max_rev = state.get("max_contract_revisions", 5)
     remaining = max(0, max_rev - contract_rev)
 
+    # Actionable prescriptions for B2
+    prescriptions = synthesize_b2_actionable_prescriptions(violations, auth_file, target_lang)
+
     return ContextualEvidencePackage(
         package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "B2_ARCHITECT_PHASE_END", iteration),
         timestamp=ContextualEvidencePackage.make_timestamp(),
@@ -435,6 +547,7 @@ def assemble_b2_evidence(
         source_of_truth=f"CONTRACT_GATE_P0_2.1:{contract_sha[:16] if contract_sha else 'UNSEALED'}",
         evidence=evidence,
         remaining_budget=remaining,
+        actionable_prescriptions=prescriptions,
     )
 
 
@@ -463,6 +576,8 @@ def assemble_b3_evidence(
     for v in violations:
         if "syntax" in v.criterion.lower():
             root_causes.append(f"Syntax error at {v.location}: {v.observed_state}")
+        elif "symbol_resolvability" in v.criterion.lower():
+            root_causes.append(f"Unresolved identifier/symbol at {v.location}: {v.observed_state}")
         elif "symbol" in v.criterion.lower() or "contract_symbols" in v.criterion:
             root_causes.append(f"Required symbol not declared: {v.observed_state}")
         elif "target_file" in v.criterion.lower():
@@ -498,6 +613,7 @@ def assemble_b3_evidence(
     allowed_changes = [
         f"Write/rewrite code in '{auth_file}' only (use === FILE: {auth_file} === block)",
         "Fix syntax errors identified in the violation roster",
+        "Add missing imports or definitions for unresolved symbols",
         "Add missing class/function declarations for required contract symbols",
     ]
     if is_dart:
@@ -1073,6 +1189,163 @@ def synthesize_b5_actionable_prescriptions(
                 )
                 prescriptions.append(rx)
 
+    # 4. Pattern: HTTP Status Code Mismatch (FastAPI / REST APIs / HTTP services)
+    if not prescriptions:
+        http_match = re.search(
+            r"(?:assert\s+(?P<actual>\d{3})\s*==\s*(?P<expected>\d{3})|where\s+(?P<actual2>\d{3})\s*=\s*<Response\s*\[(?P<actual3>\d{3})[^\]]*\]>\.status_code)",
+            output,
+        )
+        if http_match:
+            act_code = http_match.group("actual") or http_match.group("actual2") or http_match.group("actual3")
+            exp_code = http_match.group("expected") or "200/201"
+            if act_code == "422":
+                rx = ActionableRepairPrescription(
+                    prescription_id="RX-B5-HTTP-422-SCHEMA",
+                    evidence_ref="B5_SANDBOX_HTTP_STATUS_422",
+                    observed_failure=f"Endpoint rejected request with HTTP 422 Unprocessable Content (Expected HTTP {exp_code})",
+                    oracle_call_site=f"Client request in Oracle test suite returning HTTP {act_code} instead of HTTP {exp_code}",
+                    implementation_symbol=f"Request data models and endpoint parameter validation in '{auth_file}'",
+                    evidence_basis="RUNTIME_HTTP_STATUS_CODE_422_VALIDATION_REJECTION",
+                    required_change=(
+                        f"The endpoint handler rejected caller request data with HTTP 422 (Unprocessable Content). "
+                        f"Inspect request model declarations in '{auth_file}' against the payload fields supplied by the Oracle call site. "
+                        f"Ensure that all fields sent by the caller are recognized by the model, required fields are not missing, "
+                        f"and any fields omitted in the request have default values or optional type annotations so validation succeeds."
+                    ),
+                    repair_boundary_allowed=[
+                        f"Add default values or optional annotations (e.g. default=None) to model fields in '{auth_file}'",
+                        f"Align model attribute names with request payload field names in '{auth_file}'",
+                        f"Adjust endpoint request parameter types in '{auth_file}'",
+                    ],
+                    repair_boundary_forbidden=[
+                        "Do NOT modify Frozen Oracle test files",
+                        "Do NOT alter frozen contract status",
+                    ],
+                    expected_post_repair_state=f"Request succeeds with HTTP {exp_code} status code.",
+                    verification_evidence=f"Oracle test asserting status_code == {exp_code} executes and PASS.",
+                )
+                prescriptions.append(rx)
+            else:
+                rx = ActionableRepairPrescription(
+                    prescription_id="RX-B5-HTTP-STATUS-MISMATCH",
+                    evidence_ref="B5_SANDBOX_HTTP_STATUS_MISMATCH",
+                    observed_failure=f"HTTP status code assertion failed: observed HTTP {act_code}, expected HTTP {exp_code}",
+                    oracle_call_site=f"Endpoint assertion: assert response.status_code == {exp_code}",
+                    implementation_symbol=f"Endpoint route handler in '{auth_file}'",
+                    evidence_basis="RUNTIME_HTTP_STATUS_ASSERTION_MISMATCH",
+                    required_change=(
+                        f"Endpoint handler returned HTTP {act_code} instead of expected HTTP {exp_code}. "
+                        f"Ensure the route exists, handles the request method correctly, and returns the appropriate status code."
+                    ),
+                    repair_boundary_allowed=[
+                        f"Adjust status_code parameter or HTTPException status in '{auth_file}'",
+                        f"Ensure route path and HTTP method match caller request in '{auth_file}'",
+                    ],
+                    repair_boundary_forbidden=[
+                        "Do NOT modify Frozen Oracle test files",
+                        "Do NOT alter frozen contract status",
+                    ],
+                    expected_post_repair_state=f"Endpoint returns HTTP {exp_code}.",
+                    verification_evidence=f"Oracle test asserting status_code == {exp_code} executes and PASS.",
+                )
+                prescriptions.append(rx)
+
+    # 5. Pattern: NameError / Unresolved Identifier at Runtime
+    if not prescriptions:
+        name_err_match = re.search(
+            r"NameError:\s*name\s*['\"](?P<symbol>\w+)['\"]\s*is not defined",
+            output,
+        )
+        if name_err_match:
+            sym = name_err_match.group("symbol")
+            rx = ActionableRepairPrescription(
+                prescription_id="RX-B5-NAME-ERROR",
+                evidence_ref="B5_SANDBOX_NAME_ERROR",
+                observed_failure=f"NameError: name '{sym}' is not defined",
+                oracle_call_site=f"Module loading / execution in '{auth_file}'",
+                implementation_symbol=f"symbol '{sym}' in '{auth_file}'",
+                evidence_basis="PYTHON_RUNTIME_NAME_ERROR_TRACEBACK",
+                required_change=(
+                    f"Symbol '{sym}' is used in '{auth_file}' but has not been defined or imported. "
+                    f"Explicitly import '{sym}' from its defining module or define it locally before use."
+                ),
+                repair_boundary_allowed=[
+                    f"Add missing import for '{sym}' in '{auth_file}'",
+                    f"Declare or assign '{sym}' in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"'{auth_file}' loads and executes without NameError: name '{sym}' is not defined.",
+                verification_evidence=f"Test runner collects and executes without NameError.",
+            )
+            prescriptions.append(rx)
+
+    # 6. Pattern: Collection / Import / Discovery Failure (Exit Code 2)
+    if not prescriptions:
+        collect_err_match = re.search(
+            r"(?:ERROR collecting\s+([^\n\r]+)|ImportError:\s*([^\n\r]+)|ModuleNotFoundError:\s*([^\n\r]+))",
+            output,
+        )
+        if collect_err_match:
+            err_detail = collect_err_match.group(0).strip()
+            rx = ActionableRepairPrescription(
+                prescription_id="RX-B5-COLLECTION-ERROR",
+                evidence_ref="B5_SANDBOX_COLLECTION_FAILURE",
+                observed_failure=f"Test collection / module import failure: {err_detail}",
+                oracle_call_site=f"Test discovery on '{auth_file}'",
+                implementation_symbol=f"Top-level declarations and imports in '{auth_file}'",
+                evidence_basis="TEST_RUNNER_COLLECTION_ERROR_TRACEBACK",
+                required_change=(
+                    f"Test runner encountered an error while importing '{auth_file}' during test collection. "
+                    f"Resolve top-level module errors, missing imports, or initialization failures in '{auth_file}'."
+                ),
+                repair_boundary_allowed=[
+                    f"Fix imports and top-level module statements in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Test runner collects tests from '{auth_file}' cleanly without collection crash.",
+                verification_evidence=f"Test runner collects all test items without error.",
+            )
+            prescriptions.append(rx)
+
+    # 7. Pattern: Value Assertion Failure / Relational Mismatch
+    if not prescriptions:
+        assert_val_match = re.search(
+            r"assert\s+(?P<actual>[^\n=><!]+?)\s*(?P<op>==|>=|<=|>|<|!=|in)\s*(?P<expected>[^\n]+)",
+            output,
+        )
+        if assert_val_match:
+            act_expr = assert_val_match.group("actual").strip()
+            op_sym = assert_val_match.group("op")
+            exp_expr = assert_val_match.group("expected").strip()
+            rx = ActionableRepairPrescription(
+                prescription_id="RX-B5-VALUE-ASSERTION-MISMATCH",
+                evidence_ref="B5_SANDBOX_ASSERTION_FAILURE",
+                observed_failure=f"Assertion failed: assert {act_expr} {op_sym} {exp_expr}",
+                oracle_call_site=f"assert {act_expr} {op_sym} {exp_expr} in Oracle test suite",
+                implementation_symbol=f"Operation returning '{act_expr}' in '{auth_file}'",
+                evidence_basis="RUNTIME_ASSERTION_ERROR_TRACEBACK",
+                required_change=(
+                    f"Operation in '{auth_file}' produced a value that does not satisfy assertion condition "
+                    f"({op_sym} {exp_expr}). Ensure return values and state calculations match Oracle expectations."
+                ),
+                repair_boundary_allowed=[
+                    f"Modify return value or data calculation in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Assertion ({op_sym} {exp_expr}) evaluates to True.",
+                verification_evidence="Test assertion executes and PASS.",
+            )
+            prescriptions.append(rx)
+
     return prescriptions
 
 
@@ -1108,13 +1381,38 @@ def assemble_b5_evidence(
         elif "sandbox" in v.criterion.lower() or "exit_code" in v.criterion.lower():
             root_causes.append(f"Sandbox test failure (exit_code={exit_code}, failed={failed_count}).")
 
-    # Extract concise error evidence from sandbox output
+    # Extract structured failing tests from diagnostic_evidence or output
+    diag_ev = test_results.get("diagnostic_evidence") or {}
+    failing_tests_list: List[Dict[str, Any]] = []
+    for ft in diag_ev.get("failing_tests", []):
+        if isinstance(ft, dict):
+            failing_tests_list.append(ft)
+        elif hasattr(ft, "to_dict"):
+            failing_tests_list.append(ft.to_dict())
+
+    if not failing_tests_list and output:
+        py_fails = re.findall(r"FAILED\s+([^\s]+)\s*-\s*([^\n\r]+)", output)
+        for tname, msg in py_fails:
+            failing_tests_list.append({
+                "test_name": tname.strip(),
+                "failure_type": "assertion_failure" if "assert" in msg else "runtime_failure",
+                "message": msg.strip(),
+            })
+        collect_errors = re.findall(r"ERROR collecting\s+([^\n\r]+)", output)
+        for cfile in collect_errors:
+            failing_tests_list.append({
+                "test_name": f"collection:{cfile.strip()}",
+                "failure_type": "collection_test_discovery_error",
+                "message": f"Test collection error in {cfile.strip()}",
+            })
+
+    # Extract comprehensive error evidence up to 2500 chars (safe for num_ctx=8192)
     relevant_lines: List[str] = []
     for line in output.splitlines():
         stripped = line.strip()
-        if stripped and any(k in stripped.lower() for k in ("error", "exception", "fail", "expected", "actual", "nosuchmethod", "undefined", "isn't defined", "flutter")):
+        if stripped and any(k in stripped.lower() for k in ("error", "exception", "fail", "expected", "actual", "assert", "nameerror", "syntaxerror", "nosuchmethod", "undefined", "isn't defined", "flutter")):
             relevant_lines.append(stripped)
-    sandbox_evidence_str = "\n".join(relevant_lines[:12]) if relevant_lines else output[:400]
+    sandbox_evidence_str = "\n".join(relevant_lines[:35]) if relevant_lines else output[:1500]
 
     # Preserved invariants
     preserved: List[PreservedInvariant] = []
@@ -1133,11 +1431,12 @@ def assemble_b5_evidence(
         oracle_callsite_excerpt = "\n".join(relevant)
         break
 
-    # Required changes
+    # Required changes (guarantee non-empty deterministic requirement)
     required_changes = []
     for i, v in enumerate(violations, 1):
+        exp = v.expected_state if v.expected_state else "All sandbox tests pass with exit code 0"
         req_text = (
-            f"Fix test failure: {v.observed_state}. Required: {v.expected_state}. "
+            f"Fix test failure: {v.observed_state}. Required: {exp}. "
             f"Reference Oracle call site and match interface exactly."
         )
         required_changes.append(RequiredChange(
@@ -1178,6 +1477,24 @@ def assemble_b5_evidence(
         causal_owner = "ARCHITECT"
     else:
         causal_owner = "DEVELOPER"
+
+    b5_evidence = list(evidence)
+    if failing_tests_list:
+        b5_evidence.append({
+            "item": "sandbox_failing_tests",
+            "evidence_class": "DETERMINISTIC",
+            "observed": failing_tests_list,
+            "expected": "0 failing tests",
+            "status": "INVALID",
+        })
+    if sandbox_evidence_str:
+        b5_evidence.append({
+            "item": "sandbox_error_excerpt",
+            "evidence_class": "DETERMINISTIC",
+            "observed": sandbox_evidence_str[:2500],
+            "expected": "0 errors",
+            "status": "INVALID",
+        })
 
     return ContextualEvidencePackage(
         package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "B5_EXECUTOR_ITERATION", iteration),
@@ -1228,13 +1545,7 @@ def assemble_b5_evidence(
             "B5 verdict == 'PASS'",
         ],
         source_of_truth=f"SANDBOX_RUNNER:exit_code_{exit_code}",
-        evidence=evidence + ([{
-            "item": "sandbox_error_excerpt",
-            "evidence_class": "DETERMINISTIC",
-            "observed": sandbox_evidence_str[:500],
-            "expected": "0 errors",
-            "status": "INVALID",
-        }] if sandbox_evidence_str else []),
+        evidence=b5_evidence,
         remaining_budget=remaining,
         actionable_prescriptions=actionable_prescriptions,
     )

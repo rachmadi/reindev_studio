@@ -1,3 +1,4 @@
+import json
 """
 Test Suite: Validator 2 (Architect Phase-End Validator) Deep Hardening & 9-Dimension Matrix
 ReinDev Studio — Evaluation Matrix according to Implementation Plan v2.2
@@ -32,25 +33,35 @@ from backend.contract import (
 # ==============================================================================
 
 def make_valid_arch_plan(domain: str = "CLI", lang: str = "python") -> str:
-    if "dart" in lang:
-        return """File Tree:
-=== FILE: lib/main.dart ===
-import 'package:flutter/material.dart';
-
-class MainWidget extends StatelessWidget {
-  const MainWidget({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox();
-  }
-}
-=== END FILE ==="""
-    else:
-        return f"""File Tree:
-=== FILE: main.py ===
-def process_data(payload: dict) -> dict:
-    return {{"status": "ok", "domain": "{domain}"}}
-=== END FILE ==="""
+    target_file = "lib/main.dart" if "dart" in lang else "main.py"
+    scaffold = (
+        "import 'package:flutter/material.dart';\n\nclass MainWidget extends StatelessWidget {\n  const MainWidget({super.key});\n  @override\n  Widget build(BuildContext context) {\n    return const SizedBox();\n  }\n}\n"
+        if "dart" in lang
+        else f'def process_data(payload: dict) -> dict:\n    return {{"status": "ok", "domain": "{domain}"}}\n'
+    )
+    bp = {
+        "schema_version": "1.0.0",
+        "task_id": f"task_{domain.lower()}",
+        "target_language": lang,
+        "authoritative_target_file": target_file,
+        "file_tree": [target_file],
+        "architecture_summary": f"Architectural scaffold for {domain}",
+        "files": {
+            target_file: {
+                "file_path": target_file,
+                "module_role": "Authoritative Single Module",
+                "imports": [],
+                "code_scaffold": scaffold,
+            }
+        },
+        "interface_contracts": [
+            {
+                "identifier": "MainWidget" if "dart" in lang else "process_data",
+                "target_file": target_file,
+            }
+        ]
+    }
+    return f"=== BLUEPRINT JSON ===\n{json.dumps(bp, indent=2)}\n=== END BLUEPRINT JSON ==="
 
 
 def make_valid_aligned_contract(domain: str = "CLI_TOOL", lang: str = "python") -> dict:
@@ -154,12 +165,24 @@ def test_dim3_incomplete_missing_interface_contracts():
 # ==============================================================================
 
 def test_dim4_broken_ast_blueprint():
-    broken_plan = """File Tree:
-```python
-@unresolved_decorator_without_import
-def broken_syntax():
-    pass
-```"""
+    broken_bp = {
+        "schema_version": "1.0.0",
+        "task_id": "test_broken",
+        "target_language": "python",
+        "authoritative_target_file": "main.py",
+        "file_tree": ["main.py"],
+        "architecture_summary": "Broken decorator blueprint",
+        "files": {
+            "main.py": {
+                "file_path": "main.py",
+                "module_role": "Authoritative Single Module",
+                "imports": [],
+                "code_scaffold": "@unresolved_decorator_without_import\ndef broken_syntax():\n    pass\n",
+            }
+        },
+        "interface_contracts": [{"identifier": "broken_syntax", "target_file": "main.py"}]
+    }
+    broken_plan = f"=== BLUEPRINT JSON ===\n{json.dumps(broken_bp, indent=2)}\n=== END BLUEPRINT JSON ==="
 
     aligned = make_valid_aligned_contract("CLI_TOOL", "python")
     ok, frozen, _, _ = seal_and_freeze_contract(aligned, task_text="Buat modul.")

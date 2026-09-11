@@ -793,6 +793,46 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 - **Diselesaikan atas Intervensi IA:** 5 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 8 kasus
 - **Total Galat Terdokumentasi:** 59 kasus (E-001 s/d E-059)
+---
 
+### Kasus E-060: Pytest TestClient Semantic Diagnostic Truncation (Missing Response Body on HTTP 422)
+- **Waktu:** 2026-09-11 ~22:46 WIB (Pilot `fastapi_t1` Run `pv_pilot_fastapi_t1_rep1_20260911_224623`)
+- **Tingkat Keparahan:** High (Runtime Diagnostic Deficit / Blindspot)
+- **Gejala:** Pytest berhenti pada baris `assert response.status_code == 201` saat request POST menghasilkan HTTP 422. Output terminal hanya memuat `AssertionError: assert 422 == 201` tanpa mencetak payload body JSON yang berisi pesan validasi Pydantic.
+- **Akar Masalah:** Test runner standar pytest tidak mengekstrak atau mencetak atribut objek lokal `response.text` / `response.json()` ketika assertion status code gagal, sehingga fakta kegagalan skema lenyap sebelum sampai ke CEP.
+- **Tindakan Korektif (R-1):** Menginjeksi hook pytest `conftest.py` pada sandbox runner yang secara otomatis mengekstrak dan mencetak isi response body saat status HTTP bernilai 4xx atau 5xx.
+- **Sumber Solusi:** AGEN (Audit Investigasi Forensik Pilot `fastapi_t1`).
+- **Status:** Teridentifikasi & Terdokumentasi (R-1 siap diimplementasikan).
 
+---
 
+### Kasus E-061: Negative Constraint Priming & Double-Bind pada Prompt Developer
+- **Waktu:** 2026-09-11 ~22:48 WIB
+- **Tingkat Keparahan:** High (Directive Cognitive Impasse)
+- **Gejala:** Developer model (`qwen2.5-coder:7b`) menolak memodifikasi atribut field pada kelas `Product` (misal menambah `quantity` atau memberi default pada `price`/`stock`), meskipun pengujian gagal akibat HTTP 422.
+- **Akar Masalah:** Prompt sistem Developer menyertakan larangan keras dengan huruf kapital dan peringatan terminasi kegagalan: `[KONTRAK RESMI (STRICTLY FROZEN - WAJIB 100%)]: DILARANG KERAS MENGUBAH ATAU MEMODIFIKASI FROZEN CONTRACT!`. Model 7B memprioritaskan kepatuhan larangan ini di atas saran perbaikan, menciptakan situasi *double-bind*.
+- **Tindakan Korektif (R-3):** Menyelaraskan batasan kontrak pada prompt: menegaskan bahwa nama kelas dan file bersifat FROZEN, namun mutasi atribut data model (penambahan field, nilai default) adalah TINDAKAN PEMULIHAN YANG DIWAJIBKAN.
+- **Sumber Solusi:** AGEN & INTENT ARCHITECT (Audit Forensik Kausal).
+- **Status:** Teridentifikasi & Terdokumentasi (R-3 siap diimplementasikan).
+
+---
+
+### Kasus E-062: Upstream-to-Oracle Schema Disparity & Static AST Audit Absence
+- **Waktu:** 2026-09-11 ~22:49 WIB
+- **Tingkat Keparahan:** High (Upstream Ambiguity & Reasoning Burden)
+- **Gejala:** Terjadi benturan atribut antara spesifikasi Arsitek (`price`, `stock`) dengan ekspektasi Frozen Oracle (`quantity`), memicu kegagalan sistemik 4/5 pengujian di sandbox.
+- **Akar Masalah:** PM Task Specification terlalu abstrak, Arsitek berspekulasi menambahkan field e-commerce tanpa nilai default, dan sistem preskripsi B5 tidak memiliki auditor statis berbasis AST untuk membandingkan kunci payload pengujian dengan atribut kelas Pydantic.
+- **Tindakan Korektif (R-2 & R-4):**
+  1. Membangun Static AST Payload-to-Model Cross-Auditor pada B5 untuk menyintesis preskripsi tingkat field secara deterministik (R-2).
+  2. Menerapkan pedoman defensive scaffolding pada Arsitek (field sekunder wajib memiliki default value) (R-4).
+- **Sumber Solusi:** AGEN & INTENT ARCHITECT (Controlled Ablation Study).
+- **Status:** Teridentifikasi & Terdokumentasi (R-2 & R-4 siap diimplementasikan).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Investigasi Forensik Pilot fastapi_t1):
+- **Diselesaikan Mandiri oleh Agen:** 26 kasus
+- **Diselesaikan atas Intervensi IA:** 6 kasus
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 9 kasus
+- **Kasus Forensik & Rekomendasi Terbuka:** 3 kasus (E-060, E-061, E-062)
+- **Total Galat Terdokumentasi:** 62 kasus (E-001 s/d E-062)

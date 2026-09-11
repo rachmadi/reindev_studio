@@ -66,14 +66,31 @@ def test_tracer_e2e_sequence():
     mock_llm = MagicMock()
     def llm_side_effect(messages):
         prompt_str = str(messages)
-        if "Product Manager" in prompt_str or "spesifikasi" in prompt_str.lower():
-            return MagicMock(content="1. Ringkasan: Kalkulator penambahan\n2. Stories: Tambah angka\n3. Kriteria: 1+2=3")
-        elif "System Architect" in prompt_str or "arsitektur" in prompt_str.lower():
-            return MagicMock(content="=== File Tree ===\ncalc.py\ntest_calc.py")
-        elif "Developer" in prompt_str or "=== FILE:" in prompt_str:
-            return mock_response
-        elif "QA" in prompt_str or "test" in prompt_str.lower():
+        if "Senior QA & Test Engineer" in prompt_str or "automated test suite" in prompt_str:
             return mock_test_response
+        elif "Senior Software Developer" in prompt_str or "target file authoritative" in prompt_str.lower():
+            return mock_response
+        elif "System Architect" in prompt_str:
+            mock_arch_bp = {
+                "schema_version": "1.0.0",
+                "task_id": "calc",
+                "target_language": "python",
+                "authoritative_target_file": "calc.py",
+                "file_tree": ["calc.py"],
+                "architecture_summary": "Kalkulator penambahan",
+                "files": {
+                    "calc.py": {
+                        "file_path": "calc.py",
+                        "module_role": "Authoritative Single Module",
+                        "imports": [],
+                        "code_scaffold": "def add(a: int, b: int) -> int:\n    return a + b\n"
+                    }
+                },
+                "interface_contracts": [{"identifier": "add", "target_file": "calc.py"}]
+            }
+            return MagicMock(content=f"=== BLUEPRINT JSON ===\n{json.dumps(mock_arch_bp, indent=2)}\n=== END BLUEPRINT JSON ===")
+        elif "Senior Software Product Manager" in prompt_str or "ringkasan sistem" in prompt_str.lower():
+            return MagicMock(content="1. Ringkasan: Kalkulator penambahan\n2. Stories: Tambah angka\n3. Kriteria: 1+2=3")
         else:
             return mock_rev_response
 

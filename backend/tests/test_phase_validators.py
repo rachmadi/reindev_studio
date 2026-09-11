@@ -3,6 +3,7 @@ Unit Tests for Phase-End & Iteration Validators
 ReinDev Studio — Iterasi 6 (Phase-End Validation Pilot)
 """
 
+import json
 import pytest
 from backend.phase_validators import (
     validate_pm_phase,
@@ -46,10 +47,25 @@ def test_pm_phase_validator_empty_fails():
 
 
 def test_architect_phase_validator_valid():
+    bp_data = {
+        "schema_version": "1.0.0",
+        "task_id": "test_add",
+        "target_language": "python",
+        "authoritative_target_file": "main.py",
+        "file_tree": ["main.py"],
+        "architecture_summary": "Simple add function service",
+        "files": {
+            "main.py": {
+                "file_path": "main.py",
+                "module_role": "Authoritative Single Module",
+                "imports": [],
+                "code_scaffold": "def add(a: int, b: int) -> int:\n    return a + b\n"
+            }
+        },
+        "interface_contracts": [{"identifier": "add", "target_file": "main.py"}]
+    }
     state = {
-        "architecture_plan": (
-            "File Tree:\n=== FILE: main.py ===\ndef add(a: int, b: int) -> int:\n    return a + b\n=== END FILE ==="
-        ),
+        "architecture_plan": f"=== BLUEPRINT JSON ===\n{json.dumps(bp_data)}\n=== END BLUEPRINT JSON ===",
         "contract": {
             "interface_contracts": [{"identifier": "add", "target_file": "main.py"}]
         },

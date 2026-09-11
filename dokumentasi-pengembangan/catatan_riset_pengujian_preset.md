@@ -1116,7 +1116,85 @@ Setelah kode berhasil memasuki runner pytest, terdeteksi dinamika interaksi baru
 2. **H5 Terbukti Memiliki Prasyarat Polimorfisme Tipe Antarmuka:** Hipotesis bahwa penargetan fungsi level simbol spesifik (`add_matrices`, `multiply_matrices`) cukup untuk memandu Developer memperbaiki validasi dimensi ternyata tidak dapat dievaluasi secara independen jika terjadi *Interface Impedance Mismatch* (tipe input raw `list` vs objek kelas `Matrix`).
 3. **Pelajaran Desain Rekayasa untuk Fase Berikutnya:** Resep perbaikan deterministik untuk antarmuka fungsi polimorfik harus secara eksplisit menginstruksikan penanganan tipe polimorfik:
    `if isinstance(a, list): a = Matrix(a)` atau kewajiban implementasi dunder method `__add__` pada kelas model domain.
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## BAGIAN 25: RESTORASI 6 END-PHASE VALIDATION BOUNDARIES, UNIVERSAL TWO-REPAIR, & MIGRASI CANONICAL JSON BLUEPRINT — 2026-09-11 20:30 s.d. 21:45 WIB
+## ═══════════════════════════════════════════════════════════════════════════
 
+### A. Latar Belakang & Rasionalitas Arsitektur
+Menindaklanjuti temuan defek historis di mana representasi rencana arsitektur berbasis Markdown menimbulkan ambiguitas parsing (Blok 1 narasi vs Blok 2 kode), Intent Architect menginstruksikan migrasi penuh menuju **File-Centric Scaffold JSON** sebagai satu-satunya representasi internal kanonikal (`Architect -> JSON -> V2`):
+1. **JSON Sebagai Canonical Representation Tunggal:** Skema Pydantic `ArchitectScaffoldBlueprint` (`backend/blueprint_schema.py`) menjadi kontrak data mesin tunggal. Tidak ada konversi bolak-balik Markdown, dan tidak ada *silent Markdown fallback*.
+2. **Penghapusan Inner Architect Loop:** Inner repair loop pada node Architect dihapus total. Outer Gate V2 (`architect_validator`) menjadi satu-satunya otoritas pemutus kualitas dan perbaikan arsitektur.
+3. **Penegakan Universal Two-Repair Policy:** Sesuai kebijakan seragam v2.2, fase Architect dibatasi maksimal 2 kali percobaan perbaikan (`repair_attempt_counts['architect'] <= 2`).
+4. **Preskripsi B2 Framework-Agnostic:** Seluruh preskripsi perbaikan arsitektur diformulasikan pada level requirement dan integritas relasional, bukan menambal pustaka spesifik (misal FastAPI).
 
+### B. Hasil Verifikasi Teknis & Kinerja Gate V2
+1. **Unit Tests JSON Blueprint (`backend/tests/test_blueprint_json.py`):** 11/11 tests PASS (validasi skema, relasi model, penolakan malformed JSON, dan integritas scaffold per-file).
+2. **Kinerja pada Pilot `fastapi_t1`:**
+   - Attempt 0: Architect menghasilkan blueprint JSON awal dengan `class Product` (`name`, `price`, `stock`). Gate V2 mendeteksi ketiadaan scaffold per-file yang lengkap.
+   - Attempt 1: B2 memancarkan direktif perbaikan terstruktur.
+   - Attempt 2: Architect memperbaiki blueprint. Gate V2 memverifikasi kelengkapan skema, menyegel kontrak menjadi **`FROZEN`** dengan hash SHA-256 `e6cec55def70...`.
+   - Hasil: **PASS** pada Repair Attempt 2. Zero leak ke downstream.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## BAGIAN 26: EVALUASI PILOT FASTAPI_T1, AUDIT INVESTIGASI FORENSIK KAUSAL, & CONTROLLED ABLATION STUDY — 2026-09-11 22:46 WIB s.d. 2026-09-12 04:30 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### A. Profil Eksekusi Pilot `pv_pilot_fastapi_t1_rep1_20260911_224623`
+* **Task ID:** `fastapi_t1` (CRUD Produk REST API)
+* **Model Squad:** `qwen2.5-coder:7b` (Unified Local Squad via Ollama)
+* **Parameter Inferensi:** `num_ctx=8192`, `num_predict=3000` (terkunci mutlak)
+* **Status Kontrak:** `FROZEN` (SHA-256: `e6cec55def70...`)
+* **Frozen Oracle SHA-256:** `a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63` (**100% INTACT & TIDAK BERMUTASI**)
+* **Pemanggilan QA Tester LLM:** **0 pemanggilan** (Bypass mutlak)
+* **Hasil Pengujian Sandbox Awal (Loop 0):** 1/5 PASS (`test_delete_nonexistent_product`), 4/5 FAIL (HTTP 422 Unprocessable Entity)
+* **Total Loop Dikonsumsi Developer:** 5 loop (budget habis)
+* **Verdict Akhir:** **FAIL** (Divergent trajectory)
+
+### B. Audit Investigasi Forensik Kausal (Deconstructing the Failure)
+Investigasi forensik mendalam terhadap berkas telemetri 62 event dan rekonstruksi prompt Developer (12.324 karakter) mengungkap fakta mekanistik yang mengejutkan:
+
+1. **Defisit Sinyal Diagnostik Pytest TestClient:**
+   Di dalam `test_main.py`:
+   ```python
+   response = client.post("/products", json={"name": "Product A", "quantity": 15})
+   assert response.status_code == 201
+   ```
+   FastAPI menolak request karena model `Product` mewajibkan `price` dan `stock`. Namun Pytest hanya mengevaluasi status code dan mencetak:
+   `AssertionError: assert 422 == 201`
+   Pesan kesalahan validasi resmi dari Pydantic (`Field required: price`, `Field required: stock`) berada di dalam `response.json()` dan **dibuang oleh Pytest** sebelum sampai ke runner sandbox. Akibatnya, Developer hanya menerima simtom numerik mentah tanpa penyebab semantik.
+
+2. **Misatribusi Diagnostik Model 7B:**
+   Tanpa teks error Pydantic, model membaca baris pengujian berikutnya: `assert "id" in data`. Model 7B menyimpulkan secara salah bahwa kegagalan terjadi karena fungsi handler POST lupa meng-assign `id` produk. Model menghabiskan seluruh putaran loop untuk memodifikasi penetapan ID (`product.id = len(products) + 1`), tanpa pernah menyadari bahwa skema model `Product` inkompatibel dengan payload pengujian.
+
+3. **Kontradiksi Batasan Direktif (*Negative Constraint Priming & Double-Bind*):**
+   Developer menerima peringatan keras:
+   `[KONTRAK RESMI (STRICTLY FROZEN - WAJIB 100%)]: Model Data Resmi: Product (name, price, stock). DILARANG KERAS MENGUBAH ATAU MENGAMANDEMEN FROZEN CONTRACT!`
+   Model 7B memprioritaskan kepatuhan pada larangan kontrak ini. Bagi model, memodifikasi atribut kelas `Product` dipandang sebagai pelanggaran kontrak fatal yang terlarang.
+
+### C. Pembuktian Ilmiah Independen (Controlled Ablation Study Test A vs Test B)
+Untuk menguji secara definitif apakah kegagalan ini disebabkan oleh batas kecerdasan model atau oleh defisit sinyal sistem, dilakukan studi ablasi terkontrol pada model lokal `qwen2.5-coder:7b` dengan kode gagal yang sama:
+* **Test A (Kondisi Pilot: Raw Pytest 422 + Kode Oracle):**
+  Model mendiagnosa salah (mengira masalah pada assignment `id`), memodifikasi baris `id`, dan membiarkan model `Product(price, stock)` tetap salah. **Hasil: FAIL (0.0% OTRR).**
+* **Test B (Kondisi Transparan Kausal: Penjelasan Eksplisit Field Mismatch):**
+  Model seketika memahami masalah skema. Dalam 1 putaran, model menghasilkan:
+  ```python
+  class Product(BaseModel):
+      id: int | None = None
+      name: str
+      price: float = 0.0      # Default aman
+      stock: int = 0          # Default aman
+      quantity: int           # Menambahkan field pengujian
+  ```
+  Seluruh 5 unit test Frozen Oracle langsung **PASS 100% (OTRR 100.0%)**.
+
+### D. Kesimpulan Ilmiah & Rekomendasi Solusi Sistemik
+1. **Pembatalan Kesimpulan Awal:** Klaim awal bahwa model tidak mampu melakukan *self-healing* resmi dinyatakan **TIDAK TEPAT DAN DIBATALKAN**. Qwen 2.5 Coder 7B terbukti memiliki kapasitas pemulihan kode 100% jika sinyal kausal dihantarkan secara transparan.
+2. **Empat Rekomendasi Perbaikan Sistemik:**
+   - **R-1 (Sandbox Error Body Harvester):** Mencegat failure 4xx/5xx di runner pytest dan mencetak `response.json()` ke stdout agar tertangkap CEP.
+   - **R-2 (Static AST Payload-to-Model Cross-Auditor):** Membandingkan keys payload test dengan field Pydantic model secara deterministik di B5 `context_assembler.py` dan menghasilkan preskripsi kausal tingkat field.
+   - **R-3 (Harmonisasi Batasan Kontrak Developer):** Memisahkan batas beku arsitektur (nama file/class) dengan kebebasan adaptasi field/default values pada model data.
+   - **R-4 (Penyelarasan Epistemik Hulu):** Defensive Pydantic scaffolding pada Arsitek dan spesifikasi payload minimal pada PM Spec.

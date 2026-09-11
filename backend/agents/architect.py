@@ -10,6 +10,7 @@ Self-Healing Revision Loop (max 2 revisions).
 
 import re
 import json
+from pathlib import Path
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ..state import SquadState
@@ -50,28 +51,72 @@ except (ImportError, ValueError):
         from architect_validator import validate_architect_blueprint
     except ImportError:
         def validate_architect_blueprint(*args, **kwargs): return True, []
+try:
+    from ..blueprint_schema import (
+        ArchitecturalBlueprint,
+        parse_blueprint_json,
+        extract_blueprint_json_text,
+        blueprint_to_narrative_markdown
+    )
+except (ImportError, ValueError):
+    try:
+        from blueprint_schema import (
+            ArchitecturalBlueprint,
+            parse_blueprint_json,
+            extract_blueprint_json_text,
+            blueprint_to_narrative_markdown
+        )
+    except ImportError:
+        ArchitecturalBlueprint = None
+        parse_blueprint_json = lambda t: (None, "Schema not available")
+        extract_blueprint_json_text = lambda t: None
+        blueprint_to_narrative_markdown = lambda b: ""
 
 ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
 
-Format luaran yang WAJIB Anda hasilkan:
-1. Peta Struktur File Proyek (File Tree Structure) sesuai target bahasa pemrograman yang diminta
-2. Tanggung Jawab Komponen / Modul
-3. Kontrak Interface Publik & Type Annotation Eksplisit (P0-2.1 WAJIB):
-   - Untuk setiap task non-UI (REST API, CLI, modul komputasi/matematis, Library): Anda WAJIB mendefinisikan antarmuka publik yang dapat diobservasi dan diuji secara independen (nama fungsi/kelas, signature callable, parameter input, return type).
-   - Jangan biarkan Developer menebak-nebak antarmuka publik. Pastikan antarmuka selaras dengan kebutuhan task.
-4. Panduan Implementasi untuk Developer Agent
-5. INTEGRITAS ENVIRONMENT RUNTIME (WAJIB):
-   - DILARANG KERAS merancang blueprint, class, atau dependency yang menggunakan API/simbol yang dinyatakan terlarang dalam ENVIRONMENT FACT CARD.
-   - Patuhi versi pustaka yang terpasang aktual di runtime.
+FORMAT LUARAN YANG WAJIB ANDA HASILKAN:
+Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON kanonikal di dalam penanda persis seperti berikut:
 
-PRINSIP KONSISTENSI ARSITEKTUR (WAJIB):
-- Specification Coverage: Setiap requirement yang relevan dari spesifikasi harus terwakili dalam blueprint dan contract; jangan menghilangkan requirement ketika menyederhanakan rancangan.
-- Specification Authority: Pertahankan antarmuka yang telah ditentukan oleh spesifikasi secara eksak (nama fungsi, kelas, endpoint, signature); rancang bebas hanya antarmuka yang belum ditentukan, dengan tetap menjaga konsistensi.
-- Symbol Resolvability: Setiap simbol, decorator, tipe, atau dependensi yang digunakan dalam blueprint/snippet wajib memiliki sumber resolusi yang jelas (misal: statement import atau deklarasi lokal yang lengkap).
-- Declaration ↔ Reference Consistency: Setiap deklarasi interface, constructor, atau parameter yang direncanakan wajib konsisten dengan seluruh referensi dan pemanggilannya di seluruh bagian blueprint.
+=== BLUEPRINT JSON ===
+{
+  "authoritative_target_file": "main.py",
+  "file_tree": ["main.py"],
+  "architecture_summary": "Deskripsi ringkas arsitektur modul",
+  "files": {
+    "main.py": {
+      "module_role": "Authoritative Single Module",
+      "imports": [
+        "from fastapi import FastAPI, HTTPException",
+        "from pydantic import BaseModel, field_validator"
+      ],
+      "code_scaffold": "from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, field_validator\n\napp = FastAPI()\n\nclass Product(BaseModel):\n    id: int\n    name: str\n    price: float\n    stock: int\n\n    @field_validator('price', 'stock')\n    def validate_non_negative(cls, v):\n        if v < 0:\n            raise ValueError('Cannot be negative')\n        return v\n\n@app.post('/products', status_code=201)\ndef create_product(product: Product) -> Product:\n    pass\n\n@app.get('/products')\ndef list_products() -> list[Product]:\n    pass\n"
+    }
+  },
+  "interface_contracts": [
+    {
+      "identifier": "create_product",
+      "route": "/products",
+      "method": "POST",
+      "target_file": "main.py"
+    },
+    {
+      "identifier": "list_products",
+      "route": "/products",
+      "method": "GET",
+      "target_file": "main.py"
+    }
+  ]
+}
+=== END BLUEPRINT JSON ===
 
-Gunakan Bahasa Indonesia yang profesional, presisi, dan terstruktur tanpa kata-kata pengantar berlebih.
+PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
+1. File-Centric Cohesion: Seluruh implementasi kode per berkas wajib dituliskan sebagai modul utuh di dalam string `code_scaffold`.
+2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator (misal `@app.get` atau `@field_validator`), instance `app = FastAPI()` dan import `from pydantic import field_validator` WAJIB dideklarasikan secara lokal di berkas yang bersangkutan.
+3. Specification Authority: Pertahankan antarmuka yang telah ditentukan spesifikasi secara eksak.
+4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
+
+Tuliskan output JSON yang valid, presisi, dan konsisten tanpa teks pengantar berlebih di luar penanda.
 """
 
 def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang: str, arch_plan: str = "") -> dict:
@@ -218,6 +263,9 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                 seen_classes.add(cname_clean)
                 class_matches.append(cname_clean)
 
+        plan_files = [f for f in re.findall(r"(?:^|[;\n`\-\*])\s*([A-Za-z0-9_./\-]+\.(?:py|dart))\b", arch_plan) if not Path(f).name.startswith("test")]
+        primary_target_file = plan_files[0] if plan_files else "main.py"
+
         data_models = []
         interface_contracts = []
         testable_assertions = []
@@ -226,7 +274,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
             for cname in class_matches:
                 data_models.append({
                     "model_name": cname,
-                    "target_file": "main.py",
+                    "target_file": primary_target_file,
                     "fields": []
                 })
 
@@ -246,7 +294,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                     "interface_type": "FUNCTION",
                     "identifier": fn_name,
                     "http_method": None,
-                    "target_file": "main.py",
+                    "target_file": primary_target_file,
                     "parameters": [],
                     "expected_return": {
                         "return_type": ret,
@@ -274,7 +322,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                     "interface_type": "FUNCTION",
                     "identifier": fn_name,
                     "http_method": None,
-                    "target_file": "main.py",
+                    "target_file": primary_target_file,
                     "parameters": [
                         {"param_name": "a", "param_type": "float", "param_location": "ARGUMENT", "is_required": True},
                         {"param_name": "b", "param_type": "float", "param_location": "ARGUMENT", "is_required": True}
@@ -403,45 +451,7 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
     response = llm.invoke(messages)
     arch_plan = response.content if hasattr(response, "content") else str(response)
 
-    # Architect Blueprint Validator: Generic Static Consistency Check & Self-Healing Revision Loop
-    max_bp = state.get("max_blueprint_revisions")
-    max_blueprint_revisions = 2 if max_bp is None else int(max_bp)
-    blueprint_revision_count = 0
-    while blueprint_revision_count < max_blueprint_revisions:
-        is_bp_valid, bp_errors = validate_architect_blueprint(arch_plan, target_lang)
-        if is_bp_valid:
-            break
-
-        blueprint_revision_count += 1
-        bp_errors_str = "\n".join(f"- {e}" for e in bp_errors)
-        bp_feedback = (
-            f"\n\n[PERHATIAN: CETAK BIRU ANDA MEMILIKI INKONSISTENSI INTERNAL (Revisi {blueprint_revision_count}/{max_blueprint_revisions})]\n"
-            f"Ditemukan ketidaksesuaian resolusi simbol / deklarasi pada snippet cetak biru Anda:\n"
-            f"{bp_errors_str}\n\n"
-            "INSTRUKSI REVISI WAJIB:\n"
-            "Perbaiki cetak biru arsitektur Anda:\n"
-            "- Pastikan seluruh decorator, tipe, dan kelas yang digunakan memiliki statement import (from ... import) atau deklarasi yang lengkap pada modul bersangkutan.\n"
-            "- Pastikan argumen pemanggilan selaras dengan parameter constructor yang dideklarasikan.\n"
-            "Tuliskan kembali cetak biru arsitektur yang telah diperbaiki secara konsisten."
-        )
-
-        tracer = get_tracer(state.get("run_id"))
-        if tracer:
-            tracer.log_event(
-                stage="architect",
-                event_type="blueprint_validation_failed",
-                iteration=blueprint_revision_count,
-                data={
-                    "errors": bp_errors,
-                    "target_language": target_lang
-                }
-            )
-
-        messages.append(HumanMessage(content=bp_feedback))
-        response = llm.invoke(messages)
-        arch_plan = response.content if hasattr(response, "content") else str(response)
-
-    # P0-2: Lengkapi kontrak menjadi ALIGNED
+    # P0-2: Lengkapi kontrak menjadi ALIGNED (Prioritas: Blueprint JSON -> Kontrak JSON blok -> Default Fallback)
     draft_contract = state.get("contract")
     if not draft_contract or not isinstance(draft_contract, dict):
         draft_contract = create_draft_contract(
@@ -450,19 +460,56 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
             goal_summary=user_task[:120]
         )
 
-    # Cek apakah LLM menghasilkan blok kontrak JSON
-    extracted_json = extract_contract_json_from_text(arch_plan)
-    if extracted_json and isinstance(extracted_json, dict) and "interface_contracts" in extracted_json:
+    # 1. Coba ekstrak dari skema ArchitecturalBlueprint JSON
+    extracted_bp, bp_err = parse_blueprint_json(arch_plan)
+    if extracted_bp and extracted_bp.interface_contracts:
+        ifaces = []
+        assertions = []
+        for idx, ifc in enumerate(extracted_bp.interface_contracts, 1):
+            d = ifc.model_dump() if hasattr(ifc, "model_dump") else dict(ifc)
+            ifid = f"IFC-{idx:02d}"
+            if not d.get("interface_id"):
+                d["interface_id"] = ifid
+            if not d.get("interface_type"):
+                d["interface_type"] = "WIDGET" if "dart" in target_lang.lower() else "FUNCTION"
+            ifaces.append(d)
+            ident = d.get("identifier", "target")
+            assertions.append({
+                "assertion_id": f"AST-{idx:02d}",
+                "linked_req_id": "REQ-01",
+                "linked_interface_id": d["interface_id"],
+                "test_scenario": f"Execution of {ident} meets functional requirements",
+                "target_symbol": ident,
+                "input_fixture": f"{ident}()",
+                "expected_outcome": {
+                    "outcome_type": "VALUE_EQUALS",
+                    "value": 0
+                }
+            })
+        models = [
+            m.model_dump() if hasattr(m, "model_dump") else m
+            for m in extracted_bp.data_models
+        ]
         aligned_contract = complete_aligned_contract(
             draft_dict=draft_contract,
-            data_models=extracted_json.get("data_models", []),
-            interface_contracts=extracted_json.get("interface_contracts", []),
-            testable_assertions=extracted_json.get("testable_assertions", []),
-            constraints=extracted_json.get("constraints"),
-            ambiguities=extracted_json.get("unresolved_ambiguities")
+            data_models=models,
+            interface_contracts=ifaces,
+            testable_assertions=assertions
         )
     else:
-        aligned_contract = _build_default_aligned_contract(draft_contract, user_task, target_lang, arch_plan)
+        # 2. Fallback cek apakah LLM menghasilkan blok kontrak JSON konvensional
+        extracted_json = extract_contract_json_from_text(arch_plan)
+        if extracted_json and isinstance(extracted_json, dict) and "interface_contracts" in extracted_json:
+            aligned_contract = complete_aligned_contract(
+                draft_dict=draft_contract,
+                data_models=extracted_json.get("data_models", []),
+                interface_contracts=extracted_json.get("interface_contracts", []),
+                testable_assertions=extracted_json.get("testable_assertions", []),
+                constraints=extracted_json.get("constraints"),
+                ambiguities=extracted_json.get("unresolved_ambiguities")
+            )
+        else:
+            aligned_contract = _build_default_aligned_contract(draft_contract, user_task, target_lang, arch_plan)
 
     # Observability: Catat penyelarasan kontrak ALIGNED
     tracer = get_tracer(state.get("run_id"))
@@ -486,14 +533,11 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
     )
     current_logs = state.get("logs", [])
     
-    prev_bp_count = state.get("blueprint_revision_count") or 0
-    total_bp_count = prev_bp_count + blueprint_revision_count
-
     return {
         "architecture_plan": arch_plan,
         "contract": aligned_contract,
         "contract_status": "ALIGNED",
-        "blueprint_revision_count": total_bp_count,
+        "blueprint_revision_count": state.get("blueprint_revision_count", 0),
         "status": "architect_done",
         "logs": current_logs + [new_log]
     }

@@ -91,8 +91,9 @@ def _get_repair_count(state: SquadState, phase_name: str) -> int:
 
 
 def _get_max_repairs(state: SquadState) -> int:
-    val = state.get("max_phase_repair_attempts") or state.get("max_contract_revisions") or 2
-    return int(val)
+    val = state.get("max_phase_repair_attempts")
+    return int(val) if val is not None else 2
+
 
 
 def _increment_repair_count(state: SquadState, phase_name: str) -> Dict[str, int]:
@@ -266,14 +267,27 @@ def route_after_architect_validator(state: SquadState) -> str:
     status = state.get("contract_status")
     count = _get_repair_count(state, "architect")
     max_repairs = _get_max_repairs(state)
-
+    decision = END
     if verdict == "PASS" and status == ContractStatus.FROZEN.value:
-        return "developer"
+        decision = "developer"
+    elif count <= max_repairs and state.get("status") != "terminal_failure_architect_boundary":
+        decision = "architect"
 
-    if count <= max_repairs and state.get("status") != "terminal_failure_architect_boundary":
-        return "architect"
+    tracer = get_tracer(state.get("run_id"))
+    if tracer:
+        tracer.log_event(
+            stage="routing",
+            event_type="decision",
+            iteration=count,
+            data={
+                "previous_stage": "architect_validator",
+                "target_node": str(decision),
+                "verdict": verdict,
+                "contract_status": status
+            }
+        )
 
-    return END
+    return decision
 
 
 # ==============================================================================
@@ -707,7 +721,9 @@ def contract_validation_node(state: SquadState) -> dict:
         return {"status": "contract_gate_skipped"}
 
     revision_count = state.get("contract_revision_count", 0) + 1
-    max_cr = state.get("max_contract_revisions")
+    max_cr = state.get("max_phase_repair_attempts")
+    if max_cr is None:
+        max_cr = state.get("max_contract_revisions")
     max_contract_rev = 2 if max_cr is None else int(max_cr)
 
     frozen_oracle_path = state.get("frozen_oracle_path")
@@ -749,7 +765,9 @@ def route_after_contract_gate(state: SquadState) -> str:
     """Menentukan routing pasca Deterministic Contract Validation Gate (P0-2.1)."""
     contract_status = state.get("contract_status")
     revision_count = state.get("contract_revision_count", 0)
-    max_cr = state.get("max_contract_revisions")
+    max_cr = state.get("max_phase_repair_attempts")
+    if max_cr is None:
+        max_cr = state.get("max_contract_revisions")
     max_contract_rev = 2 if max_cr is None else int(max_cr)
 
     if contract_status == ContractStatus.FROZEN.value or contract_status is None:
@@ -759,13 +777,45 @@ def route_after_contract_gate(state: SquadState) -> str:
     else:
         return END
 
+
 def route_after_developer(state: SquadState) -> str:
-    """Legacy routing helper."""
-    return route_after_developer_validator(state)
+    """Legacy routing helper (backwards compatible with early unit tests)."""
+    status = state.get("status")
+    if status in ("transport_error", "terminal_failure_developer_boundary"):
+        return END
+
+    if state.get("developer_validator_contract"):
+        return route_after_developer_validator(state)
+
+    iter_count = state.get("iteration_count", 0)
+    has_test_files = bool(state.get("test_files"))
+    needs_update = state.get("tests_need_update", False)
+    frozen_oracle = state.get("frozen_oracle_path")
+    if iter_count == 0:
+        if frozen_oracle:
+            return "frozen_oracle"
+        return "tester"
+    if needs_update:
+        return "tester"
+    if has_test_files:
+        return "executor"
+    return "tester"
+
 
 def route_after_executor(state: SquadState) -> str:
-    """Legacy routing helper."""
-    return route_after_executor_validator(state)
+    """Legacy routing helper (backwards compatible with early unit tests)."""
+    if state.get("executor_iteration_validator_contract"):
+        return route_after_executor_validator(state)
+
+    test_results = state.get("test_results", {})
+    passed = test_results.get("passed", False)
+    iteration = state.get("iteration_count", 0)
+    max_it = state.get("max_iterations")
+    max_iter = 3 if max_it is None else int(max_it)
+
+    if not passed and iteration < max_iter:
+        return "developer"
+    return "reviewer"
 
 
 # ==============================================================================

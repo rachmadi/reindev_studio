@@ -258,6 +258,14 @@ def developer_agent(state: SquadState) -> dict:
                     prev_code_blocks.append(f"=== FILE: {fname} ===\n{content}\n=== END FILE ===")
                     break
             prev_code_str = "\n".join(prev_code_blocks) if prev_code_blocks else "(Belum ada kode)"
+            qa_test_blocks = []
+            for fname, content in state.get("test_files", {}).items():
+                if len(content) > 1500:
+                    test_summary = content[:1500] + "\n// ... (sisa test suite dipotong untuk efisiensi konteks)"
+                else:
+                    test_summary = content
+                qa_test_blocks.append(f"=== TEST FILE: {fname} ===\n{test_summary}\n=== END TEST FILE ===")
+            qa_test_str = "\n".join(qa_test_blocks) if qa_test_blocks else "(Belum ada test)"
 
             feedback_section = f"""
 
@@ -266,6 +274,9 @@ def developer_agent(state: SquadState) -> dict:
 
 BERKAS KODE TERAKHIR ANDA:
 {prev_code_str}
+
+BERKAS TEST RUNNER (FROZEN ORACLE CALL SITE & EXPECTATIONS):
+{qa_test_str}
 
 INSTRUKSI PERBAIKAN DETERMINISTIK:
 1. Analisis bukti deterministik dan patuhi REQUIRED CHANGES di atas secara disiplin.
@@ -372,11 +383,29 @@ INSTRUKSI PERBAIKAN:
 """
 
     if iteration == 0:
-        arch_section = (
-            f"\nRencana Arsitektur & File Tree (PANDUAN KONSEPTUAL):\n"
-            f"[PERINGATAN PRESEDEN: Jika ada kelas/pola di rancangan arsitek yang bertentangan dengan FACT CARD di atas, FACT CARD MUTLAK MENANG]\n"
-            f"{arch_plan}\n"
-        ) if arch_plan else ""
+        if arch_plan:
+            try:
+                from ..blueprint_schema import parse_blueprint_json, blueprint_to_narrative_markdown
+            except (ImportError, ValueError):
+                try:
+                    from blueprint_schema import parse_blueprint_json, blueprint_to_narrative_markdown
+                except ImportError:
+                    parse_blueprint_json = lambda t: (None, "")
+                    blueprint_to_narrative_markdown = lambda b: ""
+
+            bp_obj, _ = parse_blueprint_json(arch_plan)
+            if bp_obj:
+                rendered_plan = blueprint_to_narrative_markdown(bp_obj)
+            else:
+                rendered_plan = arch_plan
+
+            arch_section = (
+                f"\nRencana Arsitektur & File Tree (PANDUAN KONSEPTUAL):\n"
+                f"[PERINGATAN PRESEDEN: Jika ada kelas/pola di rancangan arsitek yang bertentangan dengan FACT CARD di atas, FACT CARD MUTLAK MENANG]\n"
+                f"{rendered_plan}\n"
+            )
+        else:
+            arch_section = ""
     else:
         # Intervensi 2: Compact Repair Context - hilangkan arsitektur usang/bertele-tele di loop perbaikan
         arch_section = f"\n[Rencana Arsitektur]: Gunakan Target File Authoritative '{authoritative_target_file}' dan ikuti Kontrak Resmi di atas.\n"

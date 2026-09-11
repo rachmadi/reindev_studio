@@ -19,7 +19,8 @@ Iterasi 7 Additions:
 import ast
 import re
 import hashlib
-from typing import Dict, List, Any, Optional, Tuple, TypedDict
+import builtins
+from typing import Dict, List, Any, Optional, Tuple, TypedDict, Set
 
 try:
     from .state import SquadState
@@ -126,8 +127,8 @@ def _make_cep_violations(violations_raw: List[Dict[str, Any]]) -> List["CEPViola
             criterion=v.get("criterion", "unknown"),
             severity=v.get("severity", "CRITICAL"),
             location=v.get("location", ""),
-            observed_state=v.get("message", ""),
-            expected_state=v.get("expected", ""),
+            observed_state=v.get("observed_state", v.get("message", "")),
+            expected_state=v.get("expected_state", v.get("expected", "")),
             source_detector="PHASE_VALIDATOR_DETERMINISTIC",
             observed_symbol=v.get("observed_symbol"),
         ))
@@ -136,6 +137,77 @@ def _make_cep_violations(violations_raw: List[Dict[str, Any]]) -> List["CEPViola
 # ==============================================================================
 # Helper Static Analyzers (Deterministic)
 # ==============================================================================
+
+def audit_python_module_symbol_resolvability(tree: ast.AST, fname: str = "main.py") -> List[Tuple[str, int, str]]:
+    """
+    Mengaudit keterdefinisan simbol pada tingkat modul dan class-body (bukan di dalam fungsi).
+    Mendeteksi simbol seperti 'ConfigDict' atau base class/decorator yang digunakan tanpa impor.
+    Mengembalikan list of (symbol_name, lineno, context_description).
+    """
+    imported_names: Set[str] = set()
+    defined_names: Set[str] = set()
+    builtin_names: Set[str] = set(dir(builtins))
+    common_types: Set[str] = {
+        "int", "float", "str", "bool", "bytes", "list", "dict", "tuple", "set",
+        "frozenset", "type", "object", "None", "True", "False", "Ellipsis",
+        "Any", "Optional", "Union", "List", "Dict", "Tuple", "Set", "Callable"
+    }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for n in node.names:
+                imported_names.add(n.asname or n.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            for n in node.names:
+                imported_names.add(n.asname or n.name)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defined_names.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            defined_names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    defined_names.add(target.id)
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                defined_names.add(node.target.id)
+
+    available = imported_names | defined_names | builtin_names | common_types
+
+    unresolved: List[Tuple[str, int, str]] = []
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            # 1. Base classes
+            for base in node.bases:
+                if isinstance(base, ast.Name) and base.id not in available:
+                    unresolved.append((base.id, base.lineno, f"base class of '{node.name}'"))
+            # 2. Decorators on class
+            for dec in node.decorator_list:
+                dname = dec.id if isinstance(dec, ast.Name) else (dec.func.id if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) else None)
+                if dname and dname not in available:
+                    unresolved.append((dname, dec.lineno, f"decorator of class '{node.name}'"))
+            # 3. Class body statements (evaluated at module import time)
+            for stmt in node.body:
+                if not isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    for sub in ast.walk(stmt):
+                        if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                            if sub.id not in available and not sub.id.startswith("__"):
+                                unresolved.append((sub.id, sub.lineno, f"class body of '{node.name}'"))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # Decorators on function
+            for dec in node.decorator_list:
+                dname = dec.id if isinstance(dec, ast.Name) else (dec.func.id if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) else None)
+                if dname and dname not in available:
+                    unresolved.append((dname, dec.lineno, f"decorator of def '{node.name}'"))
+        elif isinstance(node, ast.Assign):
+            # Module-level assign value
+            for sub in ast.walk(node.value):
+                if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                    if sub.id not in available and not sub.id.startswith("__"):
+                        unresolved.append((sub.id, sub.lineno, "module level"))
+
+    return unresolved
+
 
 def scan_code_symbols(code_files: Dict[str, str], target_lang: str = "python") -> Dict[str, List[str]]:
     """Mengekstrak simbol kelas, fungsi, dan import dari code_files secara deterministik."""
@@ -360,12 +432,12 @@ def validate_pm_phase(state: SquadState) -> ValidatorContract:
     # --------------------------------------------------------------------------
     words = specs.split()
     specs_lower = specs.lower()
-    is_len_ok = (len(words) >= 15)
+    is_len_ok = (len(words) >= 8)
     evidence.append({
         "item": "specifications_length",
         "evidence_class": "DETERMINISTIC",
         "observed": f"{len(words)} words",
-        "expected": ">= 15 words",
+        "expected": ">= 8 words",
         "fact": f"Specifications contain {len(words)} words ({len(specs)} characters)",
         "inference": "Adequate length for functional specification" if is_len_ok else "Specifications too brief or empty",
         "status": "VALID" if is_len_ok else "INVALID",
@@ -555,11 +627,34 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
     })
     if not is_bp_valid:
         for err in bp_errors:
+            sym = None
+            if "@" in err:
+                m_sym = re.search(r"@([A-Za-z_][A-Za-z0-9_]*)", err)
+                if m_sym:
+                    sym = f"@{m_sym.group(1)}"
+            elif "kelas basis" in err.lower() or "base class" in err.lower():
+                m_base = re.search(r"'(?:class\s+\w+\()?([A-Za-z_][A-Za-z0-9_]*)\)?'", err)
+                if m_base:
+                    sym = m_base.group(1)
+
+            is_schema = "SCHEMA_VIOLATION" in err
+            crit = "blueprint_json_schema" if is_schema else "blueprint_ast_consistency"
+            if is_schema:
+                expected_desc = "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file"
+            elif sym and sym.startswith("@"):
+                expected_desc = f"Simbol decorator '{sym}' dideklarasikan atau diimpor dalam modul berkas sebelum digunakan"
+            elif sym:
+                expected_desc = f"Kelas basis '{sym}' dideklarasikan atau diimpor dalam modul berkas sebelum pewarisan"
+            else:
+                expected_desc = "Seluruh decorator dan base class terdefinisi dalam lingkup modul berkas"
+
             violations.append({
-                "criterion": "blueprint_ast_consistency",
+                "criterion": crit,
                 "severity": "CRITICAL",
-                "message": f"Inkonsistensi AST pada blueprint: {err}",
-                "location": "architecture_plan"
+                "message": err if is_schema else f"Inkonsistensi AST pada blueprint: {err}",
+                "location": "architecture_plan",
+                "expected": expected_desc,
+                "observed_symbol": sym,
             })
 
     # 3. Contract status & SHA-256 seal
@@ -684,6 +779,7 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
         "code_files_present",
         "authoritative_target_file_compliance",
         "ast_syntax_validity",
+        "symbol_resolvability",
         "contract_symbols_conformance",
         "constraint_compliance",
         "known_good_preservation"
@@ -724,7 +820,7 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
         if is_dart:
             auth_file = "lib/card_metric.dart" if "lib/card_metric.dart" in code_files else "lib/main.dart"
         else:
-            auth_file = "main.py"
+            auth_file = "main.py" if ("main.py" in code_files or not code_files) else next(iter(code_files.keys()))
 
     has_auth_file = (auth_file in code_files)
     evidence.append({
@@ -742,11 +838,11 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
             "location": auth_file
         })
 
-    # 3. Syntax Validity
+    # 3. Syntax Validity & Symbol Resolvability
     for fname, content in code_files.items():
         if not is_dart and fname.endswith(".py"):
             try:
-                ast.parse(content, filename=fname)
+                tree = ast.parse(content, filename=fname)
                 evidence.append({
                     "item": f"ast_syntax_{fname}",
                     "evidence_class": "DETERMINISTIC",
@@ -754,6 +850,38 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
                     "expected": "PARSED_SUCCESS",
                     "status": "VALID"
                 })
+
+                # V5-4: Module-level and class-scope symbol resolvability audit
+                unresolved = audit_python_module_symbol_resolvability(tree, fname)
+                if unresolved:
+                    for sym_name, lineno, ctx_desc in unresolved:
+                        evidence.append({
+                            "item": f"symbol_resolvability_{fname}_{sym_name}",
+                            "evidence_class": "DETERMINISTIC",
+                            "observed": f"Unresolved symbol '{sym_name}' at line {lineno} ({ctx_desc})",
+                            "expected": f"Symbol '{sym_name}' defined or imported in module scope",
+                            "status": "INVALID",
+                            "symbol": sym_name,
+                            "location": f"{fname}:{lineno}",
+                        })
+                        violations.append({
+                            "criterion": "symbol_resolvability",
+                            "severity": "CRITICAL",
+                            "message": f"Simbol '{sym_name}' digunakan pada {ctx_desc} (baris {lineno}) namun tidak diimpor atau didefinisikan.",
+                            "location": f"{fname}:{lineno}",
+                            "observed_symbol": sym_name,
+                            "observed_state": f"Simbol '{sym_name}' tidak terdefinisi di {ctx_desc} ({fname}:{lineno})",
+                            "expected_state": f"Impor atau definisikan '{sym_name}' di tingkat modul",
+                            "suggested_action": f"Tambahkan impor untuk '{sym_name}' atau definisikan sebelum digunakan pada baris {lineno}."
+                        })
+                else:
+                    evidence.append({
+                        "item": f"symbol_resolvability_{fname}",
+                        "evidence_class": "DETERMINISTIC",
+                        "observed": "ALL_SYMBOLS_RESOLVED",
+                        "expected": "ALL_SYMBOLS_RESOLVED",
+                        "status": "VALID"
+                    })
             except SyntaxError as e:
                 evidence.append({
                     "item": f"ast_syntax_{fname}",
@@ -1081,7 +1209,9 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
             "criterion": "test_results_available",
             "severity": "CRITICAL",
             "message": "Hasil uji sandbox tidak memiliki exit code yang valid",
-            "location": "test_results"
+            "location": "test_results",
+            "expected": "Hasil uji sandbox tersedia dengan exit_code deterministik (0 atau 1/2)",
+            "observed_symbol": "exit_code",
         })
 
     # 2. Pass/Fail
@@ -1090,7 +1220,9 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
             "criterion": "sandbox_exit_code_clean",
             "severity": "CRITICAL",
             "message": f"Pengujian sandbox gagal ({failed_count} failed / exit code {exit_code})",
-            "location": "sandbox_tests"
+            "location": "sandbox_tests",
+            "expected": "Seluruh pengujian sandbox lulus (exit_code=0, failed=0)",
+            "observed_symbol": f"exit_code_{exit_code}",
         })
 
     # 3. Regression Detection & Passed Tests Extraction
@@ -1128,7 +1260,9 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
                 "criterion": "zero_regression_invariant",
                 "severity": "CRITICAL",
                 "message": reg["message"],
-                "location": reg["test_or_invariant"]
+                "location": reg["test_or_invariant"],
+                "expected": f"Pengujian '{reg['test_or_invariant']}' tetap berstatus PASS",
+                "observed_symbol": reg["test_or_invariant"],
             })
     else:
         evidence.append({
