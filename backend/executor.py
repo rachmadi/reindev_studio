@@ -580,8 +580,9 @@ dev_dependencies:
         is_win = False
         # 5. Siapkan Environment dengan PYTHONPATH mencakup root sandbox dan seluruh subpackage
         subdirs = [str(p.resolve()) for p in SANDBOX_DIR.rglob("*") if p.is_dir() and p.name != "__pycache__"]
-        env["PYTHONPATH"] = os.pathsep.join([str(SANDBOX_DIR.resolve())] + subdirs)
-        cmd = [sys.executable, "-m", "pytest", "-v", "--color=no", "--import-mode=importlib", "-o", "python_files=test_*.py *_test.py"]
+        backend_dir = str(Path(__file__).resolve().parent)
+        env["PYTHONPATH"] = os.pathsep.join([str(SANDBOX_DIR.resolve()), backend_dir] + subdirs)
+        cmd = [sys.executable, "-m", "pytest", "-v", "--color=no", "-p", "conftest_runtime_enricher", "--import-mode=importlib", "-o", "python_files=test_*.py *_test.py"]
     
     effective_timeout = 90 if (is_flutter or is_dart) else timeout
     try:

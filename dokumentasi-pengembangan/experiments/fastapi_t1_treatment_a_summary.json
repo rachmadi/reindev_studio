@@ -1,0 +1,42 @@
+{
+  "experiment": "phase_end_validation_pilot",
+  "date": "2026-09-12T05:18:02.240559",
+  "total_runs_planned": 3,
+  "runs_completed": 1,
+  "status": "PAUSED_AT_RUN_1",
+  "pass_count": 1,
+  "convergent_within_3_loops_count": 1,
+  "aggregate_otrr": 0.0,
+  "aggregate_otrr_percent": 0.0,
+  "runs": [
+    {
+      "run_id": "pv_pilot_fastapi_t1_rep1_20260912_051508",
+      "task_id": "fastapi_t1",
+      "target_language": "python",
+      "model": "qwen2.5-coder:7b",
+      "final_verdict": "PASS",
+      "review_verdict": "APPROVED",
+      "loops_consumed": 2,
+      "converged_within_3_loops": true,
+      "tests_passed": 5,
+      "tests_failed": 0,
+      "tests_total": 5,
+      "contract_status": "FROZEN",
+      "trajectory": "convergent",
+      "failure_classification": "NONE",
+      "duration_sec": 173.28,
+      "oracle_sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+      "oracle_sha_intact": true,
+      "tester_agent_invocations": 0,
+      "otrr": 0.0,
+      "otrr_percent": 0.0,
+      "otrr_details": {
+        "otrr": 0.0,
+        "otrr_percent": 0.0,
+        "total_failures_with_repair": 0,
+        "first_turn_successes": 0,
+        "repair_records": []
+      }
+    }
+  ]
+}

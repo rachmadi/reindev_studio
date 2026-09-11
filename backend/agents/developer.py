@@ -267,6 +267,19 @@ def developer_agent(state: SquadState) -> dict:
                 qa_test_blocks.append(f"=== TEST FILE: {fname} ===\n{test_summary}\n=== END TEST FILE ===")
             qa_test_str = "\n".join(qa_test_blocks) if qa_test_blocks else "(Belum ada test)"
 
+            if os.environ.get("REINDEV_TREATMENT_B_R3", "0") == "1":
+                r3_directive = (
+                    "3. [CONTRACT BOUNDARY PRINCIPLE]:\n"
+                    "   Status Frozen berlaku ketat pada elemen kontrak eksternal yang disegel:\n"
+                    "   - Target File Authoritative, nama kelas/interface publik, route endpoint, HTTP verbs, dan schema kontrak yang disegel.\n"
+                    "   Detail implementasi internal yang tidak disegel secara eksplisit (seperti representasi field internal, nilai default parameter/field, adapter, atau pemetaan internal) DAPAT disesuaikan bila diperlukan oleh bukti deterministik, asalkan seluruh invarian eksternal yang disegel tetap terjaga 100%.\n"
+                    f"4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
+                )
+            else:
+                r3_directive = (
+                    f"3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
+                )
+
             feedback_section = f"""
 
 [PERHATIAN KRUSIAL - SIKLUS PERBAIKAN DETERMINISTIK (LOOP {iteration}/{dev_max_iter})]:
@@ -281,13 +294,14 @@ BERKAS TEST RUNNER (FROZEN ORACLE CALL SITE & EXPECTATIONS):
 INSTRUKSI PERBAIKAN DETERMINISTIK:
 1. Analisis bukti deterministik dan patuhi REQUIRED CHANGES di atas secara disiplin.
 2. JANGAN langgar PRESERVED INVARIANTS dan REPAIR BOUNDARIES yang telah ditentukan.
-3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!
-"""
+{r3_directive}"""
             tracer = get_tracer(state.get("run_id"))
             if tracer and hasattr(tracer, "log_repair_attempt"):
                 tracer.log_repair_attempt(turn=iteration, package_id=pkg.package_id, iteration=iteration)
 
-    if not feedback_section and iteration > 0 and (test_results or state.get("developer_feedback")):
+    is_repair_mode = (iteration > 0 or state.get("status") == "developer_preflight_rejected" or bool(state.get("developer_feedback")) or bool(latest_cep and latest_cep.get("causal_owner") == "DEVELOPER"))
+
+    if not feedback_section and is_repair_mode and (test_results or state.get("developer_feedback")):
         # P0-1 & Improved Repentance: Compact Repair Context (<= 2.500 karakter untuk num_ctx=8192)
         targeted_feedback = state.get("developer_feedback")
 
@@ -382,7 +396,7 @@ INSTRUKSI PERBAIKAN:
 - Batasan: DILARANG menambah endpoint, fungsi, atau model di luar kontrak resmi ini!
 """
 
-    if iteration == 0:
+    if not is_repair_mode:
         if arch_plan:
             try:
                 from ..blueprint_schema import parse_blueprint_json, blueprint_to_narrative_markdown
@@ -462,6 +476,12 @@ INSTRUKSI PERBAIKAN:
         env_fact_card = ""
     env_grounding_section = f"\n{env_fact_card}\n" if env_fact_card else ""
 
+
+    repair_closing_directive = (
+        "WAJIB selesaikan seluruh perbaikan yang diminta pada instruksi diagnostik di atas secara disiplin!\n"
+        if is_repair_mode else ""
+    )
+
     prompt = f"""TARGET BAHASA PEMROGRAMAN: {target_lang.upper()}
 
 {lang_rule}
@@ -476,7 +496,7 @@ Spesifikasi Product Manager:
 ATURAN KETAT:
 Tulis seluruh implementasi file kode HANYA dalam bahasa {target_lang.upper()}.
 Jangan gunakan bahasa pemrograman lain!
-Patuhi ENVIRONMENT FACT CARD dan POLA KANONIKAL di atas sebagai kebenaran mutlak runtime.
+{repair_closing_directive}Patuhi ENVIRONMENT FACT CARD dan POLA KANONIKAL di atas sebagai kebenaran mutlak runtime.
 
 Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa teks obrolan apapun."""
     

@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import re
 import ast
+import json
 from typing import Dict, List, Any, Optional
 
 try:
@@ -897,6 +898,190 @@ def extract_oracle_tested_interface_functions(
     return result
 
 
+def extract_generic_runtime_diagnostics(output: str) -> List[Dict[str, Any]]:
+    """
+    Ekstrak blok generic runtime diagnostic evidence dari output runner (R-1):
+    --- [GENERIC RUNTIME DIAGNOSTIC EVIDENCE] ---
+    Type: HTTP_RESPONSE_DIAGNOSTIC / EXCEPTION_DIAGNOSTIC
+    ...
+    ---------------------------------------------
+    """
+    if not output or "[GENERIC RUNTIME DIAGNOSTIC EVIDENCE]" not in output:
+        return []
+
+    diagnostics: List[Dict[str, Any]] = []
+    blocks = re.findall(
+        r"---\s*\[GENERIC RUNTIME DIAGNOSTIC EVIDENCE\]\s*---\s*([\s\S]*?)(?:-{20,}|$)",
+        output
+    )
+    for block in blocks:
+        item: Dict[str, Any] = {}
+        for line in block.strip().splitlines():
+            line_str = line.strip()
+            if ":" in line_str:
+                k, v = line_str.split(":", 1)
+                key = k.strip().lower().replace(" ", "_")
+                val = v.strip()
+                if key == "status_code":
+                    try:
+                        val = int(val)
+                    except ValueError:
+                        pass
+                elif key in ("validation_detail", "response_body"):
+                    try:
+                        val = json.loads(val)
+                    except Exception:
+                        pass
+                item[key] = val
+        if item:
+            diagnostics.append(item)
+    return diagnostics
+
+
+def audit_caller_callee_schema_compatibility(
+    test_files: Dict[str, str],
+    code_files: Dict[str, str],
+    target_language: str = "python",
+    runtime_diagnostics: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Auditor deterministik kompatibilitas skema pemanggil (caller/Oracle test)
+    terhadap penerima (callee/implementation model) (R-2).
+
+    Prinsip Non-Solver:
+    - Hanya mendeteksi disparitas antarmuka faktual:
+      caller mengirimkan keys {caller_keys} sementara model mewajibkan {callee_keys}.
+    - DILARANG menyarankan kode implementasi konkret seperti default value 0.0.
+    """
+    if target_language != "python":
+        return None
+
+    # 1. Ekstraksi representasi pemanggil (caller) dari test_files via AST
+    caller_calls: List[Dict[str, Any]] = []
+    for tf_name, tf_code in (test_files or {}).items():
+        try:
+            tree = ast.parse(tf_code)
+            var_dicts: Dict[str, List[str]] = {}
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Assign) and isinstance(n.value, ast.Dict):
+                    keys = [k.value for k in n.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+                    for t in n.targets:
+                        if isinstance(t, ast.Name):
+                            var_dicts[t.id] = keys
+
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Call):
+                    mname = ""
+                    if isinstance(n.func, ast.Attribute):
+                        mname = n.func.attr
+                    if mname in ("post", "put", "patch"):
+                        endpoint = None
+                        if len(n.args) > 0 and isinstance(n.args[0], ast.Constant):
+                            endpoint = str(n.args[0].value)
+                        payload_keys: Optional[List[str]] = None
+                        for kw in getattr(n, "keywords", []):
+                            if kw.arg == "json":
+                                if isinstance(kw.value, ast.Dict):
+                                    payload_keys = [k.value for k in kw.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+                                elif isinstance(kw.value, ast.Name) and kw.value.id in var_dicts:
+                                    payload_keys = var_dicts[kw.value.id]
+                        if endpoint and payload_keys is not None:
+                            caller_calls.append({
+                                "endpoint": endpoint,
+                                "keys": set(payload_keys),
+                                "file": tf_name,
+                                "lineno": getattr(n, "lineno", 0),
+                                "call_repr": f"client.{mname}('{endpoint}', json={payload_keys}) at {tf_name}:{getattr(n, 'lineno', 0)}",
+                            })
+        except Exception:
+            pass
+
+    # 2. Ekstraksi model dan endpoint dari code_files via AST
+    class_fields: Dict[str, Dict[str, bool]] = {}  # model_name -> {field_name: has_default}
+    endpoint_models: Dict[str, str] = {}  # endpoint -> model_name
+
+    for cf_name, cf_code in (code_files or {}).items():
+        try:
+            tree = ast.parse(cf_code)
+            for n in ast.walk(tree):
+                if isinstance(n, ast.ClassDef):
+                    fields: Dict[str, bool] = {}
+                    for item in n.body:
+                        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                            fname = item.target.id
+                            has_def = (item.value is not None)
+                            fields[fname] = has_def
+                    if fields:
+                        class_fields[n.name] = fields
+
+            for n in ast.walk(tree):
+                if isinstance(n, ast.FunctionDef):
+                    for dec in getattr(n, "decorator_list", []):
+                        if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+                            if dec.func.attr in ("post", "put", "patch"):
+                                if len(dec.args) > 0 and isinstance(dec.args[0], ast.Constant):
+                                    ep = str(dec.args[0].value)
+                                    for arg in n.args.args:
+                                        if arg.annotation and isinstance(arg.annotation, ast.Name):
+                                            if arg.annotation.id in class_fields:
+                                                endpoint_models[ep] = arg.annotation.id
+        except Exception:
+            pass
+
+    # 3. Analisis disparitas skema
+    for call in caller_calls:
+        ep = call["endpoint"]
+        caller_keys = call["keys"]
+        model_name = endpoint_models.get(ep)
+        if not model_name and class_fields:
+            model_name = max(class_fields.keys(), key=lambda m: len(caller_keys.intersection(class_fields[m].keys())))
+
+        if model_name and model_name in class_fields:
+            fields = class_fields[model_name]
+            all_callee_keys = set(fields.keys())
+            req_callee_keys = {f for f, has_def in fields.items() if not has_def}
+
+            missing_in_caller = req_callee_keys - caller_keys
+            unrecognized_in_callee = caller_keys - all_callee_keys
+
+            if missing_in_caller or unrecognized_in_callee:
+                return {
+                    "endpoint": ep,
+                    "caller_keys": sorted(list(caller_keys)),
+                    "callee_symbol": model_name,
+                    "callee_keys": sorted(list(all_callee_keys)),
+                    "callee_required_keys": sorted(list(req_callee_keys)),
+                    "missing_in_caller": sorted(list(missing_in_caller)),
+                    "unrecognized_by_callee": sorted(list(unrecognized_in_callee)),
+                    "caller_call_site": call["call_repr"],
+                }
+
+    # 4. Fallback runtime diagnostics (jika AST tidak menemukan pemanggilan spesifik)
+    if runtime_diagnostics:
+        for diag in runtime_diagnostics:
+            if diag.get("type") == "HTTP_RESPONSE_DIAGNOSTIC" and diag.get("status_code") == 422:
+                vdetail = diag.get("validation_detail")
+                if isinstance(vdetail, list) and len(vdetail) > 0:
+                    first_err = vdetail[0]
+                    if isinstance(first_err, dict) and first_err.get("type") == "missing":
+                        loc = first_err.get("loc", [])
+                        missing_field = loc[-1] if loc else "unknown_field"
+                        caller_input = first_err.get("input", {})
+                        caller_keys = sorted(list(caller_input.keys())) if isinstance(caller_input, dict) else []
+                        return {
+                            "endpoint": "HTTP_ENDPOINT",
+                            "caller_keys": caller_keys,
+                            "callee_symbol": list(class_fields.keys())[0] if class_fields else "RequestModel",
+                            "callee_keys": caller_keys + [missing_field],
+                            "callee_required_keys": [missing_field],
+                            "missing_in_caller": [missing_field],
+                            "unrecognized_by_callee": [],
+                            "caller_call_site": f"Oracle HTTP request omitting required field '{missing_field}'",
+                        }
+
+    return None
+
+
 def synthesize_b5_actionable_prescriptions(
     state: SquadState,
     violations: List[ViolationItem],
@@ -916,8 +1101,16 @@ def synthesize_b5_actionable_prescriptions(
     """
     prescriptions: List[ActionableRepairPrescription] = []
     test_files = state.get("test_files") or {}
+    code_files = state.get("code_files") or {}
     models = _get_authoritative_models(state)
     interfaces = _get_authoritative_interfaces(state)
+    runtime_diagnostics = extract_generic_runtime_diagnostics(output)
+    schema_audit = audit_caller_callee_schema_compatibility(
+        test_files=test_files,
+        code_files=code_files,
+        target_language=target_lang,
+        runtime_diagnostics=runtime_diagnostics,
+    )
 
     # 1. Pattern: Positional argument mismatch in Python (cli_t1 / BaseModel.__init__)
     pos_arg_match = re.search(
@@ -1198,11 +1391,62 @@ def synthesize_b5_actionable_prescriptions(
         if http_match:
             act_code = http_match.group("actual") or http_match.group("actual2") or http_match.group("actual3")
             exp_code = http_match.group("expected") or "200/201"
-            if act_code == "422":
+            if (act_code == "422" or "422" in output or "unprocessable" in output.lower()) and schema_audit:
+                caller_keys = schema_audit.get("caller_keys", [])
+                callee_sym = schema_audit.get("callee_symbol", "RequestModel")
+                callee_req_keys = schema_audit.get("callee_required_keys", [])
+                callee_all_keys = schema_audit.get("callee_keys", [])
+                missing_in_caller = schema_audit.get("missing_in_caller", [])
+                unrecognized = schema_audit.get("unrecognized_by_callee", [])
+                ep = schema_audit.get("endpoint", "/endpoint")
+
+                if missing_in_caller:
+                    fail_desc = (
+                        f"Observed contract mismatch: caller supplies {caller_keys} while target request model "
+                        f"'{callee_sym}' requires {callee_req_keys} (missing in caller: {missing_in_caller})."
+                    )
+                else:
+                    fail_desc = (
+                        f"Observed contract mismatch: caller supplies {caller_keys} while target request model "
+                        f"'{callee_sym}' defines {callee_all_keys} (unrecognized by callee: {unrecognized})."
+                    )
+
+                rx = ActionableRepairPrescription(
+                    prescription_id="RX-B5-CONTRACT-SCHEMA-MISMATCH",
+                    evidence_ref="B5_CALLER_CALLEE_SCHEMA_DISPARITY",
+                    observed_failure=fail_desc,
+                    oracle_call_site=schema_audit.get("caller_call_site") or f"Caller request to '{ep}' with payload keys {caller_keys}",
+                    implementation_symbol=f"Model '{callee_sym}' / endpoint handler in '{auth_file}'",
+                    evidence_basis="CALLER_CALLEE_INTERFACE_AUDIT + RUNTIME_DIAGNOSTIC_EVIDENCE",
+                    required_change=(
+                        f"Observed contract mismatch: caller supplies {caller_keys} while target request model "
+                        f"'{callee_sym}' requires {callee_req_keys}. "
+                        f"Repair the request/response interface so the implementation accepts the authoritative caller representation "
+                        f"while preserving the required external contract."
+                    ),
+                    repair_boundary_allowed=[
+                        f"Adjust request model fields or defaults in '{auth_file}' to accept caller representation",
+                        f"Align endpoint parameter handling or model validation in '{auth_file}'",
+                    ],
+                    repair_boundary_forbidden=[
+                        "Do NOT modify Frozen Oracle test files (e.g. test_main.py)",
+                        "Do NOT alter frozen contract status",
+                    ],
+                    expected_post_repair_state=f"Endpoint handler accepts caller payload {caller_keys} and returns HTTP {exp_code}.",
+                    verification_evidence=f"Oracle test asserting status_code == {exp_code} executes and PASS.",
+                )
+                prescriptions.append(rx)
+            elif act_code == "422":
+                val_detail_str = ""
+                if runtime_diagnostics:
+                    for d in runtime_diagnostics:
+                        if d.get("validation_detail"):
+                            val_detail_str = f" Validation detail: {d.get('validation_detail')}"
+                            break
                 rx = ActionableRepairPrescription(
                     prescription_id="RX-B5-HTTP-422-SCHEMA",
                     evidence_ref="B5_SANDBOX_HTTP_STATUS_422",
-                    observed_failure=f"Endpoint rejected request with HTTP 422 Unprocessable Content (Expected HTTP {exp_code})",
+                    observed_failure=f"Endpoint rejected request with HTTP 422 Unprocessable Content (Expected HTTP {exp_code}).{val_detail_str}".strip(),
                     oracle_call_site=f"Client request in Oracle test suite returning HTTP {act_code} instead of HTTP {exp_code}",
                     implementation_symbol=f"Request data models and endpoint parameter validation in '{auth_file}'",
                     evidence_basis="RUNTIME_HTTP_STATUS_CODE_422_VALIDATION_REJECTION",
@@ -1414,6 +1658,13 @@ def assemble_b5_evidence(
             relevant_lines.append(stripped)
     sandbox_evidence_str = "\n".join(relevant_lines[:35]) if relevant_lines else output[:1500]
 
+    # Preserve generic runtime diagnostic evidence block (R-1) without truncation
+    diag_block_match = re.search(r"---\s*\[GENERIC RUNTIME DIAGNOSTIC EVIDENCE\]\s*---[\s\S]*?(?:-{20,}|$)", output)
+    if diag_block_match:
+        diag_block_text = diag_block_match.group(0).strip()
+        if diag_block_text not in sandbox_evidence_str:
+            sandbox_evidence_str = (diag_block_text + "\n\n" + sandbox_evidence_str)[:2500]
+
     # Preserved invariants
     preserved: List[PreservedInvariant] = []
     preserved.extend(_collect_oracle_invariants(state))
@@ -1493,6 +1744,16 @@ def assemble_b5_evidence(
             "evidence_class": "DETERMINISTIC",
             "observed": sandbox_evidence_str[:2500],
             "expected": "0 errors",
+            "status": "INVALID",
+        })
+
+    runtime_diagnostics = extract_generic_runtime_diagnostics(output)
+    if runtime_diagnostics:
+        b5_evidence.append({
+            "item": "generic_runtime_diagnostic",
+            "evidence_class": "DETERMINISTIC",
+            "observed": runtime_diagnostics,
+            "expected": "No HTTP client errors or unhandled runtime exceptions",
             "status": "INVALID",
         })
 

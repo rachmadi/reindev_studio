@@ -17,6 +17,7 @@ Prinsip Fondasi:
 
 from __future__ import annotations
 
+import os
 import json
 import uuid
 import hashlib
@@ -36,6 +37,10 @@ ENGINEERING_DOCTRINE: List[str] = [
     "4. [CAUSAL REPAIR BOUNDARY]: Modify only code causal to failing tests. Do not rewrite unrelated code.",
     "5. [DETERMINISTIC VERIFICATION]: Repairs are verified deterministically against Frozen Oracle. Zero regression required.",
 ]
+if os.environ.get("REINDEV_TREATMENT_B_R3", "0") == "1":
+    ENGINEERING_DOCTRINE.append(
+        "6. [CONTRACT BOUNDARY PRINCIPLE]: Frozen status applies strictly to external contract elements (routes, identifiers, verbs). Implementation details (internal fields, default values, mappings) may be adjusted to satisfy Oracle evidence while preserving frozen invariants."
+    )
 
 
 # ===========================================================================
@@ -416,14 +421,17 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
     # 1B. Deterministic Sandbox Failure Evidence (if available in evidence)
     sandbox_ev = None
     failing_tests_ev = None
+    runtime_diag_ev = None
     for ev in getattr(pkg, "evidence", []):
         if isinstance(ev, dict):
             if ev.get("item") == "sandbox_failing_tests":
                 failing_tests_ev = ev.get("observed")
             elif ev.get("item") == "sandbox_error_excerpt":
                 sandbox_ev = ev.get("observed")
+            elif ev.get("item") == "generic_runtime_diagnostic":
+                runtime_diag_ev = ev.get("observed")
 
-    if failing_tests_ev or sandbox_ev:
+    if failing_tests_ev or sandbox_ev or runtime_diag_ev:
         lines.append("\n[DETERMINISTIC SANDBOX FAILURE EVIDENCE]")
         if failing_tests_ev and isinstance(failing_tests_ev, list):
             lines.append(f"Failing Tests ({len(failing_tests_ev)} failing):")
@@ -446,6 +454,25 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
                     tb = ft.get("traceback_excerpt")
                     if tb:
                         lines.append(f"    Traceback: {tb.strip()}")
+        if runtime_diag_ev and isinstance(runtime_diag_ev, list):
+            lines.append("\nGeneric Runtime Diagnostics:")
+            for diag in runtime_diag_ev:
+                dtype = diag.get("type", "DIAGNOSTIC")
+                lines.append(f"  • Type: {dtype}")
+                if "status_code" in diag:
+                    lines.append(f"    Status Code: {diag['status_code']}")
+                if "response_body" in diag:
+                    body_val = diag["response_body"]
+                    body_str = json.dumps(body_val) if isinstance(body_val, (dict, list)) else str(body_val)
+                    lines.append(f"    Response Body: {body_str[:800]}")
+                if "validation_detail" in diag:
+                    detail_val = diag["validation_detail"]
+                    detail_str = json.dumps(detail_val) if isinstance(detail_val, (dict, list)) else str(detail_val)
+                    lines.append(f"    Validation Detail: {detail_str[:800]}")
+                if "exception_type" in diag:
+                    lines.append(f"    Exception Type: {diag['exception_type']}")
+                if "exception_message" in diag:
+                    lines.append(f"    Exception Message: {diag['exception_message']}")
         if sandbox_ev:
             lines.append("\nRaw Test Runner Output Excerpt:")
             lines.append(str(sandbox_ev).strip())
