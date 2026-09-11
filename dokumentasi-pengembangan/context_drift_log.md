@@ -215,22 +215,28 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 | Top-Ordering Canonical Prioritization & Budget Expansion pada Repair Directive | Positif (Mengeliminasi Silent Context Truncation dengan memastikan urutan kanonikal `failure → causal evidence → prescription → invariant → doctrine → verification` masuk sebelum info sekunder) | Intent Architect & Agen |
 | Penerapan Prinsip Evidence Density | Positif (Menghapus `current_code_excerpt` redundan di CEP demi menghemat budget konteks untuk hal yang sudah ada di prompt utama) | Intent Architect |
 | Identifikasi Function Boundary Blind Spot & Module-Level Validation Misattribution (E-057, D-082) | Positif (Membuka kebutuhan evolusi B5 dari module-level symbol binding menuju function-level symbol binding untuk menuntaskan 5/5 PASS) | Agen & Intent Architect |
+| Ekstraksi Deklarasi Kelas Berbasis Sintaksis Formal Python (E-058, D-084) | Positif (Mengganti regex permisif di `architect.py:200` dengan sintaks deklarasi formal `class Name(...):` dan filter stop-words guna mengeliminasi perancu hulu `dengan`) | Intent Architect & Agen |
+| Identifikasi Interface Impedance Mismatch & Priority Masking Trap (E-059, D-085) | Positif (Mendokumentasikan diskrepansi tipe pemanggil raw `list` vs asumsi `Matrix` pada fungsi level modul `add_matrices`, serta jebakan prioritas penanganan error `list`) | Agen & Intent Architect |
 
 ### Bagian B: Keputusan Mandiri Agen
 - **B1 (Penambahan di luar spesifikasi):**
   - Implementasi fungsi inspeksi deterministik `inspect_ast_exception_hierarchy()` di `backend/context_assembler.py` untuk membuktikan relasi pewarisan kelas target tanpa bergantung pada output LLM.
   - Audit komparatif AST dan trace telemetri Run 4 yang membuktikan pencapaian Zero Functional Regression (0.0% regresi pada 30 peluang).
+  - Ekstraksi simbol fungsi pemanggil Oracle (`oracle_call_site`) untuk Function-Targeted Prescription Run 5.
+  - Implementasi unit test sintaksis formal `test_architect_contract_class_syntax_extraction_excludes_narrative` (8/8 PASS).
 - **B2 (Keputusan Teknis):**
   - Penataan ulang urutan seksi pada `render_repair_directive` mengikuti urutan kanonikal linier penentu tindakan.
   - Eliminasi cuplikan kode redundan di Authoritative Context dan ekspansi kuota render `_MAX_RENDER_CHARS` ke 4.500 karakter sebagai parameter engineering terukur.
   - Analisis forensik penempatan validasi `parse_matrix` vs fungsi aljabar murni `add_matrices`/`multiply_matrices` sebagai akar kebuntuan 2 tes dimensi.
+  - Autopsi komparatif Run 4 vs Run 5.1 yang membuktikan penyebab kegagalan 0/5 adalah diskrepansi pemanggilan Frozen Oracle terhadap `add_matrices(a, b)` dengan raw `list` ketika kelas `Matrix` tidak memiliki dunder `__add__`.
 
 ### Ringkasan Distribusi Sumber Drift Sesi 2026-09-11:
-- **Intent Architect:** 72.0% (Engineering Doctrine, Behavioral Invariant Lock, Dual-Evidence AST, Canonical Sequence, Evidence Density, Otorisasi Run 4)
-- **Agen:** 28.0% (Deteksi Silent Context Truncation, AST hierarchy inspector, Top-Ordering Directive Prioritization, Identifikasi Function Boundary Blind Spot)
+- **Intent Architect:** 70.0% (Engineering Doctrine, Behavioral Invariant Lock, Dual-Evidence AST, Canonical Sequence, Evidence Density, Otorisasi Run 4 & 5.1, Sintaks Formal Extractor)
+- **Agen:** 30.0% (Deteksi Silent Context Truncation, AST hierarchy inspector, Top-Ordering Directive Prioritization, Identifikasi Blind Spot, Resolusi E-058, Autopsi Interface Mismatch E-059)
 - **Eksternal:** 0.0%
 
 ### Severity Drift Keseluruhan:
-**Major (Positive Semantic Hardening)** — Penyempurnaan arsitektural dari sekadar pengawasan sintaksis menuju pengawalan semantik hierarki tipe objek, jaminan keterbacaan instruksi tindakan (*actionable transparency*), dan pembuktian empiris preservasi invarian perilaku pada model lokal.
+**Major (Positive Semantic Hardening)** — Penyempurnaan arsitektural dari sekadar pengawasan sintaksis menuju pengawalan semantik hierarki tipe objek, jaminan keterbacaan instruksi tindakan (*actionable transparency*), eliminasi perancu ekstraksi spesifikasi hulu, dan dekonstruksi empiris impedansi antarmuka fungsi publik.
+
 
 

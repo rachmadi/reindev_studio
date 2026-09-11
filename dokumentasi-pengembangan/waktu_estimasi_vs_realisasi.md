@@ -198,9 +198,12 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **Riset 1** | Riset & Eksperimen Awal Executor & Baseline | — | 11.69 | 701.4 m | — | 2026-09-08 (11.69 jam) |
 | **Eksperimen** | Controlled Experiments (Phase 0, 1, 2 [30 Runs]) | — | 4.41 | 264.3 m | — | 2026-09-09 (4.41 jam) |
 | **Executor v2** | Pre-Flight Validation Layer & Safe Mode Implementation | — | 0.21 | 12.7 m | — | 2026-09-09 (AST validation, safe imports, anti-regression Run 10) |
+| **P0-1 & P0-2** | Machine-Readable Contract, Frontier & Dynamic Depth | — | 22.00 | 1.320,0 m | — | 2026-09-10 (P0-2, Frontier 9-Run, Gemma 4, A5/D5, D10) |
+| **Deterministic CEP** | Phase-End Validation Pilot & Controlled Runs 1–5.1 | — | 5.21 | 312.7 m | — | 2026-09-11 (B1–B6, CEP, Runs 3, 4, 5, 5.1) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen + Executor v2)** | **46.0** | **19.57** | **1.174,4 m** | **-26.43** | **Termasuk 16.31 jam riset, eksperimen & penguatan arsitektur** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **46.78** | **2.806,8 m** | **+0.78** | **Termasuk 43.52 jam riset, eksperimen, validasi formal & autopsi kausal** |
+
 
 
 
