@@ -1321,5 +1321,124 @@ FAILED test_main.py::test_matrix_multiplication_incompatible_dimensions - Failed
         assert "Direct invocation in Oracle test suite: add_matrices(a, b), multiply_matrices(a, b)" in rx.oracle_call_site
         assert "confirm pytest.raises(ValueError)" in rx.verification_evidence
 
+    def test_b5_causal_priority_interface_mismatch_resolution(self):
+        """
+        Uji deterministik Causal-Priority Resolution (Run 5.2):
+        Ketika output memuat AttributeError pada tipe bawaan ('list'), sistem harus:
+        1. Memancarkan RX-B5-FUNC-INTERFACE-001 yang menargetkan batas fungsi ('add_matrices', 'subtract_matrices', 'multiply_matrices').
+        2. Menyatakan kondisi perilaku bahwa fungsi harus menerima representasi 'list' dari Oracle.
+        3. Menolak modifikasi pada parse_matrix atau CLI logic.
+        4. Mengeliminasi RX-B5-ATTR-001 (tidak menuntut add pada list).
+        5. Mensupresi RX-B5-EXC-COMPAT-001 agar tidak terjadi Priority Masking Trap saat evaluasi eksepsi belum tercapai.
+        """
+        oracle_test_code = """
+import pytest
+import main
+
+def _add(a, b):
+    return main.add_matrices(a, b)
+
+def _sub(a, b):
+    return main.subtract_matrices(a, b)
+
+def _mul(a, b):
+    return main.multiply_matrices(a, b)
+
+def test_matrix_addition():
+    assert _add([[1, 2]], [[3, 4]]) == [[4, 6]]
+
+def test_matrix_addition_incompatible_dimensions():
+    with pytest.raises(ValueError):
+        _add([[1, 2]], [[1, 2, 3]])
+"""
+        output = """
+================================== FAILURES ===================================
+____________________________ test_matrix_addition _____________________________
+test_main.py:15: in test_matrix_addition
+    assert _add([[1, 2]], [[3, 4]]) == [[4, 6]]
+test_main.py:6: in _add
+    return main.add_matrices(a, b)
+main.py:10: in add_matrices
+    return a.add(b)
+E   AttributeError: 'list' object has no attribute 'add'
+________________ test_matrix_addition_incompatible_dimensions _________________
+test_main.py:19: in test_matrix_addition_incompatible_dimensions
+    with pytest.raises(ValueError):
+test_main.py:6: in _add
+    return main.add_matrices(a, b)
+main.py:10: in add_matrices
+    return a.add(b)
+E   AttributeError: 'list' object has no attribute 'add'
+=========================== short test summary info ===========================
+FAILED test_main.py::test_matrix_addition - AttributeError: 'list' object has no attribute 'add'
+FAILED test_main.py::test_matrix_addition_incompatible_dimensions - AttributeError: 'list' object has no attribute 'add'
+"""
+        code = """
+class Matrix:
+    def __init__(self, data):
+        self.data = data
+    def add(self, other):
+        pass
+
+def add_matrices(a: Matrix, b: Matrix) -> Matrix:
+    return a.add(b)
+
+def subtract_matrices(a: Matrix, b: Matrix) -> Matrix:
+    return a.subtract(b)
+
+def multiply_matrices(a: Matrix, b: Matrix) -> Matrix:
+    return a.multiply(b)
+
+def parse_matrix(s: str):
+    pass
+
+def main():
+    pass
+"""
+        state = {
+            "task": "Matrix calculator CLI",
+            "target_language": "python",
+            "test_files": {"test_main.py": oracle_test_code},
+            "code_files": {"main.py": code},
+            "contract": {
+                "task_intent": {"authoritative_target_file": "main.py"},
+                "data_models": [{"model_name": "Matrix"}],
+            },
+            "test_results": {
+                "passed": False,
+                "exit_code": 1,
+                "passed_count": 0,
+                "failed_count": 2,
+                "output": output,
+            },
+        }
+        pkg = assemble_b5_evidence(state, [_make_violation("VIO-001", "sandbox_exit_code_clean")], [], [])
+
+        # 1. Harus tepat 1 prescription (RX-B5-FUNC-INTERFACE-001), tidak tertimpa atau menduplikasi EXC-COMPAT atau ATTR-001
+        assert len(pkg.actionable_prescriptions) == 1
+        rx = pkg.actionable_prescriptions[0]
+
+        # 2. Cek identitas dan target kausal
+        assert rx.prescription_id == "RX-B5-FUNC-INTERFACE-001"
+        assert "add_matrices" in rx.implementation_symbol
+        assert "list" in rx.observed_failure
+        assert "add" in rx.observed_failure
+
+        # 3. Cek behavioral condition (bukan solusi implementasi sintaks spesifik)
+        assert "must accept the input representation actually supplied by the Oracle (list)" in rx.required_change
+        assert "isinstance" not in rx.required_change  # Tidak boleh mengajari kode sintaks konversi
+
+        # 4. Cek disiplin boundary larangan memodifikasi parse_matrix / CLI
+        assert any("Do NOT modify parse_matrix" in f for f in rx.repair_boundary_forbidden)
+        assert any("Do NOT modify Frozen Oracle" in f for f in rx.repair_boundary_forbidden)
+
+        # 5. Cek rendering directive
+        rendered = render_repair_directive(pkg)
+        assert "[RX-B5-FUNC-INTERFACE-001]" in rendered
+        assert "RX-B5-ATTR-001" not in rendered
+        assert "RX-B5-EXC-COMPAT-001" not in rendered
+        assert "Do NOT modify parse_matrix" in rendered
+
+
 
 

@@ -216,19 +216,63 @@ def assemble_b1_evidence(
 
     root_causes = []
     if has_fail:
-        root_causes.append(
-            "PM specification does not meet minimum structural requirements "
-            "(missing User Stories, Acceptance Criteria, or adequate length)."
-        )
+        crit_strs = [getattr(v, "criterion", "") or "" for v in violations]
+        obs_strs = [getattr(v, "observed_state", "") or "" for v in violations]
+        combined = " ".join(crit_strs + obs_strs).lower()
+
+        if "contradiction" in combined or "kontradiksi" in combined or "menargetkan dart" in combined or "menargetkan python" in combined:
+            root_causes.append(
+                "PM specification contradicts authoritative user intent or target language/platform configuration."
+            )
+        if "ambiguous" in combined or "ambigu" in combined or "ground truth" in combined:
+            root_causes.append(
+                "User task lacks sufficient ground truth to formulate a deterministic specification."
+            )
+        if "acceptance" in combined or "skenario penerimaan" in combined or "kriteria penerimaan" in combined:
+            root_causes.append(
+                "PM specification lacks actionable and testable Acceptance Criteria per Engineering Quality Standard."
+            )
+        if "structural" in combined or "terlalu pendek" in combined or "kosong" in combined or not root_causes:
+            root_causes.append(
+                "PM specification does not meet minimum structural requirements "
+                "(missing System Scope, Capabilities/User Stories, or adequate length)."
+            )
 
     required_changes = []
     for i, v in enumerate(violations, 1):
+        target = "pm_specification"
+        if "task" in (getattr(v, "location", "") or "").lower():
+            target = "user_task_clarification"
+        elif "contract" in (getattr(v, "location", "") or "").lower():
+            target = "draft_contract"
+
+        obs = getattr(v, "observed_state", "") or ""
+        exp = getattr(v, "expected_state", "") or ""
+        req_text = f"{obs} → {exp}" if exp else obs
+
         required_changes.append(RequiredChange(
             change_id=f"REQ-{i:03d}",
-            target="pm_specification",
+            target=target,
             violation_ref=v.violation_id,
-            deterministic_requirement=v.observed_state + " → " + v.expected_state,
+            deterministic_requirement=req_text,
         ))
+
+    allowed_changes = [
+        "Revise system scope and summary",
+        "Add or refine functional capabilities and user stories",
+        "Add explicit, testable acceptance criteria",
+        "Align specification with authoritative user task and target language",
+    ]
+
+    expected_post_repair_state = [
+        "Specification length >= 15 words and >= 50 chars",
+        "Contains structured System Scope / Capabilities and testable Acceptance Criteria",
+        "Consistent with authoritative user intent and platform configuration",
+    ]
+
+    failure_summary = (
+        "; ".join(root_causes[:2]) if root_causes else "PM phase validated."
+    )
 
     return ContextualEvidencePackage(
         package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "B1_PM_PHASE_END", iteration),
@@ -238,23 +282,23 @@ def assemble_b1_evidence(
         validator_type="PHASE_END",
         verdict=verdict,
         causal_owner="PM" if has_fail else "NONE",
-        failure_summary="PM specification lacks required structure (User Stories / Acceptance Criteria)." if has_fail else "PM phase validated.",
+        failure_summary=failure_summary,
         root_causes=root_causes,
         violations=violations,
         violation_dependencies=[],
-        authoritative_context={},
+        authoritative_context={
+            "user_task": (state.get("task", "") or "")[:200],
+            "target_language": state.get("target_language", "python") or "python",
+        },
         active_constraints={"spec_min_words": 15, "spec_min_chars": 50},
         preserved_invariants=[],
         repair_boundary=RepairBoundary(
-            allowed_changes=["Add User Stories section", "Add Acceptance Criteria section", "Expand specification text"],
+            allowed_changes=allowed_changes,
             forbidden_changes=_standard_forbidden_changes(state.get("target_language") or "python"),
         ),
         forbidden_changes=_standard_forbidden_changes(state.get("target_language") or "python"),
         required_changes=required_changes,
-        expected_post_repair_state=[
-            "Specification length >= 15 words and >= 50 chars",
-            "Contains structured User Stories or Acceptance Criteria",
-        ],
+        expected_post_repair_state=expected_post_repair_state,
         verification_criteria=[
             "validate_pm_phase returns verdict == 'PASS'",
         ],
@@ -650,23 +694,88 @@ def extract_oracle_tested_exception_functions(
                 pass
         for tname in failing_test_names:
             tname_lower = tname.lower()
-            found_for_test = False
             for df in defined_funcs:
-                core_op = df.replace("_matrices", "").replace("matrix_", "")
-                if core_op and core_op in tname_lower:
+                tokens = [tok for tok in re.split(r"[_\W]+", df.lower()) if tok]
+                if any(tok in tname_lower for tok in tokens if len(tok) >= 3):
                     tested_funcs.append(df)
-                    found_for_test = True
-            if not found_for_test:
-                if "addition" in tname_lower:
-                    tested_funcs.append("add_matrices")
-                if "multiplication" in tname_lower:
-                    tested_funcs.append("multiply_matrices")
 
     # Deduplicate preserving order
     seen = set()
     result: List[str] = []
     for f in tested_funcs:
         if f not in seen:
+            seen.add(f)
+            result.append(f)
+    return result
+
+
+def extract_oracle_tested_interface_functions(
+    test_files: Dict[str, str],
+    output: str,
+    code_files: Dict[str, str],
+    auth_file: str,
+    builtin_type: str = "list",
+) -> List[str]:
+    """
+    Mengekstrak secara deterministik nama fungsi target pada antarmuka berkas implementasi
+    yang mengalami kegagalan AttributeError pada tipe data bawaan (e.g. 'list').
+    Menghubungkan traceback runtime ke batas fungsi implementasi aktual untuk mengeliminasi
+    'Priority Masking Trap' (Run 5.2).
+    """
+    defined_funcs: List[str] = []
+    code = code_files.get(auth_file, "")
+    if code:
+        try:
+            tree = ast.parse(code)
+            defined_funcs = [n.name for n in tree.body if isinstance(n, ast.FunctionDef)]
+        except Exception:
+            pass
+
+    matched_funcs: List[str] = []
+    # 1. Analisis traceback: temukan fungsi defined_funcs yang dipanggil sebelum kegagalan AttributeError
+    for df in defined_funcs:
+        pattern = rf"(?:main\.{df}\b|def\s+{df}\b)[\s\S]*?E\s+AttributeError:\s*'{builtin_type}'\s+object\s+has\s+no\s+attribute"
+        if re.search(pattern, output):
+            matched_funcs.append(df)
+
+    # 2. Analisis call-site Oracle AST jika traceback tidak menemukan atau test_files tersedia
+    if not matched_funcs:
+        failing_test_names = re.findall(r"FAILED\s+[\w\/\.\\]+::(?P<tname>\w+)", output)
+        for tf_name, tf_code in test_files.items():
+            try:
+                tree = ast.parse(tf_code)
+                helpers = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+                for node in tree.body:
+                    if isinstance(node, ast.FunctionDef):
+                        if failing_test_names and node.name not in failing_test_names:
+                            continue
+                        for child in ast.walk(node):
+                            if isinstance(child, ast.Call):
+                                cname = child.func.id if isinstance(child.func, ast.Name) else getattr(child.func, "attr", "")
+                                if cname in helpers:
+                                    h_node = helpers[cname]
+                                    for h_child in ast.walk(h_node):
+                                        if isinstance(h_child, ast.Attribute) and getattr(h_child.value, "id", "") == "main":
+                                            if h_child.attr in defined_funcs or not defined_funcs:
+                                                matched_funcs.append(h_child.attr)
+                                elif hasattr(child.func, "value") and getattr(child.func.value, "id", "") == "main":
+                                    if child.func.attr in defined_funcs or not defined_funcs:
+                                        matched_funcs.append(child.func.attr)
+            except Exception:
+                pass
+
+    # 3. Fallback matching token-based dari output jika masih kosong
+    if not matched_funcs and defined_funcs:
+        for df in defined_funcs:
+            tokens = [tok for tok in re.split(r"[_\W]+", df.lower()) if tok]
+            if any(tok in output.lower() for tok in tokens if len(tok) >= 3 and tok not in ("test", "main")):
+                matched_funcs.append(df)
+
+    # Deduplikasi dengan preservasi urutan
+    seen = set()
+    result: List[str] = []
+    for f in matched_funcs:
+        if f not in seen and f not in ("main",):
             seen.add(f)
             result.append(f)
     return result
@@ -703,7 +812,7 @@ def synthesize_b5_actionable_prescriptions(
 
     if pos_arg_match and target_lang == "python":
         oracle_call_site = ""
-        called_symbol = "Matrix" if "Matrix" in models else (models[0] if models else "Model")
+        called_symbol = models[0] if models else "Model"
 
         # Ekstraksi deterministik call site aktual dari Frozen Oracle test files via AST
         for tf_name, tf_code in test_files.items():
@@ -718,7 +827,7 @@ def synthesize_b5_actionable_prescriptions(
                             val = getattr(node.func.value, "id", "")
                             cname = f"{val}.{node.func.attr}" if val else node.func.attr
 
-                        target_candidates = models if models else ["Matrix"]
+                        target_candidates = models if models else [called_symbol]
                         short_name = cname.split(".")[-1]
                         if short_name in target_candidates or any(short_name.lower() == m.lower() for m in target_candidates):
                             if len(node.args) > 0:
@@ -756,7 +865,7 @@ def synthesize_b5_actionable_prescriptions(
             ],
             repair_boundary_forbidden=[
                 "Do NOT modify Frozen Oracle test files (e.g. test_main.py)",
-                "Do NOT alter matrix calculation logic or string parsing logic unless causal to constructor invocation",
+                "Do NOT alter business logic or formatting unless causal to constructor invocation",
                 "Do NOT alter frozen contract status",
             ],
             expected_post_repair_state=f"'{called_symbol}(data)' can be instantiated positionally without raising TypeError.",
@@ -772,29 +881,69 @@ def synthesize_b5_actionable_prescriptions(
     if attr_match and not prescriptions:
         missing_attr = attr_match.group(1) or attr_match.group(3) or "attribute"
         obj_name = attr_match.group(2) or auth_file
-        rx = ActionableRepairPrescription(
-            prescription_id="RX-B5-ATTR-001",
-            evidence_ref="B5_SANDBOX_ATTRIBUTE_ERROR",
-            observed_failure=attr_match.group(0).strip(),
-            oracle_call_site=f"Invocation of '{missing_attr}' in Oracle test suite",
-            implementation_symbol=f"symbol '{missing_attr}' on {obj_name} in '{auth_file}'",
-            evidence_basis="RUNTIME_ATTRIBUTE_ERROR_TRACEBACK",
-            required_change=(
-                f"Implement or expose '{missing_attr}' on '{obj_name}' to satisfy the contract "
-                f"and Oracle test interface requirements."
-            ),
-            repair_boundary_allowed=[
-                f"Add or export '{missing_attr}' in '{auth_file}'",
-                f"Implement logic for '{missing_attr}' according to contract specification",
-            ],
-            repair_boundary_forbidden=[
-                "Do NOT modify Frozen Oracle test files",
-                "Do NOT alter frozen contract status",
-            ],
-            expected_post_repair_state=f"'{missing_attr}' is resolvable and callable without AttributeError.",
-            verification_evidence=f"Tests calling '{missing_attr}' execute without AttributeError.",
-        )
-        prescriptions.append(rx)
+        builtin_types = {"list", "dict", "tuple", "set", "int", "float", "str", "bytes", "bool", "nonetype"}
+        if obj_name.lower() in builtin_types and target_lang == "python":
+            code_files = state.get("code_files") or {}
+            target_funcs = extract_oracle_tested_interface_functions(
+                test_files=test_files,
+                output=output,
+                code_files=code_files,
+                auth_file=auth_file,
+                builtin_type=obj_name,
+            )
+            funcs_display = ", ".join(target_funcs) if target_funcs else f"Functions in '{auth_file}'"
+            oracle_calls = ", ".join([f"{f}(a, b)" for f in target_funcs]) if target_funcs else f"Direct invocation in '{auth_file}'"
+            rx = ActionableRepairPrescription(
+                prescription_id="RX-B5-FUNC-INTERFACE-001",
+                evidence_ref="B5_SANDBOX_INTERFACE_MISMATCH",
+                observed_failure=f"{attr_match.group(0).strip()} (function invoked with '{obj_name}' representation)",
+                oracle_call_site=f"Direct invocation in Oracle test suite: {oracle_calls}",
+                implementation_symbol=f"Oracle-tested functions: {funcs_display} in '{auth_file}'",
+                evidence_basis="RUNTIME_TRACEBACK + ORACLE_CALL_SITE_INTERFACE_AUDIT",
+                required_change=(
+                    f"{funcs_display} must accept the input representation actually supplied by the Oracle ({obj_name}) "
+                    f"and perform the required operations defined by the contract. Required behavioral condition: ensure that each function "
+                    f"can receive {obj_name} inputs from direct Oracle calls and produce valid results without "
+                    f"raising AttributeError on '{obj_name}'."
+                ),
+                repair_boundary_allowed=[
+                    f"Modify function signatures and input handling in {funcs_display} in '{auth_file}' to accept {obj_name} inputs",
+                    f"Ensure {funcs_display} perform required operations on the supplied input representation",
+                    f"Add or update input validation inside {funcs_display} in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify parse_matrix, CLI formatting, or unrelated domain logic unless independently evidenced as failing.",
+                    "Do NOT modify Frozen Oracle test files (e.g. test_main.py)",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"{funcs_display} accept Oracle input representation ({obj_name}) and return valid operation results without raising AttributeError.",
+                verification_evidence=f"Direct Oracle invocation of {funcs_display} executes and PASS.",
+            )
+            prescriptions.append(rx)
+        else:
+            rx = ActionableRepairPrescription(
+                prescription_id="RX-B5-ATTR-001",
+                evidence_ref="B5_SANDBOX_ATTRIBUTE_ERROR",
+                observed_failure=attr_match.group(0).strip(),
+                oracle_call_site=f"Invocation of '{missing_attr}' in Oracle test suite",
+                implementation_symbol=f"symbol '{missing_attr}' on {obj_name} in '{auth_file}'",
+                evidence_basis="RUNTIME_ATTRIBUTE_ERROR_TRACEBACK",
+                required_change=(
+                    f"Implement or expose '{missing_attr}' on '{obj_name}' to satisfy the contract "
+                    f"and Oracle test interface requirements."
+                ),
+                repair_boundary_allowed=[
+                    f"Add or export '{missing_attr}' in '{auth_file}'",
+                    f"Implement logic for '{missing_attr}' according to contract specification",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"'{missing_attr}' is resolvable and callable without AttributeError.",
+                verification_evidence=f"Tests calling '{missing_attr}' execute without AttributeError.",
+            )
+            prescriptions.append(rx)
 
     # 3. Pattern: Exception type mismatch / Incompatible Exception (cli_t1 / pytest.raises)
     # Dual evidence: Runtime traceback + AST class hierarchy audit
@@ -810,6 +959,8 @@ def synthesize_b5_actionable_prescriptions(
         r"Failed:\s*DID NOT RAISE\s*<class\s*['\"](?P<expected_exc>[\w\.]+)['\"]>",
         output
     )
+
+    has_interface_mismatch = any(p.prescription_id == "RX-B5-FUNC-INTERFACE-001" for p in prescriptions)
 
     if (exc_mismatch_match or did_not_raise_match or summary_mismatch) and target_lang == "python":
         expected_exc = "ValueError"
@@ -831,87 +982,96 @@ def synthesize_b5_actionable_prescriptions(
             actual_exc = summary_mismatch.group("actual_exc")
             error_msg = summary_mismatch.group("error_msg").strip()
 
-        # Evidence 2: Deterministic AST audit of exception class hierarchy in target code
-        code_files = state.get("code_files") or {}
-        ast_audit = inspect_ast_exception_hierarchy(
-            code_files=code_files,
-            auth_file=auth_file,
-            actual_exc_name=actual_exc,
-            expected_exc_name=expected_exc,
+        # Prioritization check (Run 5.2): Jika kegagalan disebabkan oleh interface mismatch
+        # (AttributeError/TypeError pada input bawaan), pengujian dimensi belum pernah mencapai
+        # titik evaluasi eksepsi sebenarnya. Emisi RX-B5-EXC-COMPAT-001 disupresi agar tidak memicu
+        # Priority Masking Trap sampai antarmuka input diperbaiki.
+        should_suppress_exc_compat = (
+            has_interface_mismatch and actual_exc in ("AttributeError", "TypeError") and not did_not_raise_match
         )
 
-        # Emisi resep HANYA jika terbukti tidak kompatibel secara deterministik
-        if not ast_audit.get("is_subclass_compatible", False):
-            # Ekstraksi fungsi target deterministik untuk eliminasi Function Boundary Blind Spot
-            target_funcs = extract_oracle_tested_exception_functions(
-                test_files=test_files,
-                output=output,
+        if not should_suppress_exc_compat:
+            # Evidence 2: Deterministic AST audit of exception class hierarchy in target code
+            code_files = state.get("code_files") or {}
+            ast_audit = inspect_ast_exception_hierarchy(
                 code_files=code_files,
                 auth_file=auth_file,
+                actual_exc_name=actual_exc,
+                expected_exc_name=expected_exc,
             )
 
-            if target_funcs:
-                funcs_display = ", ".join(target_funcs)
-                oracle_calls = ", ".join([f"{f}(a, b)" for f in target_funcs])
-                impl_symbol = f"Oracle-tested functions: {funcs_display} in '{auth_file}'"
-                call_site = f"Direct invocation in Oracle test suite: {oracle_calls} with incompatible dimensions"
-                req_change = (
-                    f"When matrix dimensions are incompatible, each function must raise an exception compatible with '{expected_exc}'. "
-                    f"Required behavioral condition: ensure that dimension validation is performed inside the function body of {', '.join([repr(f) for f in target_funcs])} "
-                    f"before element-wise operations (e.g. verify row and column counts conform to algebraic rules). "
-                    f"This requirement is satisfied either by: "
-                    f"(a) raising '{expected_exc}' directly inside {funcs_display}, or "
-                    f"(b) ensuring that any custom domain exception (e.g. {actual_exc}) explicitly inherits from "
-                    f"'{expected_exc}' (i.e. class {actual_exc}({expected_exc}): ...). "
-                    f"The structural design is determined by the developer, but type compatibility with "
-                    f"'{expected_exc}' and exception raising directly within {funcs_display} is mandatory."
+            # Emisi resep HANYA jika terbukti tidak kompatibel secara deterministik
+            if not ast_audit.get("is_subclass_compatible", False):
+                # Ekstraksi fungsi target deterministik untuk eliminasi Function Boundary Blind Spot
+                target_funcs = extract_oracle_tested_exception_functions(
+                    test_files=test_files,
+                    output=output,
+                    code_files=code_files,
+                    auth_file=auth_file,
                 )
-                boundary_allowed = [
-                    f"Add or update dimension compatibility validation inside {funcs_display} in '{auth_file}'",
-                    f"Raise '{expected_exc}' (or a subclass of '{expected_exc}') when dimensions are incompatible in '{auth_file}'",
-                    f"Modify exception class declaration or raise statements in '{auth_file}'",
-                ]
-                verif_evidence = f"Invoke each function directly with the Oracle's incompatible-dimension inputs and confirm pytest.raises({expected_exc})."
-            else:
-                impl_symbol = f"Exception declaration and raising logic in '{auth_file}'"
-                call_site = f"with pytest.raises({expected_exc}) at Oracle test suite"
-                req_change = (
-                    f"When invalid input or incompatible dimensions are provided, operations must raise an exception "
-                    f"compatible with '{expected_exc}'. This requirement is satisfied either by: "
-                    f"(a) raising '{expected_exc}' directly, or "
-                    f"(b) ensuring that any custom domain exception (e.g. {actual_exc}) explicitly inherits from "
-                    f"'{expected_exc}' (i.e. class {actual_exc}({expected_exc}): ...). "
-                    f"The structural design is determined by the developer, but type compatibility with "
-                    f"'{expected_exc}' is mandatory."
-                )
-                boundary_allowed = [
-                    f"Modify exception class declaration or raise statements in dimension validation logic in '{auth_file}'",
-                    f"Add or update input validation for incompatible dimensions in '{auth_file}'",
-                ]
-                verif_evidence = f"test_matrix_addition_incompatible_dimensions and test_matrix_multiplication_incompatible_dimensions execute and PASS."
 
-            rx = ActionableRepairPrescription(
-                prescription_id="RX-B5-EXC-COMPAT-001",
-                evidence_ref="DUAL_EVIDENCE_RUNTIME_AND_AST_HIERARCHY_AUDIT",
-                observed_failure=(
-                    f"Oracle test asserted with pytest.raises({expected_exc}), but function raised '{actual_exc}' "
-                    f"({error_msg}). Deterministic AST audit confirms '{actual_exc}' inherits from "
-                    f"{ast_audit.get('declared_bases', [])}, not '{expected_exc}' ({ast_audit.get('subclass_relation', '')})."
-                ),
-                oracle_call_site=call_site,
-                implementation_symbol=impl_symbol,
-                evidence_basis=f"RUNTIME_TRACEBACK + AST_HIERARCHY_AUDIT ({ast_audit.get('hierarchy_path', '')})",
-                required_change=req_change,
-                repair_boundary_allowed=boundary_allowed,
-                repair_boundary_forbidden=[
-                    "Do NOT alter matrix arithmetic algorithms or return formats for addition, subtraction, or multiplication which are already LOCKED behavioral invariants",
-                    "Do NOT alter Frozen Oracle test files (e.g. test_main.py)",
-                    "Do NOT alter frozen contract status",
-                ],
-                expected_post_repair_state=f"Operations with incompatible dimensions raise an exception caught by pytest.raises({expected_exc}).",
-                verification_evidence=verif_evidence,
-            )
-            prescriptions.append(rx)
+                if target_funcs:
+                    funcs_display = ", ".join(target_funcs)
+                    oracle_calls = ", ".join([f"{f}(a, b)" for f in target_funcs])
+                    impl_symbol = f"Oracle-tested functions: {funcs_display} in '{auth_file}'"
+                    call_site = f"Direct invocation in Oracle test suite: {oracle_calls} with incompatible dimensions"
+                    req_change = (
+                        f"When matrix dimensions are incompatible, each function must raise an exception compatible with '{expected_exc}'. "
+                        f"Required behavioral condition: ensure that input validation is performed inside the function body of {', '.join([repr(f) for f in target_funcs])} "
+                        f"before executing core operations. "
+                        f"This requirement is satisfied either by: "
+                        f"(a) raising '{expected_exc}' directly inside {funcs_display}, or "
+                        f"(b) ensuring that any custom domain exception (e.g. {actual_exc}) explicitly inherits from "
+                        f"'{expected_exc}' (i.e. class {actual_exc}({expected_exc}): ...). "
+                        f"The structural design is determined by the developer, but type compatibility with "
+                        f"'{expected_exc}' and exception raising directly within {funcs_display} is mandatory."
+                    )
+                    boundary_allowed = [
+                        f"Add or update input validation inside {funcs_display} in '{auth_file}'",
+                        f"Raise '{expected_exc}' (or a subclass of '{expected_exc}') when inputs are invalid in '{auth_file}'",
+                        f"Modify exception class declaration or raise statements in '{auth_file}'",
+                    ]
+                    verif_evidence = f"Invoke each function directly with the Oracle's invalid inputs and confirm pytest.raises({expected_exc})."
+                else:
+                    impl_symbol = f"Exception declaration and raising logic in '{auth_file}'"
+                    call_site = f"with pytest.raises({expected_exc}) at Oracle test suite"
+                    req_change = (
+                        f"When invalid input or incompatible arguments are provided, operations must raise an exception "
+                        f"compatible with '{expected_exc}'. This requirement is satisfied either by: "
+                        f"(a) raising '{expected_exc}' directly, or "
+                        f"(b) ensuring that any custom domain exception (e.g. {actual_exc}) explicitly inherits from "
+                        f"'{expected_exc}' (i.e. class {actual_exc}({expected_exc}): ...). "
+                        f"The structural design is determined by the developer, but type compatibility with "
+                        f"'{expected_exc}' is mandatory."
+                    )
+                    boundary_allowed = [
+                        f"Modify exception class declaration or raise statements in input validation logic in '{auth_file}'",
+                        f"Add or update input validation for invalid arguments in '{auth_file}'",
+                    ]
+                    verif_evidence = f"Failing test asserting pytest.raises({expected_exc}) executes and PASS."
+
+                rx = ActionableRepairPrescription(
+                    prescription_id="RX-B5-EXC-COMPAT-001",
+                    evidence_ref="DUAL_EVIDENCE_RUNTIME_AND_AST_HIERARCHY_AUDIT",
+                    observed_failure=(
+                        f"Oracle test asserted with pytest.raises({expected_exc}), but function raised '{actual_exc}' "
+                        f"({error_msg}). Deterministic AST audit confirms '{actual_exc}' inherits from "
+                        f"{ast_audit.get('declared_bases', [])}, not '{expected_exc}' ({ast_audit.get('subclass_relation', '')})."
+                    ),
+                    oracle_call_site=call_site,
+                    implementation_symbol=impl_symbol,
+                    evidence_basis=f"RUNTIME_TRACEBACK + AST_HIERARCHY_AUDIT ({ast_audit.get('hierarchy_path', '')})",
+                    required_change=req_change,
+                    repair_boundary_allowed=boundary_allowed,
+                    repair_boundary_forbidden=[
+                        "Do NOT alter core domain algorithms or return formats which are already LOCKED behavioral invariants",
+                        "Do NOT alter Frozen Oracle test files (e.g. test_main.py)",
+                        "Do NOT alter frozen contract status",
+                    ],
+                    expected_post_repair_state=f"Operations with invalid inputs raise an exception caught by pytest.raises({expected_exc}).",
+                    verification_evidence=verif_evidence,
+                )
+                prescriptions.append(rx)
 
     return prescriptions
 
@@ -1008,6 +1168,17 @@ def assemble_b5_evidence(
         auth_file=auth_file,
     )
 
+    if not has_fail:
+        causal_owner = "NONE"
+    elif state.get("causal_owner_phase"):
+        causal_owner = state.get("causal_owner_phase").upper()
+    elif test_results.get("causal_owner"):
+        causal_owner = test_results.get("causal_owner").upper()
+    elif any("contract" in v.criterion.lower() or "specification" in v.criterion.lower() for v in violations):
+        causal_owner = "ARCHITECT"
+    else:
+        causal_owner = "DEVELOPER"
+
     return ContextualEvidencePackage(
         package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "B5_EXECUTOR_ITERATION", iteration),
         timestamp=ContextualEvidencePackage.make_timestamp(),
@@ -1015,7 +1186,7 @@ def assemble_b5_evidence(
         phase="EXECUTOR",
         validator_type="ITERATION",
         verdict=verdict,
-        causal_owner="DEVELOPER" if has_fail else "NONE",
+        causal_owner=causal_owner,
         failure_summary=(
             f"Sandbox execution failed: {failed_count} test(s) failed "
             f"(exit_code={exit_code}, passed={passed_count})."

@@ -407,6 +407,43 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Pemetaan Diminishing Returns: Stagnasi terjadi konsisten pada Loop 2-3; penambahan loop 5 s/d 10 menghasilkan 0% pemulihan akibat The Semantic Deadlock Triad (State Contamination in-memory DB FastAPI, Misatribusi Diagnostik CLI, dan Mismatch Test Suite Flutter).
   - Rekomendasi Batas Optimal: Anggaran perbaikan Developer optimal untuk model 7B lokal adalah **D4**.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## RESTORASI ARSITEKTURAL: END-PHASE VALIDATION ENGINE v2.2 — 2026-09-11 20:36 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Commit Arsitektur v2.2
+- **Commit Hash:** 83ad76a (amended with hash record)
+- **Status:** TERVERIFIKASI PENUH (187 / 187 tests PASS, Zero Regression)
+- **Pesan Commit:** `feat(validation): restore and generalize 6 end-phase validation boundaries with universal two-repair policy and zero downstream leakage (v2.2)`
+- **Waktu Eksekusi:** 2026-09-11 20:36 WIB
+- **Cakupan Berkas Utama:**
+  - `backend/graph.py` [MODIFIED — 6 quality boundaries terpasang, eliminasi celah V5 -> Reviewer, helper universal counter integer]
+  - `backend/graph_phase_validated.py` [MODIFIED — sinkronisasi topologi dan rute non-leaking]
+  - `backend/contract.py` [MODIFIED — Single Consolidated Gate, eliminasi hardcoding Matrix dan target file card_metric]
+  - `backend/phase_validators.py` [MODIFIED — hardening V1 s.d. V6, target file berhirarki, multi-lang structural AST]
+  - `backend/context_assembler.py` [MODIFIED — generalisasi causal attribution, eliminasi ad-hoc matrix rules, dynamic causal owner]
+  - `backend/agents/pm.py` [MODIFIED — integrasi pm_feedback CEP Attempt #1 dan #2]
+  - `backend/tests/test_graph_topology.py` [NEW — 16 unit tests topologi dan routing boundary]
+  - `backend/tests/test_v1_pm_hardening.py` [NEW — 13 unit tests 9-dimensi V1 PM]
+  - `backend/tests/test_v2_architect_hardening.py` [NEW — 13 unit tests 9-dimensi V2 Architect]
+  - `backend/tests/test_v3_developer_hardening.py` [NEW — 13 unit tests 9-dimensi V3 Developer]
+  - `backend/tests/test_v4_test_suite_hardening.py` [NEW — 13 unit tests 9-dimensi V4 Test Suite / Oracle]
+  - `backend/tests/test_v5_executor_hardening.py` [NEW — 11 unit tests 9-dimensi V5 Executor]
+  - `backend/tests/test_v6_reviewer_hardening.py` [NEW — 9 unit tests 9-dimensi V6 Reviewer]
+  - `dokumentasi-pengembangan/decision_log.md` [MODIFIED — D-086 s.d. D-089]
+  - `dokumentasi-pengembangan/validation_log.md` [MODIFIED — Validasi resmi Tahap 1-8 v2.2]
+  - `dokumentasi-pengembangan/human_intervention.md` [MODIFIED — Intervensi No. 92-97]
+  - `dokumentasi-pengembangan/conversation_log.md` [MODIFIED — Sesi restorasi v2.2]
+  - `dokumentasi-pengembangan/commit_history.md` [MODIFIED]
+- **Invarian & Metrik Utama:**
+  - 100% Zero Downstream Leakage (tidak ada artefak FAIL yang lolos ke downstream).
+  - Universal Two-Repair Policy (`MAX_REPAIR_ATTEMPTS = 2`) teruji konsisten di seluruh 6 fase.
+  - Causal Return cascade revalidation terbukti tanpa Reviewer shortcut.
+  - Frozen Oracle baseline SHA-256 `0bd5b598...` 100% utuh dan tidak tersentuh.
+
+
 
 
 

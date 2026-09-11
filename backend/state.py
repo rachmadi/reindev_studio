@@ -38,3 +38,21 @@ class SquadState(TypedDict):
     failed_strategies: Optional[List[Dict[str, Any]]] # Strategi gagal yang pernah dicoba
     known_good_constraints: Optional[List[str]] # Constraint yang sudah terverifikasi benar dan harus dipertahankan
 
+    # Phase-End Validation & Universal Two-Repair Engine (v2.2)
+    repair_attempt_counts: Optional[Dict[str, int]]  # {"pm": 0, "architect": 0, "developer": 0, "tester": 0, "executor": 0, "reviewer": 0}
+    max_phase_repair_attempts: Optional[int]         # Batas maksimal perbaikan per fase (default: 2)
+    phase_evidence_packages: Optional[Dict[str, Any]] # Paket bukti CEP per fase
+    causal_owner_phase: Optional[str]                # Fase pemilik kausal (misal: "architect", "developer")
+    causal_owner_artifact: Optional[str]             # Nama/jenis artefak pemilik kausal
+    pm_validator_contract: Optional[Dict[str, Any]]
+    architect_validator_contract: Optional[Dict[str, Any]]
+    developer_validator_contract: Optional[Dict[str, Any]]
+    oracle_validator_contract: Optional[Dict[str, Any]]
+    test_suite_validator_contract: Optional[Dict[str, Any]]
+    executor_iteration_validator_contract: Optional[Dict[str, Any]]
+    reviewer_validator_contract: Optional[Dict[str, Any]]
+    latest_evidence_package: Optional[Dict[str, Any]]
+    previous_passed_tests: Optional[List[str]]
+    invariant_regression_history: Optional[Dict[str, Any]]
+    review_verdict: Optional[str]
+    expected_oracle_sha: Optional[str]

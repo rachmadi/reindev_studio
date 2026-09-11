@@ -40,13 +40,28 @@ def pm_agent(state: SquadState) -> dict:
         if is_dart else
         "Target Ekosistem: PYTHON (PEP 8, Type Hinting, pytest)"
     )
+
+    repair_count = (state.get("repair_attempt_counts") or {}).get("pm", 0)
+    pm_feedback = state.get("pm_feedback") or ""
+    repair_section = ""
+    if repair_count > 0 and pm_feedback:
+        repair_section = f"""
+PERINGATAN PERBAIKAN (Percobaan Perbaikan #{repair_count}):
+Spesifikasi sebelumnya ditolak oleh Phase-End Validator V1 dengan umpan balik:
+{pm_feedback}
+
+Instruksi Perbaikan Wajib:
+1. Penuhi seluruh komponen yang diminta (khususnya Ringkasan Sistem, User Stories, dan Acceptance Criteria terukur).
+2. Pertahankan kebutuhan awal pengguna tanpa membuat asumsi di luar cakupan tugas.
+3. Patuhi format luaran 1, 2, 3 secara ketat.
+"""
     
     prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
 {ecosystem_guidance}
 
 Deskripsi Tugas Pengguna:
 {user_task}
-
+{repair_section}
 Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tanpa basa-basi pembuka atau penutup."""
 
     messages = [
@@ -57,7 +72,7 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
     response = llm.invoke(messages)
     specs = response.content if hasattr(response, "content") else str(response)
 
-    # P0-2: Domain detection & DRAFT Contract generation
+    # Domain detection & DRAFT Contract generation (mission-agnostic categories)
     task_lower = user_task.lower()
     if is_dart or "widget" in task_lower:
         domain = "FLUTTER_WIDGET"
@@ -65,6 +80,8 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
         domain = "REST_API"
     elif any(k in task_lower for k in ["kalkulator", "calculator", "matriks", "matrix", "cli"]):
         domain = "CLI_TOOL"
+    elif any(k in task_lower for k in ["pipeline", "etl", "dataform", "dbt", "stream"]):
+        domain = "DATA_PIPELINE"
     else:
         domain = "ALGORITHM"
 
@@ -105,11 +122,13 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
                 "status": "DRAFT",
                 "domain": domain,
                 "target_language": target_lang,
-                "req_count": len(reqs)
+                "req_count": len(reqs),
+                "repair_attempt": repair_count,
             }
         )
 
-    new_log = f"[Product Manager]: Spesifikasi ({len(specs)} char) & DRAFT Contract ({domain}) berhasil dirumuskan."
+    repair_str = f" [Repair #{repair_count}]" if repair_count > 0 else ""
+    new_log = f"[Product Manager]{repair_str}: Spesifikasi ({len(specs)} char) & DRAFT Contract ({domain}) berhasil dirumuskan."
     current_logs = state.get("logs", [])
     
     return {

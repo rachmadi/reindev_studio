@@ -42,6 +42,7 @@ class DomainType(str, Enum):
     FLUTTER_WIDGET = "FLUTTER_WIDGET"
     CLI_TOOL = "CLI_TOOL"
     ALGORITHM = "ALGORITHM"
+    DATA_PIPELINE = "DATA_PIPELINE"
 
 
 class TargetLanguage(str, Enum):
@@ -198,7 +199,7 @@ class TaskIntent(BaseModel):
     @field_validator("domain")
     @classmethod
     def validate_domain(cls, v: str) -> str:
-        valid_domains = {"REST_API", "FLUTTER_WIDGET", "CLI_TOOL", "ALGORITHM"}
+        valid_domains = {d.value for d in DomainType}
         if v not in valid_domains:
             raise ValueError(f"Domain must be one of {valid_domains}, got '{v}'")
         return v
@@ -509,9 +510,8 @@ def check_oracle_interface_consistency(
         for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
             if sym not in ("app", "main"):
                 tested_symbols.add(sym)
-        if "Matrix" in content or "Matrix" in tested_symbols:
-            for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
-                tested_symbols.add(dunder)
+        for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
+            tested_symbols.add(dunder)
 
         if tested_symbols and contract_symbols:
             common = contract_symbols.intersection(tested_symbols)
@@ -824,23 +824,27 @@ def seal_and_freeze_contract(
     target_lang = c_dict.get("target_ecosystem", {}).get("language", "")
     is_dart = "dart" in target_lang.lower() or domain == "FLUTTER_WIDGET"
 
-    if is_dart:
-        # Contract Gate menetapkan secara eksplisit: target_file = lib/card_metric.dart
-        # Nama file yang diberikan Architect tidak boleh mengoverride target file authoritative.
-        c_dict["target_file"] = "lib/card_metric.dart"
-        for iface in c_dict.get("interface_contracts", []):
-            if isinstance(iface, dict):
-                iface["target_file"] = "lib/card_metric.dart"
-        for m in c_dict.get("data_models", []):
-            if isinstance(m, dict):
-                m["target_file"] = "lib/card_metric.dart"
-    elif not c_dict.get("target_file"):
+    if not c_dict.get("target_file"):
         for iface in c_dict.get("interface_contracts", []):
             if isinstance(iface, dict) and iface.get("target_file"):
                 c_dict["target_file"] = iface["target_file"]
                 break
         if not c_dict.get("target_file"):
-            c_dict["target_file"] = c_dict.get("target_ecosystem", {}).get("entrypoint", "main.py")
+            for m in c_dict.get("data_models", []):
+                if isinstance(m, dict) and m.get("target_file"):
+                    c_dict["target_file"] = m["target_file"]
+                    break
+        if not c_dict.get("target_file"):
+            default_ep = "lib/main.dart" if is_dart else "main.py"
+            c_dict["target_file"] = c_dict.get("target_ecosystem", {}).get("entrypoint", default_ep)
+
+    auth_tf = c_dict["target_file"]
+    for iface in c_dict.get("interface_contracts", []):
+        if isinstance(iface, dict) and not iface.get("target_file"):
+            iface["target_file"] = auth_tf
+    for m in c_dict.get("data_models", []):
+        if isinstance(m, dict) and not m.get("target_file"):
+            m["target_file"] = auth_tf
 
     # Validasi 4 Pilar
     is_valid, errors, warnings = validate_contract_gate(
