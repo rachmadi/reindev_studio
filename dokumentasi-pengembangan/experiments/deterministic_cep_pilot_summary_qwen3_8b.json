@@ -1,0 +1,42 @@
+{
+  "experiment": "phase_end_validation_pilot",
+  "date": "2026-09-11T13:24:41.855435",
+  "total_runs_planned": 3,
+  "runs_completed": 1,
+  "status": "PAUSED_AT_RUN_2",
+  "pass_count": 0,
+  "convergent_within_3_loops_count": 0,
+  "aggregate_otrr": 0.0,
+  "aggregate_otrr_percent": 0.0,
+  "runs": [
+    {
+      "run_id": "pv_pilot_cli_t1_rep1_20260911_112424",
+      "task_id": "cli_t1",
+      "target_language": "python",
+      "model": "qwen3:8b",
+      "final_verdict": "FAIL",
+      "review_verdict": "NEEDS_REVISION",
+      "loops_consumed": 10,
+      "converged_within_3_loops": false,
+      "tests_passed": 0,
+      "tests_failed": 5,
+      "tests_total": 5,
+      "contract_status": "FROZEN",
+      "trajectory": "stagnant",
+      "failure_classification": "A. Developer Failure",
+      "duration_sec": 7217.17,
+      "oracle_sha256": "0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124",
+      "oracle_sha_intact": true,
+      "tester_agent_invocations": 0,
+      "otrr": 0.0,
+      "otrr_percent": 0.0,
+      "otrr_details": {
+        "otrr": 0.0,
+        "otrr_percent": 0.0,
+        "total_failures_with_repair": 0,
+        "first_turn_successes": 0,
+        "repair_records": []
+      }
+    }
+  ]
+}

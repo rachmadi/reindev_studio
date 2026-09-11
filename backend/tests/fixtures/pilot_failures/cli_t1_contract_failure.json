@@ -1,0 +1,134 @@
+{
+  "package_id": "EV-CLI-T1-B2-REP1",
+  "timestamp": "2026-09-10T10:42:35Z",
+  "validator": "B2_ARCHITECT_PHASE_END",
+  "phase": "ARCHITECT",
+  "validator_type": "PHASE_END",
+  "verdict": "FAIL",
+  "causal_owner": "ARCHITECT",
+  "failure_summary": "Kontrak ditolak oleh Contract Gate P0-2.1: duplikasi model data MatrixOperation dan interface spekulatif yang tidak ada dalam Frozen Oracle.",
+  "root_causes": [
+    "Pilar 2 (Referential Integrity) Violation: Duplicate model_name 'MatrixOperation' appears 2 times in data_models.",
+    "Pilar 4 (Authority & Consistency) Violation: Speculative interfaces ['test_add', 'from_list', 'validate'] not found in authoritative specification or Frozen Oracle."
+  ],
+  "violations": [
+    {
+      "violation_id": "VIO-001",
+      "criterion": "referential_integrity",
+      "severity": "CRITICAL",
+      "location": "contract:data_models",
+      "observed_symbol": "MatrixOperation",
+      "observed_state": "Model 'MatrixOperation' appears 2 times in data_models list",
+      "expected_state": "Each model_name must be strictly unique within data_models",
+      "source_detector": "CONTRACT_GATE_PILAR_2"
+    },
+    {
+      "violation_id": "VIO-002",
+      "criterion": "authoritative_interface_conformance",
+      "severity": "CRITICAL",
+      "location": "contract:interface_contracts",
+      "observed_symbol": "test_add, from_list, validate",
+      "observed_state": "Contract defines speculative interfaces ['test_add', 'from_list', 'validate'] not present in task specification or Frozen Oracle",
+      "expected_state": "Interface contracts must exactly match authoritative functions from Frozen Oracle: ['parse_matrix', 'add_matrices', 'subtract_matrices', 'multiply_matrices', 'format_matrix', 'main']",
+      "source_detector": "CONTRACT_GATE_PILAR_4"
+    }
+  ],
+  "violation_dependencies": [],
+  "authoritative_context": {
+    "authoritative_target_file": "main.py",
+    "authoritative_functions": ["parse_matrix", "add_matrices", "subtract_matrices", "multiply_matrices", "format_matrix", "main"],
+    "cli_invocation_pattern": "python main.py [matrix_a] [op] [matrix_b]",
+    "required_models": ["Matrix"],
+    "contract_status": "REJECTED"
+  },
+  "active_constraints": {
+    "target_language": "python",
+    "max_files": 1,
+    "contract_revisions_used": 5,
+    "contract_revisions_max": 5
+  },
+  "preserved_invariants": [
+    {
+      "invariant_id": "INV-ORACLE",
+      "category": "ORACLE_INTEGRITY",
+      "description": "Frozen Oracle SHA-256 is 100% intact",
+      "evidence_value": "0bd5b598afa7ae4c...",
+      "status": "VERIFIED_TRUE"
+    },
+    {
+      "invariant_id": "INV-BP-AST",
+      "category": "AST_STRUCTURE",
+      "description": "Blueprint AST parsed cleanly with 0 syntax errors",
+      "evidence_value": "0 errors",
+      "status": "VERIFIED_TRUE"
+    }
+  ],
+  "repair_boundary": {
+    "allowed_changes": [
+      "Remove duplicate MatrixOperation model so data_models has unique entries only",
+      "Replace speculative interfaces with exact authoritative function names from Frozen Oracle: parse_matrix, add_matrices, subtract_matrices, multiply_matrices, format_matrix, main"
+    ],
+    "forbidden_changes": [
+      "Modify Frozen Oracle (test files)",
+      "Unfreeze or amend FROZEN contract",
+      "Invent speculative public interfaces not in contract",
+      "Rename authoritative interface names (parse_matrix, add_matrices, etc.)",
+      "Add CLI flags not defined in authoritative specification",
+      "Modify already-proven passing tests"
+    ]
+  },
+  "forbidden_changes": [
+    "Modify Frozen Oracle (test files)",
+    "Unfreeze or amend FROZEN contract",
+    "Invent speculative public interfaces not in contract",
+    "Rename authoritative interface names"
+  ],
+  "required_changes": [
+    {
+      "change_id": "REQ-001",
+      "target": "contract:data_models",
+      "violation_ref": "VIO-001",
+      "deterministic_requirement": "Remove the duplicate 'MatrixOperation' entry so data_models contains only unique model_name values",
+      "preserve_refs": ["INV-ORACLE"],
+      "forbidden_refs": ["Modify Frozen Oracle"]
+    },
+    {
+      "change_id": "REQ-002",
+      "target": "contract:interface_contracts",
+      "violation_ref": "VIO-002",
+      "deterministic_requirement": "Define interface_contracts for exactly these authoritative functions from the Frozen Oracle: parse_matrix, add_matrices, subtract_matrices, multiply_matrices, format_matrix, main — with correct signatures",
+      "preserve_refs": ["INV-ORACLE"],
+      "forbidden_refs": ["Invent speculative interfaces", "Rename authoritative interface names"]
+    }
+  ],
+  "expected_post_repair_state": [
+    "No duplicate model names in data_models",
+    "interface_contracts matches authoritative specification exactly (parse_matrix, add_matrices, subtract_matrices, multiply_matrices, format_matrix, main)",
+    "Contract Gate P0-2.1 Pilar 4 passes (no speculative interfaces)",
+    "Contract status transitions to FROZEN with SHA-256 seal",
+    "Frozen Oracle SHA-256 preserved intact"
+  ],
+  "verification_criteria": [
+    "validate_contract_gate returns (True, [], [])",
+    "contract_status == 'FROZEN'",
+    "B2 verdict == 'PASS'"
+  ],
+  "source_of_truth": "FROZEN_ORACLE_SHA256:0bd5b598",
+  "evidence": [
+    {
+      "item": "contract_gate_errors",
+      "evidence_class": "DETERMINISTIC",
+      "observed": 2,
+      "expected": 0,
+      "status": "INVALID"
+    },
+    {
+      "item": "contract_status_and_seal",
+      "evidence_class": "DETERMINISTIC",
+      "observed": {"status": "REJECTED", "sha256": "None"},
+      "expected": {"status": "FROZEN", "sha256": "64-hex-chars"},
+      "status": "INVALID"
+    }
+  ],
+  "remaining_budget": 0
+}

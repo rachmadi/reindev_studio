@@ -1,0 +1,129 @@
+{
+  "package_id": "EV-FLUTTER-T1-B5-REP1",
+  "timestamp": "2026-09-10T10:50:28Z",
+  "validator": "B5_EXECUTOR_ITERATION",
+  "phase": "EXECUTOR",
+  "validator_type": "ITERATION",
+  "verdict": "FAIL",
+  "causal_owner": "DEVELOPER",
+  "failure_summary": "flutter test fails: Widget constructor 'CardMetric' does not accept parameter 'data' required by Frozen Oracle call site.",
+  "root_causes": [
+    "Constructor signature mismatch: Frozen Oracle invokes 'CardMetric(data: CardMetricData(...))' but Developer declared 'const CardMetric({super.key})' without 'data' named parameter — causing compiler error 'The named parameter data isn't defined'."
+  ],
+  "violations": [
+    {
+      "violation_id": "VIO-001",
+      "criterion": "authoritative_call_site_conformance",
+      "severity": "CRITICAL",
+      "location": "lib/card_metric.dart:CardMetric_constructor",
+      "observed_symbol": "CardMetric({super.key})",
+      "observed_state": "Constructor 'CardMetric' declared without 'data' named parameter — compiler rejects Oracle call: CardMetric(data: CardMetricData(...))",
+      "expected_state": "Constructor must accept named parameter: 'const CardMetric({super.key, this.data})' with field 'final CardMetricData? data' on class CardMetric",
+      "source_detector": "SANDBOX_RUNNER:flutter_test"
+    }
+  ],
+  "violation_dependencies": [],
+  "authoritative_context": {
+    "authoritative_target_file": "lib/card_metric.dart",
+    "oracle_call_site": "await tester.pumpWidget(ProviderScope(child: MaterialApp(home: Scaffold(body: CardMetric(data: CardMetricData(title: 'CPU', value: 80, unit: '%'))))));",
+    "required_models": ["CardMetricData"],
+    "required_widgets": ["CardMetric"],
+    "contract_status": "FROZEN",
+    "contract_sha256": "6471d863056679fb..."
+  },
+  "active_constraints": {
+    "target_language": "dart",
+    "max_files": 1,
+    "framework": "Flutter / Riverpod (Sound Null Safety)",
+    "forbidden_classes": ["StateNotifier", "ChangeNotifier", "StateProvider"],
+    "iteration": 1,
+    "max_iterations": 10
+  },
+  "preserved_invariants": [
+    {
+      "invariant_id": "INV-ORACLE",
+      "category": "ORACLE_INTEGRITY",
+      "description": "Frozen Oracle SHA-256 is 100% intact",
+      "evidence_value": "4589e15cfb8f37ba...",
+      "status": "VERIFIED_TRUE"
+    },
+    {
+      "invariant_id": "INV-CONTRACT",
+      "category": "CONTRACT_STATUS",
+      "description": "Contract is FROZEN with SHA-256 seal",
+      "evidence_value": "6471d863056679fb...",
+      "status": "VERIFIED_TRUE"
+    },
+    {
+      "invariant_id": "INV-BP-AST",
+      "category": "AST_STRUCTURE",
+      "description": "Dart structural delimiters balance check passed (0 errors)",
+      "evidence_value": "0 delimiter errors",
+      "status": "VERIFIED_TRUE"
+    }
+  ],
+  "repair_boundary": {
+    "allowed_changes": [
+      "Add 'final CardMetricData? data;' field to class CardMetric",
+      "Change constructor to: 'const CardMetric({super.key, this.data});'",
+      "Ensure CardMetricData class has fields: title (String), value (double), unit (String) with defaults",
+      "Use Provider<CardMetricData> from Riverpod for state (not StateNotifier)"
+    ],
+    "forbidden_changes": [
+      "Modify Frozen Oracle (test files)",
+      "Unfreeze or amend FROZEN contract",
+      "Rename class CardMetric or CardMetricData",
+      "Create external files outside lib/card_metric.dart",
+      "Use deprecated StateNotifier, ChangeNotifier, or StateProvider",
+      "Remove or rename the 'data' parameter"
+    ]
+  },
+  "forbidden_changes": [
+    "Modify Frozen Oracle (test files)",
+    "Unfreeze or amend FROZEN contract",
+    "Rename CardMetric or CardMetricData",
+    "Use StateNotifier or ChangeNotifier",
+    "Create files outside lib/"
+  ],
+  "required_changes": [
+    {
+      "change_id": "REQ-001",
+      "target": "lib/card_metric.dart",
+      "violation_ref": "VIO-001",
+      "deterministic_requirement": "Modify class CardMetric to: (1) add field 'final CardMetricData? data;', (2) change constructor to 'const CardMetric({super.key, this.data});'. This must match Oracle call site: CardMetric(data: CardMetricData(title: 'CPU', value: 80, unit: '%'))",
+      "preserve_refs": ["INV-ORACLE", "INV-CONTRACT", "INV-BP-AST"],
+      "forbidden_refs": ["Modify Frozen Oracle", "Unfreeze contract", "Rename CardMetric"]
+    }
+  ],
+  "expected_post_repair_state": [
+    "CardMetric constructor accepts 'data:' named parameter without compilation error",
+    "flutter test compiles cleanly",
+    "1/1 test passes (exit_code == 0, failed_count == 0)",
+    "Zero regressions against previously-passing tests",
+    "INV-ORACLE, INV-CONTRACT, INV-BP-AST all remain verified"
+  ],
+  "verification_criteria": [
+    "flutter test exit_code == 0",
+    "test_results['passed_count'] == 1",
+    "test_results['failed_count'] == 0",
+    "B5 verdict == 'PASS'"
+  ],
+  "source_of_truth": "SANDBOX_RUNNER:flutter_test",
+  "evidence": [
+    {
+      "item": "sandbox_execution_result",
+      "evidence_class": "DETERMINISTIC",
+      "observed": {"passed": false, "exit_code": 1, "failed_count": 1, "passed_count": 0},
+      "expected": {"passed": true, "exit_code": 0, "failed_count": 0},
+      "status": "INVALID"
+    },
+    {
+      "item": "compiler_error",
+      "evidence_class": "DETERMINISTIC",
+      "observed": "The named parameter 'data' isn't defined. (documentation) Try correcting the name to an existing named parameter's name, or defining a named parameter with the name 'data'.",
+      "expected": "Clean compilation with 0 errors",
+      "status": "INVALID"
+    }
+  ],
+  "remaining_budget": 9
+}

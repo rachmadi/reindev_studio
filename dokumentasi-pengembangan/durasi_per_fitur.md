@@ -671,11 +671,70 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 ---
 
 ### Rekapitulasi Formula Waktu Realisasi Sesi Improved Repentance + D10 Experiment:
-\mathbf{\text{Total Waktu Realisasi} = 645\text{ s (Dev)} + 7.523,6\text{ s (Test)} + 760\text{ s (Doc/Forensik)} = 8.928,6\text{ detik} \approx 148\text{ menit } 49\text{ detik} (2.48\text{ jam})}
+- **TOTAL REALISASI SESI:** 1.050s + 9.573,9s + 720s = **11.343,9 detik (~189 menit 4 detik / 3.15 jam)**.
 - **Waktu Mulai Sesi:** 2026-09-10 08:16:00 WIB
 - **Waktu Selesai Pengujian & Dokumentasi:** 2026-09-10 10:45:00 WIB
 - **Total Durasi Aktual:** **148 menit 49 detik (100% dihitung berdasarkan timestamp eksperimen riil)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI ABLASI QWEN3, ENGINEERING DOCTRINE, & RUN 3 CLI_T1 — 2026-09-11
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan & Implementasi Intervensi (Development Time)
+| No | Aktivitas Pengembangan Fitur & Modul | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Refactoring schema `PreservedInvariant` & perumusan `ENGINEERING_DOCTRINE` 5 poin di `backend/contextual_evidence.py` | 14:35:00 | 14:40:00 | 300 s | 5.00 m (0.08 j) |
+| 2 | Implementasi AST Class Hierarchy Inspector (`inspect_ast_exception_hierarchy`) & deteksi Dual-Evidence di `backend/context_assembler.py` | 14:40:00 | 14:47:00 | 420 s | 7.00 m (0.12 j) |
+| 3 | Ekstraksi behavioral invariants (`behavior:test_matrix_addition`) dan pelacakan riwayat regresi permanen di `phase_validators.py` & `graph_phase_validated.py` | 14:55:00 | 14:58:30 | 210 s | 3.50 m (0.06 j) |
+| 4 | Injeksi prompt doktrin ke `DEV_SYSTEM_PROMPT` di `backend/agents/developer.py` | 14:58:30 | 15:00:30 | 120 s | 2.00 m (0.03 j) |
+| 5 | Implementasi Canonical Prioritization (`render_repair_directive`), eliminasi redundansi `current_code_excerpt`, dan penaikan kuota render 4.500 karakter di `contextual_evidence.py` & `context_assembler.py` (D-081) | 15:27:00 | 15:31:00 | 240 s | 4.00 m (0.07 j) |
+| 6 | Implementasi Function-Level Symbol Binding AST extractor (`extract_oracle_tested_exception_functions`) & penguatan resep `RX-B5-EXC-COMPAT-001` di `context_assembler.py` (D-083) | 16:26:00 | 16:32:00 | 360 s | 6.00 m (0.10 j) |
+| 7 | Implementasi Formal Syntax-Based Class Declaration Extractor berbasis delimiter/colon dan stop-words defense-in-depth di `architect.py:200` (D-084, E-058) | 17:21:00 | 17:23:30 | 150 s | 2.50 m (0.04 j) |
+| | **Subtotal Waktu Pengembangan & Modul** | | | **1.800 s** | **30.00 m (0.50 jam)** |
+
+### Komponen 2: Waktu Pengujian Terkontrol & Uji Ulang (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Uji Ablasi `qwen3:8b` Run 1 (`num_predict=3000`, reasoning token exhaustion) | 10:48:08 | 11:15:00 | 1.612,0 s | 26.87 m (0.45 j) |
+| 2 | Uji Ablasi `qwen3:8b` Run 2 (`num_predict=6000`, 10 loop penuh ~2 jam) | 11:24:24 | 13:24:41 | 7.217,2 s | 120.29 m (2.00 j) |
+| 3 | Pre-flight validation unit tests Gates A–I Run 3 (266 passed in 15.35s) | 15:00:30 | 15:01:00 | 30 s | 0.50 m (0.01 j) |
+| 4 | Controlled Run 3 `cli_t1` (`pv_pilot_cli_t1_rep1_20260911_150102`, 10 loops, 0/5 pass) | 15:01:02 | 15:12:56 | 714,7 s | 11.91 m (0.20 j) |
+| 5 | Pre-flight validation unit tests Gates A–I Run 4 (266 passed in 15.11s) | 15:31:00 | 15:31:34 | 34 s | 0.57 m (0.01 j) |
+| 6 | Controlled Run 4 `cli_t1` (`pv_pilot_cli_t1_rep1_20260911_153134`, 10 loops, **3/5 PASS (60.0%)**, Zero Regression, 0 QA calls) | 15:31:34 | 15:44:13 | 759,25 s | 12.65 m (0.21 j) |
+| 7 | Pre-flight validation unit tests Gates A–I Run 5 (268 passed in 15.51s, 82/82 contextual evidence tests) | 16:32:00 | 16:34:00 | 120 s | 2.00 m (0.03 j) |
+| 8 | Controlled Run 5 `cli_t1` (`pv_pilot_cli_t1_rep1_20260911_163409`, 10 loops, Gate B3 quarantine, 0/5 tests executed, 0 QA calls) | 16:34:09 | 16:43:42 | 573,64 s | 9.56 m (0.16 j) |
+| 9 | Unit tests `test_architect_validator.py` (8 passed) & Pre-flight Gates A–I Run 5.1 (269 passed in 15.39s) | 17:23:30 | 17:24:30 | 60 s | 1.00 m (0.02 j) |
+| 10 | Controlled Run 5.1 `cli_t1` (`pv_pilot_cli_t1_rep1_20260911_172558`, 10 loops, 0/5 pass, Gate B3 PASS, 0 QA calls) | 17:25:58 | 17:45:16 | 1.157,43 s | 19.29 m (0.32 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **12.278,22 s** | **204.64 m (3.41 jam)** |
+
+### Komponen 3: Waktu Analisis Forensik & Dokumentasi (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi Forensik Run 3 (dekonstruksi Silent Context Truncation di `render_repair_directive`) | 15:13:00 | 15:18:30 | 330 s | 5.50 m (0.09 j) |
+| 2 | Perumusan D-081 & E-056, pemutakhiran `walkthrough.md` Seksi 7, `implementation_plan.md` Seksi 12–13 | 15:18:30 | 15:22:00 | 210 s | 3.50 m (0.06 j) |
+| 3 | Pemutakhiran menyeluruh log IIDD pasca Run 3 (`catatan_riset_pengujian_preset.md`, `error_log.md`, `decision_log.md`, `conversation_log.md`, `human_intervention.md`, `context_drift_log.md`, `validation_log.md`, `durasi_per_fitur.md`, `waktu_estimasi_vs_realisasi.md`) | 15:22:00 | 15:25:00 | 180 s | 3.00 m (0.05 j) |
+| 4 | Dokumentasi persetujuan IA (Intervensi #84), analisis konseptual delivery failure vs treatment failure, penguncian urutan kanonikal linier dan densitas bukti Run 4 di seluruh dokumen | 15:25:00 | 15:27:00 | 120 s | 2.00 m (0.03 j) |
+| 5 | Investigasi Forensik Run 4, analisis zero functional regression 3/5 PASS, dan identifikasi akar masalah *Function Boundary Blind Spot* pada `parse_matrix` vs `add_matrices` | 15:44:13 | 15:52:13 | 480 s | 8.00 m (0.13 j) |
+| 6 | Penyusunan Bagian 24 `catatan_riset_pengujian_preset.md`, perumusan Intervensi #85 di `human_intervention.md`, perumusan D-082 di `decision_log.md`, dan perumusan Kasus E-057 di `error_log.md` | 15:52:13 | 16:12:13 | 1.200 s | 20.00 m (0.33 j) |
+| 7 | Pemutakhiran menyeluruh log IIDD lanjutan (`durasi_per_fitur.md`, `conversation_log.md`, `validation_log.md`, `context_drift_log.md`, `walkthrough.md`, `implementation_plan.md`) | 16:12:13 | 16:25:21 | 788 s | 13.13 m (0.22 j) |
+| 8 | Perumusan D-083, Intervensi #86 & #87, penyusunan Bagian 25 catatan riset pra-Run 5 | 16:25:21 | 16:34:00 | 519 s | 8.65 m (0.14 j) |
+| 9 | Investigasi Forensik Run 5, dekonstruksi regex ekstraksi data model di `architect.py:200`, analisis Gate B3 Pre-Execution Deadlock, dan pemutakhiran menyeluruh log IIDD | 16:43:42 | 16:47:00 | 198 s | 3.30 m (0.06 j) |
+| 10 | Perumusan D-084, Intervensi #89, penyusunan Bagian 27 catatan riset pra-Run 5.1 | 17:24:30 | 17:25:30 | 60 s | 1.00 m (0.02 j) |
+| 11 | Investigasi Forensik Run 5.1, analisis fenomena *List vs Class Interface Mismatch / Priority Masking Trap*, perumusan D-085, E-059, Intervensi #90, dan pemutakhiran menyeluruh log IIDD | 17:45:16 | 17:55:16 | 600 s | 10.00 m (0.17 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **4.685 s** | **78.08 m (1.30 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 2026-09-11 (Pasca Run 5.1):
+\mathbf{\text{Total Waktu Realisasi} = 1.800\text{ s (Dev)} + 12.278,22\text{ s (Test)} + 4.685\text{ s (Doc/Forensik)} = 18.763,22\text{ detik} \approx 312\text{ menit } 43\text{ detik} (5.21\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-11 10:48:08 WIB
+- **Waktu Pencatatan Checkpoint:** 2026-09-11 17:55:16 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
 
 
 

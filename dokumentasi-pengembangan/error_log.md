@@ -722,8 +722,77 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Improved Repentance + D10):
-- **Diselesaikan Mandiri oleh Agen:** 22 kasus
+### Kasus E-056: Silent Context Truncation pada Repair Directive Contextual Evidence Package (Run 3 cli_t1)
+- **Waktu:** 2026-09-11 ~15:01 s.d. 15:18 WIB
+- **Tingkat Keparahan:** High (Cognitive Starvation / Feedback Blind Spot)
+- **Gejala:** Developer model (`qwen2.5-coder:7b`) pada Run 3 `cli_t1` mengalami kegagalan 0/5 PASS terus-menerus di sepanjang Loop 1 hingga Loop 10 dengan error `TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given`, tanpa pernah memodifikasi konstruktor kelas `Matrix` untuk mendukung argumen posisional `Matrix(data)`.
+- **Akar Masalah:** Detektor B5 Contextual Evidence berhasil mendiagnosis kegagalan dan menerbitkan 2 resep deterministik: `RX-B5-POS-ARG-001` (kewajiban mendukung positional instantiation `Matrix(data)`) dan `RX-B5-EXC-COMPAT-001` (kewajiban exception compatibility dengan `ValueError`). Namun, fungsi perender Markdown `render_repair_directive` membatasi panjang teks pada `_MAX_RENDER_CHARS = 2550`. Karena bagian awal (Fakta, Root Cause, Violations, Active Constraints, Authoritative Context yang menyertakan cuplikan kode lengkap, dan Preserved Invariants) telah mengonsumsi seluruh kuota karakter, teks directive terpotong (*truncated*) tepat di akhir Bagian 5. Akibatnya, Bagian 7 (`ACTIONABLE REPAIR PRESCRIPTIONS`) dan `ENGINEERING DOCTRINE` **100% terpotong habis** sebelum sampai ke prompt Developer. Developer mengalami *feedback blind spot* dan hanya membaca pesan error generik fallback, sehingga mengulang kode yang sama selama 10 loop berturut-turut.
+- **Tindakan Korektif (Disetujui IA 15:25 WIB):**
+  1. Menata ulang urutan seksi pada `render_repair_directive` mengikuti urutan kanonikal linier penentu tindakan: `failure → causal evidence → prescription → invariant → doctrine → verification` sebelum informasi sekunder (runtime constraints & boundaries), memastikan informasi deterministik paling krusial selalu diproses terlebih dahulu.
+  2. Menghilangkan duplikasi cuplikan kode `current_code_excerpt` di dalam `authoritative_context` berdasarkan prinsip *Evidence Density* guna menghemat ruang konteks.
+  3. Menaikkan kuota render `_MAX_RENDER_CHARS` dari 2.550 ke 4.500 karakter sebagai parameter engineering yang terukur dan rasional untuk `num_ctx=8192`.
+- **Sumber Solusi:** AGEN (Analisis Forensik Telemetri Run 3) & INTENT ARCHITECT (Persetujuan Metodologis).
+- **Status:** Resolved in Run 4 (Delivery Mechanism Succeeded).
+
+---
+
+### Kasus E-057: Function Boundary Blind Spot & Module-Level Validation Misattribution pada Exception Testing (Run 4 cli_t1)
+- **Waktu:** 2026-09-11 ~15:31 s.d. 15:44 WIB
+- **Tingkat Keparahan:** Medium (Semantic Local Deadlock)
+- **Gejala:** Developer model (`qwen2.5-coder:7b`) pada Run 4 `cli_t1` berhasil meraih 3/5 PASS di seluruh Loop 0 hingga Loop 9 dengan 0 regresi, namun tertahan pada 2 uji dimensi (`test_matrix_addition_incompatible_dimensions` dan `test_matrix_multiplication_incompatible_dimensions`) dengan pesan `DID NOT RAISE ValueError`.
+- **Akar Masalah:** Detektor B5 Contextual Evidence berhasil mendiagnosis ketiadaan `ValueError` dan menerbitkan resep `RX-B5-EXC-COMPAT-001`. Model Developer mematuhi resep ini dan menuliskan `raise ValueError("Invalid dimensions")` secara eksplisit, tetapi menempatkannya secara eksklusif di dalam fungsi parser string CLI `parse_matrix()`. Di sisi lain, Frozen Oracle memanggil langsung fungsi aljabar `add_matrices(a, b)` dan `multiply_matrices(a, b)` dengan matriks incompatible dimensions. Karena fungsi operasi matematika tersebut menggunakan `zip()` Python langsung tanpa penjaga dimensi awal (`len(matrix1) != len(matrix2)`), eksekusi memotong pasangan dimensi berlebih tanpa melempar exception. Resep B5 mencantumkan `implementation_symbol: "Exception declaration and raising logic in 'main.py'"` secara generik di tingkat modul, sehingga Developer mengira penambahan `ValueError` pada `parse_matrix` sudah memenuhi kewajiban resep.
+- **Tindakan Korektif:**
+  1. Memperkaya sintesis resep deterministik B5 agar mendeteksi nama fungsi spesifik yang dipanggil oleh test runner pada call site (`oracle_call_site`) dan mengikatnya ke `implementation_symbol` (misal: `add_matrices`, `multiply_matrices`), bukan hanya simbol generik tingkat berkas.
+  2. Menyertakan klausa preskriptif bahwa validasi dimensi wajib disematkan pada tubuh fungsi operasi itu sendiri sebelum komputasi pasangan `zip()`.
+- **Sumber Solusi:** AGEN (Analisis Forensik Telemetri Run 4).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-058: Natural Language Specification Ingestion & Permissive Class Regex Misattribution (Run 5 cli_t1)
+- **Waktu:** 2026-09-11 ~16:34 s.d. 16:47 WIB
+- **Tingkat Keparahan:** High (Contract Extraction Confounder / Static Quarantine Deadlock)
+- **Gejala:** Seluruh 10 loop pada Controlled Run 5 `cli_t1` gagal total (verdict FAIL, 0/5 tests executed) karena ditolak sebelum eksekusi sandbox oleh Gate B3 (`B3_DEVELOPER_PRE_EXECUTION`) dengan pelanggaran: `contract_symbols_conformance`: `Data Models mandatory kontrak tidak dideklarasikan: ['dengan']`.
+- **Akar Masalah:**
+  1. Pada fase Architect, LLM menghasilkan rencana arsitektur dalam bahasa Indonesia yang memuat kalimat penjelas:
+     `- \`Matrix\` class dengan metode \`__add__\` dan \`__sub__\`.`
+  2. Fungsi pembangun kontrak default di `backend/agents/architect.py:200` menggunakan regex ekstraksi kelas yang terlalu permisif:
+     `class_matches = re.findall(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", arch_plan)`
+     Regex ini mencocokkan kata `"class "` yang diikuti kata sambung bahasa Indonesia `"dengan"`, mengekstrak `"dengan"` sebagai Data Model wajib, dan menyegelnya ke dalam kontrak FROZEN (`required_models: ['Matrix', 'dengan']`).
+  3. Developer menulis kode kalkulator matriks yang valid dengan `class Matrix:`, tetapi secara semantik wajar tidak menulis `class dengan:`.
+  4. Gate B3 secara deterministik menolak kode tersebut dan mengarantina eksekusi sandbox. Akibatnya, treatment perbaikan B5 (*Function-Targeted Prescription*) tidak pernah tercapai karena kode tidak pernah dieksekusi di runner pytest.
+- **Tindakan Korektif:**
+  1. Memperketat regex ekstraksi kelas pada `backend/agents/architect.py` agar hanya mencocokkan deklarasi kelas Python yang valid secara sintaksis: `r"class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*\(.*?\))?\s*:"`.
+  2. Menambahkan daftar stop-words Python/linguistik (misal: `dengan`, `and`, `or`, `for`, `in`, `is`, `as`, `the`, `of`, `to`) untuk mencegah false-positive pada teks natural language.
+- **Sumber Solusi:** AGEN (Analisis Forensik Telemetri Run 5).
+- **Status:** Tuntas (Resolved pada Run 5.1).
+
+---
+
+### Kasus E-059: List vs Class Interface Mismatch & Priority Masking Trap (Run 5.1 cli_t1)
+- **Waktu:** 2026-09-11 ~17:25 s.d. 17:55 WIB
+- **Tingkat Keparahan:** High (Priority Masking / Semantic Repair Stagnation)
+- **Gejala:** Pada Controlled Run 5.1 `cli_t1`, gerbang B3 berhasil dilalui pada Loop 0, namun seluruh 10 loop menghasilkan 0/5 PASS (0.0%). Seluruh 5 pengujian gagal seketika dengan `AttributeError: 'list' object has no attribute 'add'` (atau `'subtract'`, `'multiply'`). Sepanjang 10 loop, Developer sama sekali tidak pernah mengubah implementasi `add_matrices` atau `multiply_matrices` (*First Correct Causal Target = FAILED / N/A*).
+- **Akar Masalah:**
+  1. Arsitek mendefinisikan `class Matrix` dengan metode biasa `add`, `subtract`, `multiply`, bukan dunder method `__add__`, `__sub__`, `__mul__`.
+  2. Di dalam test suite Frozen Oracle (`test_main.py`), helper `_add(a, b)` memeriksa `hasattr(m1, '__add__')`. Karena `Matrix` tidak memiliki `__add__`, runner beralih ke `elif hasattr(main, 'add_matrices'): return _to_list(main.add_matrices(a, b))`.
+  3. Pada baris tersebut, argumen yang dipassing ke `main.add_matrices` adalah `a` dan `b` (bertipe raw Python `list`), bukan `m1` dan `m2`.
+  4. Fungsi buatan Developer mengasumsikan parameter bertipe `Matrix` (`return a.add(b)`), memicu `AttributeError: 'list' object has no attribute 'add'` di semua 5 tes.
+  5. B5 Contextual Evidence Package memancarkan `RX-B5-ATTR-001` dengan target `symbol 'add' on list in 'main.py'`.
+  6. Karena model 7B tidak dapat memodifikasi tipe built-in `list`, dan eksekusi terhenti sebelum verifikasi dimensi dilakukan, model mengalami *Priority Masking Trap*: Developer terus berputar memodifikasi parser CLI `main()` dan `parse_matrix()`, sementara `add_matrices` dan `multiply_matrices` tidak pernah disentuh sepanjang 10 loop.
+- **Tindakan Korektif:**
+  1. Pada sintesis perbaikan deterministik antarmuka: jika terjadi `AttributeError` pada pemanggilan fungsi antarmuka terhadap tipe bawaan (`list`), instruksikan penanganan tipe polimorfik secara eksplisit: `if isinstance(a, list): a = Matrix(a)`.
+  2. Alternatif arsitektural: mewajibkan Arsitek menyertakan dunder operator (`__add__`, `__sub__`, `__mul__`) pada model data aljabar.
+- **Sumber Solusi:** AGEN (Analisis Forensik Telemetri Run 5.1).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Run 5.1 cli_t1):
+- **Diselesaikan Mandiri oleh Agen:** 26 kasus
 - **Diselesaikan atas Intervensi IA:** 5 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 8 kasus
-- **Total Galat Terdokumentasi:** 55 kasus (E-001 s/d E-055)
+- **Total Galat Terdokumentasi:** 59 kasus (E-001 s/d E-059)
+
+
+

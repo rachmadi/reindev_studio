@@ -136,3 +136,34 @@ def test_universal_entry_point():
     is_v_dart, errs_dart = validate_architect_blueprint(dart_bp, "dart")
     assert not is_v_dart
     assert len(errs_dart) > 0
+
+
+def test_architect_contract_class_syntax_extraction_excludes_narrative():
+    from backend.agents.architect import _build_default_aligned_contract
+    from backend.contract import create_draft_contract
+
+    narrative_plan = """
+### Rencana Arsitektur
+Sistem ini menggunakan struktur data matriks.
+- `Matrix` class dengan metode `__add__` dan `__sub__`.
+Arsitektur ini menggunakan class dengan tujuan pemisahan tanggung jawab.
+
+```python
+class Matrix:
+    def __init__(self, data):
+        self.data = data
+
+    def __add__(self, other):
+        pass
+```
+"""
+    draft = create_draft_contract(raw_intent="cli_t1", target_language="python", domain="CLI_TOOL")
+    aligned = _build_default_aligned_contract(draft, "cli_t1", "python", narrative_plan)
+    extracted_models = [m["model_name"] for m in aligned.get("data_models", [])]
+    
+    # Hanya 'Matrix' yang boleh diekstrak sebagai model kelas formal
+    # Kata sambung bahasa Indonesia 'dengan' atau narasi dilarang diekstrak
+    assert "Matrix" in extracted_models
+    assert "dengan" not in extracted_models
+    assert len(extracted_models) == 1
+

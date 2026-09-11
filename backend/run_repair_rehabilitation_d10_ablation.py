@@ -229,10 +229,10 @@ def classify_trajectory(
     - oscillating: Test pass naik-turun
     - regressive: Test pass menurun
     """
-    if loops == 0:
-        return "gated"
     if verdict == "PASS":
         return "convergent" if loops <= 3 else "slow-convergent"
+    if loops == 0:
+        return "gated"
 
     if not repair_history or len(repair_history) <= 1:
         return "stagnant"
@@ -474,6 +474,7 @@ def run_single_ablation(task, rep, run_idx, total_runs):
         "logs": [],
         "run_id": run_id,
         "output_dir": str(proj_dir.resolve()),
+        "frozen_oracle_path": task["oracle_path"],
         "oracle_path": task["oracle_path"],
         "contract": None,
         "contract_status": None,

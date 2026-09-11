@@ -1,0 +1,141 @@
+{
+  "package_id": "EV-FASTAPI-T1-B2-REP1",
+  "timestamp": "2026-09-10T09:40:15Z",
+  "validator": "B2_ARCHITECT_PHASE_END",
+  "phase": "ARCHITECT",
+  "validator_type": "PHASE_END",
+  "verdict": "FAIL",
+  "causal_owner": "ARCHITECT",
+  "failure_summary": "Blueprint arsitektur memuat decorator tanpa resolusi import pada potongan kode modular (blueprint_block_2).",
+  "root_causes": [
+    "Referenced decorator '@field_validator' has no resolvable import/declaration in blueprint_block_2.",
+    "Referenced decorator '@app.get' references 'app' object defined in isolated blueprint_block_1 without cross-block import."
+  ],
+  "violations": [
+    {
+      "violation_id": "VIO-001",
+      "criterion": "symbol_resolvability",
+      "severity": "CRITICAL",
+      "location": "architecture_plan:block_2",
+      "observed_symbol": "field_validator",
+      "observed_state": "Decorator '@field_validator' referenced without resolvable import statement in block scope",
+      "expected_state": "Explicit import 'from pydantic import BaseModel, field_validator' must appear in same block",
+      "source_detector": "AST_INSPECTION"
+    },
+    {
+      "violation_id": "VIO-002",
+      "criterion": "symbol_resolvability",
+      "severity": "CRITICAL",
+      "location": "architecture_plan:block_2",
+      "observed_symbol": "app",
+      "observed_state": "Decorator '@app.get' references 'app = FastAPI()' defined in isolated blueprint_block_1 without module import",
+      "expected_state": "Consolidate into single self-contained file with 'app = FastAPI()' and imports co-located",
+      "source_detector": "AST_INSPECTION"
+    }
+  ],
+  "violation_dependencies": [
+    {
+      "dependent_violation": "VIO-002",
+      "prerequisite": "VIO-001",
+      "rationale": "Pydantic and FastAPI imports must both be present in the same module scope before routes can use their decorators."
+    }
+  ],
+  "authoritative_context": {
+    "authoritative_target_file": "main.py",
+    "required_interfaces": ["POST /products/", "GET /products/", "GET /products/{id}", "DELETE /products/{id}"],
+    "required_models": ["Product", "ProductCreate"],
+    "contract_status": "FROZEN",
+    "contract_sha256": "d266453bb6c553cf..."
+  },
+  "active_constraints": {
+    "target_language": "python",
+    "max_files": 1,
+    "framework": "FastAPI + Pydantic v2",
+    "contract_revisions_used": 5,
+    "contract_revisions_max": 5
+  },
+  "preserved_invariants": [
+    {
+      "invariant_id": "INV-ORACLE",
+      "category": "ORACLE_INTEGRITY",
+      "description": "Frozen Oracle SHA-256 is 100% intact",
+      "evidence_value": "a1db9bb1f6eaf47d...",
+      "status": "VERIFIED_TRUE"
+    },
+    {
+      "invariant_id": "INV-CONTRACT",
+      "category": "CONTRACT_STATUS",
+      "description": "Contract is FROZEN with SHA-256 seal",
+      "evidence_value": "d266453bb6c553cf...",
+      "status": "VERIFIED_TRUE"
+    }
+  ],
+  "repair_boundary": {
+    "allowed_changes": [
+      "Add missing import statements to blueprint code blocks (from pydantic import BaseModel, field_validator)",
+      "Add 'from fastapi import FastAPI, HTTPException' import to each code block that uses app",
+      "Consolidate blueprint into single main.py with all imports co-located"
+    ],
+    "forbidden_changes": [
+      "Modify Frozen Oracle (test files)",
+      "Unfreeze or amend FROZEN contract",
+      "Invent speculative public interfaces not in contract",
+      "Rename authoritative interface names defined in contract",
+      "Split into multiple files (models.py, routers.py, schemas.py)"
+    ]
+  },
+  "forbidden_changes": [
+    "Modify Frozen Oracle (test files)",
+    "Unfreeze or amend FROZEN contract",
+    "Split into multiple files",
+    "Invent new endpoints"
+  ],
+  "required_changes": [
+    {
+      "change_id": "REQ-001",
+      "target": "architecture_plan",
+      "violation_ref": "VIO-001",
+      "deterministic_requirement": "Add 'from pydantic import BaseModel, field_validator' at the top of blueprint code block that uses @field_validator",
+      "preserve_refs": ["INV-ORACLE", "INV-CONTRACT"],
+      "forbidden_refs": ["Unfreeze contract", "Modify Frozen Oracle"]
+    },
+    {
+      "change_id": "REQ-002",
+      "target": "architecture_plan",
+      "violation_ref": "VIO-002",
+      "deterministic_requirement": "Consolidate 'app = FastAPI()' declaration and all @app route handlers into single canonical main.py file structure",
+      "preserve_refs": ["INV-ORACLE", "INV-CONTRACT"],
+      "forbidden_refs": ["Split into multiple files"]
+    }
+  ],
+  "expected_post_repair_state": [
+    "All referenced decorators (@field_validator, @app.get) resolve to valid imports",
+    "Blueprint AST parses with 0 errors across all code blocks",
+    "Single file main.py architecture preserved",
+    "Frozen Oracle SHA-256 and Contract seal preserved"
+  ],
+  "verification_criteria": [
+    "validate_architect_blueprint returns (True, [])",
+    "validate_contract_gate returns (True, [], [])",
+    "contract_status remains 'FROZEN'",
+    "B2 verdict == 'PASS'"
+  ],
+  "source_of_truth": "CONTRACT_GATE_P0_2.1:d266453b",
+  "evidence": [
+    {
+      "item": "blueprint_ast_errors",
+      "evidence_class": "DETERMINISTIC",
+      "observed": 2,
+      "expected": 0,
+      "status": "INVALID"
+    },
+    {
+      "item": "contract_status_and_seal",
+      "evidence_class": "DETERMINISTIC",
+      "observed": {"status": "FROZEN", "sha256": "d266453b..."},
+      "expected": {"status": "FROZEN", "sha256": "64-hex-chars"},
+      "status": "VALID"
+    }
+  ],
+  "remaining_budget": 0
+}

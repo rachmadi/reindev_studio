@@ -51,7 +51,12 @@ ATURAN REKAYASA & KEBERSIHAN KODE (STRICT):
 1. DILARANG KERAS menyertakan teks obrolan, salam, basa-basi, atau penjelasan di luar kode. Output Anda harus 100% berupa definisi file kode murni.
 2. Tulis kode yang lengkap, modular, dengan penanganan kesalahan dan type annotation sesuai target bahasa pemrograman.
 3. JANGAN PERNAH menyertakan placeholder seperti '# TODO', '# implement later', atau '...'.
-4. Format setiap file kode menggunakan blok penanda khusus persis seperti ini:
+4. DOKTRIN REKAYASA (ENGINEERING DOCTRINE):
+   - [AUTHORITATIVE CONTRACT]: Signature dan antarmuka Oracle adalah sumber kebenaran mutlak.
+   - [EXCEPTION COMPATIBILITY]: Tipe exception harus kompatibel secara hierarkis (issubclass(Actual, Expected)).
+   - [BEHAVIORAL INVARIANT PRESERVATION]: Fungsionalitas/pengujian yang sudah berstatus PROVEN dilarang keras dirusak (BEHAVIORAL_MUTATION: FORBIDDEN).
+   - [CAUSAL REPAIR SCOPE]: Modifikasi HANYA kode yang terbukti kausal terhadap kegagalan.
+5. Format setiap file kode menggunakan blok penanda khusus persis seperti ini:
 === FILE: [nama_file] ===
 [isi kode murni tanpa backtick markdown]
 === END FILE ===
@@ -227,10 +232,54 @@ def developer_agent(state: SquadState) -> dict:
         authoritative_target_file = "lib/card_metric.dart" if is_dart else "main.py"
 
     feedback_section = ""
-    if iteration > 0 and test_results:
+    latest_cep = state.get("latest_evidence_package")
+    dev_max_iter = state.get("max_iterations") if state.get("max_iterations") is not None else 10
+
+    if latest_cep and latest_cep.get("causal_owner") == "DEVELOPER":
+        try:
+            from ..contextual_evidence import ContextualEvidencePackage, render_repair_directive
+        except (ImportError, ValueError):
+            try:
+                from contextual_evidence import ContextualEvidencePackage, render_repair_directive
+            except ImportError:
+                ContextualEvidencePackage = None
+                render_repair_directive = None
+        if ContextualEvidencePackage and render_repair_directive:
+            pkg = ContextualEvidencePackage.from_dict(latest_cep)
+            rendered_directive = render_repair_directive(pkg)
+
+            # Sediakan konteks kode yang sudah ditulis sebelumnya - prioritaskan authoritative target file
+            prev_code_blocks = []
+            code_files = state.get("code_files", {})
+            if authoritative_target_file in code_files:
+                prev_code_blocks.append(f"=== FILE: {authoritative_target_file} ===\n{code_files[authoritative_target_file]}\n=== END FILE ===")
+            else:
+                for fname, content in code_files.items():
+                    prev_code_blocks.append(f"=== FILE: {fname} ===\n{content}\n=== END FILE ===")
+                    break
+            prev_code_str = "\n".join(prev_code_blocks) if prev_code_blocks else "(Belum ada kode)"
+
+            feedback_section = f"""
+
+[PERHATIAN KRUSIAL - SIKLUS PERBAIKAN DETERMINISTIK (LOOP {iteration}/{dev_max_iter})]:
+{rendered_directive}
+
+BERKAS KODE TERAKHIR ANDA:
+{prev_code_str}
+
+INSTRUKSI PERBAIKAN DETERMINISTIK:
+1. Analisis bukti deterministik dan patuhi REQUIRED CHANGES di atas secara disiplin.
+2. JANGAN langgar PRESERVED INVARIANTS dan REPAIR BOUNDARIES yang telah ditentukan.
+3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!
+"""
+            tracer = get_tracer(state.get("run_id"))
+            if tracer and hasattr(tracer, "log_repair_attempt"):
+                tracer.log_repair_attempt(turn=iteration, package_id=pkg.package_id, iteration=iteration)
+
+    if not feedback_section and iteration > 0 and (test_results or state.get("developer_feedback")):
         # P0-1 & Improved Repentance: Compact Repair Context (<= 2.500 karakter untuk num_ctx=8192)
         targeted_feedback = state.get("developer_feedback")
-        dev_max_iter = state.get("max_iterations") if state.get("max_iterations") is not None else 10
+
         if not targeted_feedback and isinstance(test_results.get("diagnostic_evidence"), dict):
             try:
                 from ..diagnostic_parser import build_targeted_feedback_from_dict

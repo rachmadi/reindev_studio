@@ -1160,3 +1160,471 @@ Kunci metodologi: Facts before diagnosis, Evidence-backed constraints, Early exi
 
 [ANTIGRAVITY - 10:45]
 (Menyajikan laporan tuntas eksperimen Improved Repentance + D10, ringkasan telemetri 9-run, analisis empiris The Semantic Deadlock Triad, jawaban mendalam verdict atas 5 revisi yang belum tepat sasaran, pembaruan 8 berkas log IIDD, verifikasi regresi 170 backend unit tests PASS, dan sinkronisasi ke remote GitHub).
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## EVALUASI E2, ABLASI QWEN3, & RUN 3 CLI_T1 — 2026-09-11 11:00 s.d. 15:23 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+---
+
+[USER (INTENT ARCHITECT) - 10:48]
+"Verdict sementara qwen 3 8b?"
+
+[ANTIGRAVITY - 10:50]
+(Menyampaikan analisis komparatif model `qwen3:8b` vs `qwen2.5-coder:7b`: fenomena reasoning token exhaustion pada kuota `num_predict=3000` di mana penalaran internal menghabiskan token sebelum emisi kode, serta beban memory offloading 64% GPU + 36% CPU pada VRAM 6GB yang menurunkan kecepatan ke 5–7 token/detik).
+
+---
+
+[USER (INTENT ARCHITECT) - 11:15]
+"hentikan"
+
+[ANTIGRAVITY - 11:15]
+(Menghentikan proses eksekusi `qwen3:8b` secara teratur dan memastikan state tersimpan rapi).
+
+---
+
+[USER (INTENT ARCHITECT) - 11:20]
+"naikkan num_predict ke 6000 dan uji ulang seperti tadi"
+
+[ANTIGRAVITY - 11:22]
+(Mengonfigurasi `num_predict=6000` pada gateway, menjalankan ulang pengujian `qwen3:8b` pada `cli_t1` selama 10 loop [7.217,2 detik / ~120,3 menit], memverifikasi bahwa `num_predict=6000` diterapkan pada 10/10 gateway calls, dan mendokumentasikan adaptasi parsial model serta hambatan Type Rigidity).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:10]
+"Apa pendapatmu sejauh ini? Apa saranmu untuk langkah selanjutnya?"
+
+[ANTIGRAVITY - 14:15]
+(Menyajikan evaluasi komparatif komprehensif antara `qwen3:8b` dan `qwen2.5-coder:7b`, memaparkan keunggulan pragmatis koder 7B, serta mengajukan 2 pilihan strategis: Opsi A [Menuntaskan `cli_t1` E2 dari 3/5 ke 5/5 PASS via penguatan Engineering Doctrine dan Invariant Lock] vs Opsi B [Menuntaskan task Flutter/FastAPI]).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:30]
+"Kita memilih Opsi A: menuntaskan cli_t1 dari kondisi E2 saat ini menuju 5/5 PASS, dengan memperkuat Bible of Goat (aturan dasar) dan mekanisme invariant flag.
+PENTING:
+- Jangan langsung melakukan implementasi.
+- Jangan mengubah file apa pun.
+- Jangan menjalankan test/experiment.
+- Jangan membuat commit.
+- Jangan mengeksekusi perubahan kode apa pun.
+- Tahap pertama HANYA membuat RENCANA IMPLEMENTASI untuk saya review dan setujui.
+- Eksekusi baru boleh dilakukan setelah saya memberikan persetujuan eksplisit terhadap rencana tersebut.
+KONTEKS EKSPERIMEN YANG HARUS DIPERTAHANKAN:
+1. E2 menggunakan qwen2.5-coder:7b.
+2. Target task: cli_t1.
+3. E2 Targeted Actionable Prescription sudah menghasilkan: Run 1: 2/5 PASS, Run 2: 3/5 PASS (add, sub, mul lulus).
+4. Dua failure tersisa: exception compatibility (ValueError vs MatrixError Exception).
+Mengenai Bible of Goat, itu maksudnya Engineering Doctrine, Development Doctrine, atau Agent Engineering Doctrine."
+
+[ANTIGRAVITY - 14:35]
+(Menegaskan kepatuhan mutlak terhadap aturan STOP AND PLAN, menyusun `implementation_plan.md` awal berbasis Engineering Doctrine 5 poin, Behavioral Invariant Lock, dan Exception Hierarchy compatibility, serta membuang seluruh terminologi internal non-formal).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:48]
+"Itu semua bagus. Tapi ada 4 koreksi penting:
+1. Jangan menyebut '100% Converged' sebagai target seolah-olah outcome. Target outcome: 5/5 PASS. Karena 'converged' adalah hasil eksperimen, bukan kondisi yang kita tetapkan sebelumnya.
+2. Deteksi exception hierarchy jangan bergantung pada regex stdout saja. Harus ada evidence kedua yang deterministik, misalnya audit AST terhadap deklarasi class (MatrixError -> Exception vs ValueError) sebagai dual-evidence ground truth.
+3. Mekanisme invariant lock jangan sampai mematikan kemampuan model menambah validasi (Behavior Lock > Source-Code Lock).
+4. Jika invariant pernah regresi, riwayatnya jangan dihapus saat pulih (Strict Transparency)."
+
+[ANTIGRAVITY - 14:55]
+(Menyempurnakan `implementation_plan.md` secara menyeluruh dengan mengakomodasi keempat koreksi kritis: Target outcome 5/5 PASS, AST class hierarchy inspector `inspect_ast_exception_hierarchy()`, behavioural invariant locking `behavior:test_matrix_addition`, dan pelacakan riwayat regresi permanen `ever_regressed: True`).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:00]
+"Approved and proceed"
+
+[ANTIGRAVITY - 15:01 s.d. 15:15]
+(Mengeksekusi rencana kerja yang telah disetujui:
+ 1. Memperluas schema `PreservedInvariant` dan mendeklarasikan `ENGINEERING_DOCTRINE` di `backend/contextual_evidence.py`.
+ 2. Mengintegrasikan fungsi AST audit hierarki exception dan deteksi Dual-Evidence di `backend/context_assembler.py`.
+ 3. Mengintegrasikan ekstraksi passed tests dan pelacakan regresi di `backend/phase_validators.py` & `backend/graph_phase_validated.py`.
+ 4. Menyisipkan ringkasan doktrin ke `DEV_SYSTEM_PROMPT` di `backend/agents/developer.py`.
+ 5. Menjalankan unit tests [80/80 PASS] dan Pre-Flight Gates A–I [266/266 PASS].
+ 6. Menjalankan Controlled Run 3 `cli_t1` [`pv_pilot_cli_t1_rep1_20260911_150102`, 714.7s, 10 loops].
+ Hasil observasi: 0/5 PASS di seluruh loop 1–10 akibat instansiasi `Matrix(BaseModel)`).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:15]
+"Lapor tiap 3 menit"
+
+[ANTIGRAVITY - 15:18]
+(Menjadwalkan timer 3 menit di background, menyampaikan laporan investigasi forensik awal: menemukan akar masalah bahwa B5 berhasil memancarkan `RX-B5-POS-ARG-001` dan `RX-B5-EXC-COMPAT-001`, namun *Silent Context Truncation* pada `render_repair_directive` [_MAX_RENDER_CHARS = 2550] memotong habis seksi resep dan doktrin, sehingga Developer tidak pernah membacanya).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:20]
+"Dokumentasikan dulu dan update dokumen yang berkenaan, sementara IA menganalisis"
+
+[ANTIGRAVITY - 15:22]
+(Memperbarui `error_log.md` [Kasus E-056], `decision_log.md` [D-081], `walkthrough.md` [Seksi 7 Run 3 Audit], dan `implementation_plan.md` [Seksi 12 & 13], serta menyampaikan Laporan Progres Interval 3 Menit ke-2).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:24]
+"Catatan riset juga perlu upate. Jangan lupa, catat timestamp karena waktu realisasi iterasi 6 masih terus berjalan"
+
+[ANTIGRAVITY - 15:24]
+(Memperbarui `catatan_riset_pengujian_preset.md` dengan menyusun Bagian 22 [Ablasi Qwen3 8B] dan Bagian 23 [E2 Run 3 CLI_T1 & Silent Context Truncation], serta mencatat durasi realisasi riil di `durasi_per_fitur.md` secara presisi).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:25]
+"Dan menurutku perbaikan ini disetujui untuk diaplikasikan sebelum Run 4, dengan satu syarat metodologis kecil.
+Yang ditemukan bukan kegagalan baru pada kemampuan repair si coder. Justru ada kegagalan pada delivery mechanism: prescription yang sudah berhasil dibuat oleh Python tidak pernah sampai ke Developer karena renderer memotongnya sebelum bagian prescription dan doctrine. Jadi treatment yang seharusnya diuji ternyata belum benar-benar diterima oleh subject.
+Itu perbedaan yang sangat besar.
+Aku approve tiga perubahan tersebut:
+1. Prescription + Doctrine diprioritaskan. Urutannya harus memastikan minimal: failure → causal evidence → prescription → invariant → doctrine → verification sudah masuk sebelum informasi sekunder.
+2. Hilangkan current_code_excerpt yang redundant (Evidence density: jangan menghabiskan ruang untuk evidence yang sudah tersedia di channel lain).
+3. Naikkan limit 2.550 → 4.500 (Parameter engineering yang reasonable, kapasitas ditentukan tokenisasi aktual).
+Yang paling menarik justru ini: Run 3 memberikan diagnosis yang sangat bersih: B5 diagnosis OK, Prescription OK, CEP renderer FAIL (bottleneck), Developer tidak terima prescription. Run 3 jangan dihitung sebagai bukti doktrin gagal karena treatment belum sampai ke model.
+Jangan utak-atik hal lain sebelum Run 4: model qwen2.5-coder:7b, num_ctx=8192, num_predict=3000, Developer <= 10, Executor immutable, Oracle immutable, QA=0, treatment sama, hanya delivery/prioritization CEP yang diperbaiki.
+Eksperimen bersih: 'Setelah evidence dan prescription benar-benar sampai kepada Developer, apakah coder dapat melakukan repair tanpa merusak invariant yang sudah proven?'"
+
+---
+
+[USER (INTENT ARCHITECT) - 15:25:52]
+"Selesaikan dulu update catatan dan log sebelum mulai"
+
+[ANTIGRAVITY - 15:27]
+(Mematuhi instruksi mutlak Intent Architect: menyelesaikan pemutakhiran seluruh dokumen log, catatan riset, human intervention, decision log, error log, dan durasi kerja secara tuntas sebelum menyentuh atau memodifikasi file kode implementasi apa pun).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:29]
+"approved and proceed"
+
+[ANTIGRAVITY - 15:30 s.d. 15:44]
+(Melaksanakan eksekusi Controlled Run 4 `cli_t1` sesuai protokol yang disetujui:
+ 1. Mengimplementasikan Canonical Prioritization pada `render_repair_directive` di `backend/contextual_evidence.py` (memastikan urutan kanonikal `failure → causal evidence → prescription → invariant → doctrine → verification`).
+ 2. Menghapus duplikasi `current_code_excerpt` pada `backend/context_assembler.py` (Evidence Density) dan menaikkan kuota render teks menjadi 4.500 karakter.
+ 3. Menjalankan verifikasi unit tests suite (80 passed) dan pre-flight verification Gates A–I (266 passed in 15.11s).
+ 4. Menjalankan Controlled Run 4 `cli_t1` [`pv_pilot_cli_t1_rep1_20260911_153134`, 759.25 detik / ~12.65 menit, 10 loops].
+ Hasil observasi: 3/5 TESTS PASSED (60.0%) konsisten di setiap loop 0–9. Zero functional regression (0/30 peluang regresi). Seluruh 3 invarian terbukti [add, sub, mul] 100% terjaga!).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:44]
+"Update semua dokumentasi terkait"
+
+[ANTIGRAVITY - 15:45 s.d. 16:25]
+(Menuntaskan pembaruan dokumentasi komprehensif pasca-Controlled Run 4:
+ 1. Menambahkan Bagian 24 pada `catatan_riset_pengujian_preset.md`: tabulasi telemetri Run 4 loop-by-loop, analisis pembuktian Zero Functional Regression, dan identifikasi akar masalah *Function Boundary Blind Spot* pada exception handling.
+ 2. Mencatat Intervensi No. 85 pada `human_intervention.md`.
+ 3. Merumuskan Keputusan Arsitektural D-082 pada `decision_log.md` (Validasi Empiris Behavioral Invariant Preservation & Gap Atribusi Kausal Level Fungsi).
+ 4. Mendokumentasikan Kasus E-057 pada `error_log.md` (Function Boundary Blind Spot & Module-Level Validation Misattribution).
+ 5. Memutakhirkan metrik dan formula waktu riil pada `durasi_per_fitur.md`.
+ 6. Mencatat dialog verbatim pada `conversation_log.md`.
+ 7. Menyusun entri validasi empiris Run 4 pada `validation_log.md`.
+ 8. Mencatat perluasan observasi pada `context_drift_log.md`.
+ 9. Memperbarui dokumen `walkthrough.md` dan `implementation_plan.md` di brain directory).
+
+---
+
+[USER (INTENT ARCHITECT) - 16:25]
+"Sebagai Intent Architect, saya melihat Run 4 sebagai hasil yang sangat informatif, tetapi saya akan mengoreksi satu klaim penting dalam laporan itu:
+1. Putusan IA: Delivery mechanism berhasil, Behavioral Invariant Lock bekerja sebagai regression containment (temuan besar!).
+2. Koreksi Epistemik: Jangan tulis 'YA, SECARA ABSOLUT DAN DETERMINISTIK'. Rumusan yang tepat: 'Pada Run 4, evidence menunjukkan bahwa Behavioral Invariant Lock berhasil menahan regresi fungsional pada 3 operasi yang sudah PASS di seluruh 10 loop'.
+3. Formula Evaluasi: delivery ≠ convergence.
+4. Desain Run 5: Isolasi variabel tunggal (Function-Targeted Prescription) pada B5 (`add_matrices`, `multiply_matrices`), kunci seluruh parameter lainnya.
+5. Kriteria pembacaan hasil: 5/5 <=3 loops (dukungan kuat H5), 5/5 >3 loops (membantu tapi belum efisien), 4/5 (ada pengaruh tapi ada failure mode lain), 3/5 stagnan (H5 melemah, masalah lebih dalam), regression (investigasi invariant lock), perbaiki parse_matrix lagi (resep gagal mengarahkan causal target)."
+
+---
+
+[ANTIGRAVITY - 16:32]
+(Menyelaraskan epistemik di seluruh dokumen riset, merumuskan hipotesis H5, mengimplementasikan *Function-Level Symbol Binding* pada `RX-B5-EXC-COMPAT-001` melalui AST parser di `backend/context_assembler.py`, meloloskan 82/82 contextual evidence tests dan 268/268 Pre-Flight Gates A–I, serta meminta persetujuan formal peluncuran Run 5).
+
+---
+
+[USER (INTENT ARCHITECT) - 16:34]
+"Persetujuan Intent Architect: DISETUJUI. Run 5 memiliki desain eksperimen yang jauh lebih tajam daripada Run 4. Variabel bebasnya jelas: Function-Level Symbol Binding pada prescription B5. Parameter lainnya tetap terkunci... Kunci putusan: Treatment diperkuat, guardrails terkunci, kriteria pembacaan hasil diikat."
+
+---
+
+[USER (INTENT ARCHITECT) - 16:35]
+"Cek tiap 3 menit dan laporkan"
+
+---
+
+[USER (INTENT ARCHITECT) - 16:40]
+"Estimasi waktu selesai?"
+
+---
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## EVALUASI E2, ABLASI QWEN3, & RUN 3 CLI_T1 — 2026-09-11 11:00 s.d. 15:23 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+---
+
+[USER (INTENT ARCHITECT) - 10:48]
+"Verdict sementara qwen 3 8b?"
+
+[ANTIGRAVITY - 10:50]
+(Menyampaikan analisis komparatif model `qwen3:8b` vs `qwen2.5-coder:7b`: fenomena reasoning token exhaustion pada kuota `num_predict=3000` di mana penalaran internal menghabiskan token sebelum emisi kode, serta beban memory offloading 64% GPU + 36% CPU pada VRAM 6GB yang menurunkan kecepatan ke 5–7 token/detik).
+
+---
+
+[USER (INTENT ARCHITECT) - 11:15]
+"hentikan"
+
+[ANTIGRAVITY - 11:15]
+(Menghentikan proses eksekusi `qwen3:8b` secara teratur dan memastikan state tersimpan rapi).
+
+---
+
+[USER (INTENT ARCHITECT) - 11:20]
+"naikkan num_predict ke 6000 dan uji ulang seperti tadi"
+
+[ANTIGRAVITY - 11:22]
+(Mengonfigurasi `num_predict=6000` pada gateway, menjalankan ulang pengujian `qwen3:8b` pada `cli_t1` selama 10 loop [7.217,2 detik / ~120,3 menit], memverifikasi bahwa `num_predict=6000` diterapkan pada 10/10 gateway calls, dan mendokumentasikan adaptasi parsial model serta hambatan Type Rigidity).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:10]
+"Apa pendapatmu sejauh ini? Apa saranmu untuk langkah selanjutnya?"
+
+[ANTIGRAVITY - 14:15]
+(Menyajikan evaluasi komparatif komprehensif antara `qwen3:8b` dan `qwen2.5-coder:7b`, memaparkan keunggulan pragmatis koder 7B, serta mengajukan 2 pilihan strategis: Opsi A [Menuntaskan `cli_t1` E2 dari 3/5 ke 5/5 PASS via penguatan Engineering Doctrine dan Invariant Lock] vs Opsi B [Menuntaskan task Flutter/FastAPI]).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:30]
+"Kita memilih Opsi A: menuntaskan cli_t1 dari kondisi E2 saat ini menuju 5/5 PASS, dengan memperkuat Bible of Goat (aturan dasar) dan mekanisme invariant flag.
+PENTING:
+- Jangan langsung melakukan implementasi.
+- Jangan mengubah file apa pun.
+- Jangan menjalankan test/experiment.
+- Jangan membuat commit.
+- Jangan mengeksekusi perubahan kode apa pun.
+- Tahap pertama HANYA membuat RENCANA IMPLEMENTASI untuk saya review dan setujui.
+- Eksekusi baru boleh dilakukan setelah saya memberikan persetujuan eksplisit terhadap rencana tersebut.
+KONTEKS EKSPERIMEN YANG HARUS DIPERTAHANKAN:
+1. E2 menggunakan qwen2.5-coder:7b.
+2. Target task: cli_t1.
+3. E2 Targeted Actionable Prescription sudah menghasilkan: Run 1: 2/5 PASS, Run 2: 3/5 PASS (add, sub, mul lulus).
+4. Dua failure tersisa: exception compatibility (ValueError vs MatrixError Exception).
+Mengenai Bible of Goat, itu maksudnya Engineering Doctrine, Development Doctrine, atau Agent Engineering Doctrine."
+
+[ANTIGRAVITY - 14:35]
+(Menegaskan kepatuhan mutlak terhadap aturan STOP AND PLAN, menyusun `implementation_plan.md` awal berbasis Engineering Doctrine 5 poin, Behavioral Invariant Lock, dan Exception Hierarchy compatibility, serta membuang seluruh terminologi internal non-formal).
+
+---
+
+[USER (INTENT ARCHITECT) - 14:48]
+"Itu semua bagus. Tapi ada 4 koreksi penting:
+1. Jangan menyebut '100% Converged' sebagai target seolah-olah outcome. Target outcome: 5/5 PASS. Karena 'converged' adalah hasil eksperimen, bukan kondisi yang kita tetapkan sebelumnya.
+2. Deteksi exception hierarchy jangan bergantung pada regex stdout saja. Harus ada evidence kedua yang deterministik, misalnya audit AST terhadap deklarasi class (MatrixError -> Exception vs ValueError) sebagai dual-evidence ground truth.
+3. Mekanisme invariant lock jangan sampai mematikan kemampuan model menambah validasi (Behavior Lock > Source-Code Lock).
+4. Jika invariant pernah regresi, riwayatnya jangan dihapus saat pulih (Strict Transparency)."
+
+[ANTIGRAVITY - 14:55]
+(Menyempurnakan `implementation_plan.md` secara menyeluruh dengan mengakomodasi keempat koreksi kritis: Target outcome 5/5 PASS, AST class hierarchy inspector `inspect_ast_exception_hierarchy()`, behavioural invariant locking `behavior:test_matrix_addition`, dan pelacakan riwayat regresi permanen `ever_regressed: True`).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:00]
+"Approved and proceed"
+
+[ANTIGRAVITY - 15:01 s.d. 15:15]
+(Mengeksekusi rencana kerja yang telah disetujui:
+ 1. Memperluas schema `PreservedInvariant` dan mendeklarasikan `ENGINEERING_DOCTRINE` di `backend/contextual_evidence.py`.
+ 2. Mengintegrasikan fungsi AST audit hierarki exception dan deteksi Dual-Evidence di `backend/context_assembler.py`.
+ 3. Mengintegrasikan ekstraksi passed tests dan pelacakan regresi di `backend/phase_validators.py` & `backend/graph_phase_validated.py`.
+ 4. Menyisipkan ringkasan doktrin ke `DEV_SYSTEM_PROMPT` di `backend/agents/developer.py`.
+ 5. Menjalankan unit tests [80/80 PASS] dan Pre-Flight Gates A–I [266/266 PASS].
+ 6. Menjalankan Controlled Run 3 `cli_t1` [`pv_pilot_cli_t1_rep1_20260911_150102`, 714.7s, 10 loops].
+ Hasil observasi: 0/5 PASS di seluruh loop 1–10 akibat instansiasi `Matrix(BaseModel)`).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:15]
+"Lapor tiap 3 menit"
+
+[ANTIGRAVITY - 15:18]
+(Menjadwalkan timer 3 menit di background, menyampaikan laporan investigasi forensik awal: menemukan akar masalah bahwa B5 berhasil memancarkan `RX-B5-POS-ARG-001` dan `RX-B5-EXC-COMPAT-001`, namun *Silent Context Truncation* pada `render_repair_directive` [_MAX_RENDER_CHARS = 2550] memotong habis seksi resep dan doktrin, sehingga Developer tidak pernah membacanya).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:20]
+"Dokumentasikan dulu dan update dokumen yang berkenaan, sementara IA menganalisis"
+
+[ANTIGRAVITY - 15:22]
+(Memperbarui `error_log.md` [Kasus E-056], `decision_log.md` [D-081], `walkthrough.md` [Seksi 7 Run 3 Audit], dan `implementation_plan.md` [Seksi 12 & 13], serta menyampaikan Laporan Progres Interval 3 Menit ke-2).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:24]
+"Catatan riset juga perlu upate. Jangan lupa, catat timestamp karena waktu realisasi iterasi 6 masih terus berjalan"
+
+[ANTIGRAVITY - 15:24]
+(Memperbarui `catatan_riset_pengujian_preset.md` dengan menyusun Bagian 22 [Ablasi Qwen3 8B] dan Bagian 23 [E2 Run 3 CLI_T1 & Silent Context Truncation], serta mencatat durasi realisasi riil di `durasi_per_fitur.md` secara presisi).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:25]
+"Dan menurutku perbaikan ini disetujui untuk diaplikasikan sebelum Run 4, dengan satu syarat metodologis kecil.
+Yang ditemukan bukan kegagalan baru pada kemampuan repair si coder. Justru ada kegagalan pada delivery mechanism: prescription yang sudah berhasil dibuat oleh Python tidak pernah sampai ke Developer karena renderer memotongnya sebelum bagian prescription dan doctrine. Jadi treatment yang seharusnya diuji ternyata belum benar-benar diterima oleh subject.
+Itu perbedaan yang sangat besar.
+Aku approve tiga perubahan tersebut:
+1. Prescription + Doctrine diprioritaskan. Urutannya harus memastikan minimal: failure → causal evidence → prescription → invariant → doctrine → verification sudah masuk sebelum informasi sekunder.
+2. Hilangkan current_code_excerpt yang redundant (Evidence density: jangan menghabiskan ruang untuk evidence yang sudah tersedia di channel lain).
+3. Naikkan limit 2.550 → 4.500 (Parameter engineering yang reasonable, kapasitas ditentukan tokenisasi aktual).
+Yang paling menarik justru ini: Run 3 memberikan diagnosis yang sangat bersih: B5 diagnosis OK, Prescription OK, CEP renderer FAIL (bottleneck), Developer tidak terima prescription. Run 3 jangan dihitung sebagai bukti doktrin gagal karena treatment belum sampai ke model.
+Jangan utak-atik hal lain sebelum Run 4: model qwen2.5-coder:7b, num_ctx=8192, num_predict=3000, Developer <= 10, Executor immutable, Oracle immutable, QA=0, treatment sama, hanya delivery/prioritization CEP yang diperbaiki.
+Eksperimen bersih: 'Setelah evidence dan prescription benar-benar sampai kepada Developer, apakah coder dapat melakukan repair tanpa merusak invariant yang sudah proven?'"
+
+---
+
+[USER (INTENT ARCHITECT) - 15:25:52]
+"Selesaikan dulu update catatan dan log sebelum mulai"
+
+[ANTIGRAVITY - 15:27]
+(Mematuhi instruksi mutlak Intent Architect: menyelesaikan pemutakhiran seluruh dokumen log, catatan riset, human intervention, decision log, error log, dan durasi kerja secara tuntas sebelum menyentuh atau memodifikasi file kode implementasi apa pun).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:29]
+"approved and proceed"
+
+[ANTIGRAVITY - 15:30 s.d. 15:44]
+(Melaksanakan eksekusi Controlled Run 4 `cli_t1` sesuai protokol yang disetujui:
+ 1. Mengimplementasikan Canonical Prioritization pada `render_repair_directive` di `backend/contextual_evidence.py` (memastikan urutan kanonikal `failure → causal evidence → prescription → invariant → doctrine → verification`).
+ 2. Menghapus duplikasi `current_code_excerpt` pada `backend/context_assembler.py` (Evidence Density) dan menaikkan kuota render teks menjadi 4.500 karakter.
+ 3. Menjalankan verifikasi unit tests suite (80 passed) dan pre-flight verification Gates A–I (266 passed in 15.11s).
+ 4. Menjalankan Controlled Run 4 `cli_t1` [`pv_pilot_cli_t1_rep1_20260911_153134`, 759.25 detik / ~12.65 menit, 10 loops].
+ Hasil observasi: 3/5 TESTS PASSED (60.0%) konsisten di setiap loop 0–9. Zero functional regression (0/30 peluang regresi). Seluruh 3 invarian terbukti [add, sub, mul] 100% terjaga!).
+
+---
+
+[USER (INTENT ARCHITECT) - 15:44]
+"Update semua dokumentasi terkait"
+
+[ANTIGRAVITY - 15:45 s.d. 16:25]
+(Menuntaskan pembaruan dokumentasi komprehensif pasca-Controlled Run 4:
+ 1. Menambahkan Bagian 24 pada `catatan_riset_pengujian_preset.md`: tabulasi telemetri Run 4 loop-by-loop, analisis pembuktian Zero Functional Regression, dan identifikasi akar masalah *Function Boundary Blind Spot* pada exception handling.
+ 2. Mencatat Intervensi No. 85 pada `human_intervention.md`.
+ 3. Merumuskan Keputusan Arsitektural D-082 pada `decision_log.md` (Validasi Empiris Behavioral Invariant Preservation & Gap Atribusi Kausal Level Fungsi).
+ 4. Mendokumentasikan Kasus E-057 pada `error_log.md` (Function Boundary Blind Spot & Module-Level Validation Misattribution).
+ 5. Memutakhirkan metrik dan formula waktu riil pada `durasi_per_fitur.md`.
+ 6. Mencatat dialog verbatim pada `conversation_log.md`.
+ 7. Menyusun entri validasi empiris Run 4 pada `validation_log.md`.
+ 8. Mencatat perluasan observasi pada `context_drift_log.md`.
+ 9. Memperbarui dokumen `walkthrough.md` dan `implementation_plan.md` di brain directory).
+
+---
+
+[USER (INTENT ARCHITECT) - 16:25]
+"Sebagai Intent Architect, saya melihat Run 4 sebagai hasil yang sangat informatif, tetapi saya akan mengoreksi satu klaim penting dalam laporan itu:
+1. Putusan IA: Delivery mechanism berhasil, Behavioral Invariant Lock bekerja sebagai regression containment (temuan besar!).
+2. Koreksi Epistemik: Jangan tulis 'YA, SECARA ABSOLUT DAN DETERMINISTIK'. Rumusan yang tepat: 'Pada Run 4, evidence menunjukkan bahwa Behavioral Invariant Lock berhasil menahan regresi fungsional pada 3 operasi yang sudah PASS di seluruh 10 loop'.
+3. Formula Evaluasi: delivery ≠ convergence.
+4. Desain Run 5: Isolasi variabel tunggal (Function-Targeted Prescription) pada B5 (`add_matrices`, `multiply_matrices`), kunci seluruh parameter lainnya.
+5. Kriteria pembacaan hasil: 5/5 <=3 loops (dukungan kuat H5), 5/5 >3 loops (membantu tapi belum efisien), 4/5 (ada pengaruh tapi ada failure mode lain), 3/5 stagnan (H5 melemah, masalah lebih dalam), regression (investigasi invariant lock), perbaiki parse_matrix lagi (resep gagal mengarahkan causal target)."
+
+---
+
+[ANTIGRAVITY - 16:32]
+(Menyelaraskan epistemik di seluruh dokumen riset, merumuskan hipotesis H5, mengimplementasikan *Function-Level Symbol Binding* pada `RX-B5-EXC-COMPAT-001` melalui AST parser di `backend/context_assembler.py`, meloloskan 82/82 contextual evidence tests dan 268/268 Pre-Flight Gates A–I, serta meminta persetujuan formal peluncuran Run 5).
+
+---
+
+[USER (INTENT ARCHITECT) - 16:34]
+"Persetujuan Intent Architect: DISETUJUI. Run 5 memiliki desain eksperimen yang jauh lebih tajam daripada Run 4. Variabel bebasnya jelas: Function-Level Symbol Binding pada prescription B5. Parameter lainnya tetap terkunci... Kunci putusan: Treatment diperkuat, guardrails terkunci, kriteria pembacaan hasil diikat."
+
+---
+
+[USER (INTENT ARCHITECT) - 16:35]
+"Cek tiap 3 menit dan laporkan"
+
+---
+
+[USER (INTENT ARCHITECT) - 16:40]
+"Estimasi waktu selesai?"
+
+---
+
+[ANTIGRAVITY - 16:41]
+(Menyampaikan laporan berkala menit ke-7 dan estimasi waktu selesai ~16:43:15 WIB berdasarkan latensi rata-rata LLM 45.8s/loop dan batas maksimum budget Developer 10 loop. Melaporkan temuan kausal krusial Gate B3 Pre-Execution Deadlock yang menahan seluruh Loop 0 s.d. 7 akibat ketidakcocokan simbol data model `missing_models: ['dengan']`).
+
+---
+
+[ANTIGRAVITY - 16:47]
+(Menyampaikan laporan komprehensif penuntasan Controlled Run 5 `cli_t1`:
+ 1. Run ID `pv_pilot_cli_t1_rep1_20260911_163409` selesai pada 16:43:42 WIB (durasi 573.64 detik).
+ 2. Frozen Oracle SHA-256 `0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124` terverifikasi **100% INTACT & UNTOUCHED**.
+ 3. QA Tester LLM terbukti 0 pemanggilan (100% Bypassed).
+ 4. Seluruh 10 loop tertahan secara deterministik di Gate B3 (`B3_DEVELOPER_PRE_EXECUTION`) karena kontrak memuat `data_models = ['Matrix', 'dengan']`.
+ 5. Hasil forensik membuktikan *Upstream Contract Extraction Artifact*: regex permisif `re.findall(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", arch_plan)` di `architect.py:200` menangkap frasa bahasa Indonesia `"class dengan..."`.
+ 6. Epistemic verdict: Hasil Run 5 adalah **INCONCLUSIVE terhadap H5** karena treatment hilir B5 tidak pernah tercapai akibat karantina gerbang hulu B3).
+
+---
+
+[USER (INTENT ARCHITECT) - 17:21]
+"Putusan resmi Intent Architect: Run 5 = INCONCLUSIVE.
+Saya menerima diagnosis dan tidak akan menghitung Run 5 sebagai failure H5. Treatment Function-Targeted Prescription tidak pernah reached karena seluruh 10 loop tertahan di B3 oleh required_models=['Matrix','dengan']. Dengan demikian First Correct Causal Target = N/A memang tepat.
+Yang justru terbukti dari Run 5:
+- B3 berhasil mencegah kode masuk ke sandbox ketika kontrak formal cacat.
+- Frozen Oracle tetap immutable.
+- QA Tester tetap 0.
+- Failure baru terlokalisasi cukup tajam pada upstream contract extraction, khususnya regex class\s+... yang terlalu permisif.
+Putusan terhadap Run 5.1: DISETUJUI — tetapi dengan satu batasan metodologis.
+Run 5.1 boleh memperbaiki contract extraction defect E-058, kemudian mengulang cli_t1 dengan seluruh parameter eksperimental Run 5 tetap terkunci.
+Tujuannya bukan 'memperbaiki ReinDev supaya hasilnya bagus', melainkan: menghilangkan confounder upstream yang membuat treatment H5 tidak pernah terpapar kepada Developer. Setelah itu barulah kita bisa menguji H5 secara sah.
+Satu hal yang saya minta diperhatikan: Jangan menjadikan stop-word filter sebagai mekanisme utama. Perbaikan paling fundamental adalah memastikan extractor hanya mengenali deklarasi kelas yang benar-benar berbentuk sintaks deklarasi, bukan kemunculan frasa class <word> di narasi. Stop-word filter boleh menjadi defense-in-depth, tetapi jangan sampai sistem bergantung padanya.
+Dan ada konsekuensi penelitian yang bagus:
+Run 3 → Delivery defect
+Run 4 → Causal attribution gap
+Run 5 → Upstream contract extraction defect
+Kita sekarang menemukan bahwa sebelum menyalahkan kemampuan repair model, seluruh rantai evidence harus terlebih dahulu terbukti mengantarkan kontrak yang benar sampai ke titik repair.
+Jadi: Run 5: INCONCLUSIVE. Run 5.1: GO. H5 remains formally untested. Silakan lanjutkan Run 5.1"
+
+---
+
+[ANTIGRAVITY - 17:25]
+(Menyelaraskan seluruh dokumen riset dengan putusan IA: merumuskan D-084, mencatat Intervensi No. 89, mengimplementasikan formal syntax-based class declaration extractor di `backend/agents/architect.py:200` [+ defense-in-depth stop-words], menambahkan unit test regresi di `test_architect_validator.py` [8/8 PASS], meloloskan 269 unit tests Pre-Flight Gates A–I [15.39s, Frozen Oracle 100% cocok], dan meluncurkan Controlled Run 5.1 `cli_t1`).
+
+---
+
+[USER (INTENT ARCHITECT) - 17:28]
+"Sementara menunggu, lakukan git push untuk commit yang ada"
+
+---
+
+[ANTIGRAVITY - 17:29]
+(Memverifikasi status repositori git: remote `origin/main` sudah tersinkronisasi penuh dengan commit `9b9274d`, tidak ada commit tertinggal yang belum di-push).
+
+---
+
+[USER (INTENT ARCHITECT) - 17:30]
+"Untuk git, sekalian saja setelah hasil 5.1 didapat, baru commit dan push"
+
+---
+
+[ANTIGRAVITY - 17:38]
+(Menyampaikan laporan berkala eksekusi Run 5.1 pada Loop 4:
+ 1. Resolusi E-058 sukses 100% (`data_models = ['Matrix']`, Gate B3 PASS di Loop 0).
+ 2. Sandbox Frozen Oracle berhasil ditembus seketika.
+ 3. Mengidentifikasi fenomena baru *List vs Class Interface Mismatch*: kelas `Matrix` tidak memiliki `__add__` sehingga Frozen Oracle memanggil `main.add_matrices(a, b)` dengan raw `list`. Di sisi lain, Developer mengasumsikan `a` adalah `Matrix` (`a.add(b)`), memicu `AttributeError: 'list' object has no attribute 'add'`.
+ 4. B5 memancarkan `RX-B5-ATTR-001` dan `RX-B5-EXC-COMPAT-001`.
+ 5. Developer pada Loop 1–3 memodifikasi `parse_matrix` dan `main()`, belum menyentuh `add_matrices`).
+
+---
+
+[ANTIGRAVITY - 17:55]
+(Menyajikan laporan ilmiah final Controlled Run 5.1 `cli_t1`:
+ 1. Run ID `pv_pilot_cli_t1_rep1_20260911_172558` selesai pada 17:45:16 WIB (durasi 1.157,43 detik, 10 loops).
+ 2. Frozen Oracle SHA-256 `0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124` terverifikasi **100% INTACT & TIDAK TERSENTUH**.
+ 3. QA Tester LLM terbukti 0 pemanggilan.
+ 4. Gate B3 meloloskan kode pada Loop 0, membuktikan defek E-058 tuntas terpecahkan.
+ 5. Seluruh 10 loop menghasilkan 0/5 PASS akibat `AttributeError` masif pada pemanggilan fungsi antarmuka.
+ 6. Developer terperangkap dalam *Priority Masking Trap*: `add_matrices` dan `multiply_matrices` tidak pernah dimodifikasi sepanjang 10 loop (*First Correct Causal Target = FAILED / N/A*).
+ 7. Menyinkronkan seluruh berkas log IIDD [catatan riset, decision log D-085, error log E-059, human intervention #90, validation log, durasi per fitur], lalu mengeksekusi git commit dan git push terpadu ke remote GitHub sesuai instruksi IA).
+

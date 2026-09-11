@@ -197,7 +197,26 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
             r"(?:def\s+|-\s*|\*\s*|`)([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\], ]+))?",
             arch_plan
         )
-        class_matches = re.findall(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", arch_plan)
+        # Ekstraksi class yang dideklarasikan secara sintaksis formal dalam Python:
+        # Mengharuskan batasan awal baris/delimiter, kata kunci 'class', nama identifier,
+        # opsional parameter inheritance/type arguments, dan penutup tanda titik dua ':'
+        raw_class_matches = re.findall(
+            r"(?:^|[;\n`])\s*class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*\([^)]*\))?\s*:",
+            arch_plan,
+            re.MULTILINE
+        )
+        # Defense-in-depth: abaikan keyword/stop-words dan deduplikasi berurutan
+        _CLASS_STOP_WORDS = {
+            "dengan", "and", "or", "in", "is", "for", "the", "a", "an", "to", "of",
+            "pass", "def", "return", "class", "from", "import", "as", "not"
+        }
+        seen_classes = set()
+        class_matches = []
+        for cname in raw_class_matches:
+            cname_clean = cname.strip()
+            if cname_clean and cname_clean.lower() not in _CLASS_STOP_WORDS and cname_clean not in seen_classes:
+                seen_classes.add(cname_clean)
+                class_matches.append(cname_clean)
 
         data_models = []
         interface_contracts = []
@@ -212,9 +231,13 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                 })
 
         if func_matches:
+            seen_fns = set()
             for idx, (fn_name, params_str, ret_type) in enumerate(func_matches, 1):
                 if fn_name in ("if", "for", "while", "with", "print", "assert", "return"):
                     continue
+                if fn_name in seen_fns:
+                    continue
+                seen_fns.add(fn_name)
                 ifid = f"IFC-0{idx}" if idx < 10 else f"IFC-{idx}"
                 astid = f"AST-0{idx}" if idx < 10 else f"AST-{idx}"
                 ret = ret_type.strip() if ret_type else "float"
@@ -306,15 +329,42 @@ def architect_agent(state: SquadState) -> dict:
     )
     
     feedback_section = ""
-    contract_feedback = state.get("contract_feedback")
-    if contract_feedback:
-        feedback_section = (
-            f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
-            f"{contract_feedback}\n\n"
-            "INSTRUKSI REVISI WAJIB:\n"
-            "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
-            "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
-        )
+    latest_cep = state.get("latest_evidence_package")
+    if latest_cep and latest_cep.get("causal_owner") == "ARCHITECT":
+        try:
+            from ..contextual_evidence import ContextualEvidencePackage, render_repair_directive
+        except (ImportError, ValueError):
+            try:
+                from contextual_evidence import ContextualEvidencePackage, render_repair_directive
+            except ImportError:
+                ContextualEvidencePackage = None
+                render_repair_directive = None
+        if ContextualEvidencePackage and render_repair_directive:
+            pkg = ContextualEvidencePackage.from_dict(latest_cep)
+            rendered = render_repair_directive(pkg)
+            feedback_section = (
+                f"\n\n[PERHATIAN: BLUEPRINT / KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG DETERMINISTIK - REVISI DIPERLUKAN]\n"
+                f"{rendered}\n\n"
+                "INSTRUKSI REVISI DETERMINISTIK WAJIB:\n"
+                "1. Analisis bukti kegagalan deterministik di atas dan patuhi batas perubahan (REPAIR BOUNDARIES).\n"
+                "2. Selesaikan seluruh REQUIRED CHANGES dan pastikan tidak ada unresolvable symbols atau duplikasi deklarasi.\n"
+                "3. Definisikan `interface_contracts` secara eksplisit agar kontrak lolos validasi Contract Gate."
+            )
+            tracer = get_tracer(state.get("run_id"))
+            if tracer and hasattr(tracer, "log_repair_attempt"):
+                rev_idx = state.get("contract_revision_count", 0)
+                tracer.log_repair_attempt(turn=rev_idx, package_id=pkg.package_id, iteration=rev_idx)
+
+    if not feedback_section:
+        contract_feedback = state.get("contract_feedback")
+        if contract_feedback:
+            feedback_section = (
+                f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
+                f"{contract_feedback}\n\n"
+                "INSTRUKSI REVISI WAJIB:\n"
+                "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
+                "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
+            )
 
     # Environment Grounding untuk Architect
     try:

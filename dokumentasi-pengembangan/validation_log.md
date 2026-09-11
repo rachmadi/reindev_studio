@@ -807,4 +807,130 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   - `dokumentasi-pengembangan/experiments/repair_rehabilitation_d10_result.md`
   - `dokumentasi-pengembangan/experiments/repair_rehabilitation_d10_summary.json`
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI IMPLEMENTASI & RUN 3 CLI_T1: ENGINEERING DOCTRINE & INVARIANT LOCK — 2026-09-11 15:20 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Engineering Doctrine 5 Poin):** Modul `backend/contextual_evidence.py` mendeklarasikan doktrin rekayasa generik (Authoritative Contract, Exception Compatibility, Behavioral Invariant Lock, Causal Repair Boundary, Deterministic Verification) tanpa istilah non-formal.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di unit test `test_engineering_doctrine_rendered_for_developer`).
+- **Kriteria 2 (Behavioral Invariant Lock):** Mengunci invarian berbasis kontrak perilaku pengujian (`behavior:test_matrix_addition` dll.) dengan status `PROVEN` dan larangan `BEHAVIORAL_MUTATION: FORBIDDEN`.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di unit test `test_behavioral_invariants_lock_proven_tests`).
+- **Kriteria 3 (Dual-Evidence AST Ground Truth):** Fungsi `inspect_ast_exception_hierarchy` memverifikasi struktur kelas dan pewarisan exception secara deterministik via AST, dan resep `RX-B5-EXC-COMPAT-001` hanya dipancarkan jika traceback runtime DAN AST audit sama-sama mengonfirmasi inkompatibilitas.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di `test_ast_exception_hierarchy_inspector_incompatible`, `_compatible`, dan `test_b5_dual_evidence_synthesis`).
+- **Kriteria 4 (Strict Transparency Riwayat Regresi):** Field `ever_regressed: True`, `regression_count`, dan `regression_history` dipertahankan secara permanen tanpa penghapusan saat invarian pulih.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di unit test `test_preserved_invariant_state_machine_with_history`).
+- **Kriteria 5 (Pre-Flight Gates A–I):** Seluruh 266 unit tests backend dan 9 pre-flight gates lulus 100% sebelum eksekusi Run 3.  
+  *Hasil:* ✅ Terpenuhi (266 passed in 15.35s).
+- **Kriteria 6 (Eksekusi Run 3 cli_t1 & Root Cause Discovery):** Controlled Run 3 dieksekusi selama 714.7 detik (10 loops). Seluruh 5 tes FAILED di setiap loop akibat `TypeError: BaseModel.__init__() takes 1 positional argument`. Investigasi forensik menemukan *Silent Context Truncation* pada `render_repair_directive` (`_MAX_RENDER_CHARS = 2550`) yang memotong habis Actionable Prescriptions dan Engineering Doctrine sebelum sampai ke Developer LLM.  
+  *Hasil:* ✅ Teridentifikasi deterministik (Solusi D-081 dirumuskan: Top-Ordering Prioritization & alokasi kuota 4.500 karakter).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **VALIDATION PENDING (PERSETUJUAN METODOLOGIS D-081 & PENGUNCIAN PROTOKOL RUN 4 DIBERIKAN RESMI OLEH INTENT ARCHITECT — INTERVENSI #84)**
+- **Catatan Otoritas (2026-09-11 15:26 WIB):**
+  1. Intent Architect menyetujui implementasi D-081 dengan 3 perbaikan: (1) Urutan kanonikal linier `failure → causal evidence → prescription → invariant → doctrine → verification` sebelum informasi sekunder; (2) Penghapusan `current_code_excerpt` redundan berdasarkan prinsip *Evidence Density*; (3) Penaikan batas kuota render 2.550 → 4.500 karakter sebagai parameter engineering rasional.
+  2. Penegasan metodologis IA: Kegagalan Run 3 adalah kegagalan sistem pengiriman (*delivery mechanism failure*), bukan kegagalan kemampuan repair coder maupun kegagalan Engineering Doctrine (*treatment* belum sampai ke subjek uji).
+  3. Seluruh variabel lain dikunci 100% (Model Qwen 7B, num_ctx 8192, num_predict 3000, Dev budget <=10, Executor immutable, Oracle immutable, QA=0) untuk menguji pertanyaan riset bersih: *"Setelah evidence dan prescription benar-benar sampai kepada Developer, apakah coder dapat melakukan repair tanpa merusak invariant yang sudah proven?"*.
+  4. Seluruh catatan riset dan berkas log IIDD telah disinkronkan 100%. Sistem siap melakukan implementasi D-081 dan eksekusi Controlled Run 4 `cli_t1`.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: CONTROLLED RUN 4 CLI_T1 (CANONICAL PRIORITIZATION & ZERO FUNCTIONAL REGRESSION) — 2026-09-11 15:44 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Delivery Mechanism Repair & Canonical Prioritization):** Fungsi `render_repair_directive` di `backend/contextual_evidence.py` berhasil menata ulang urutan direktif secara kanonikal linier (`failure → causal evidence → prescription → invariant → doctrine → verification`), mengeliminasi `current_code_excerpt` redundan, dan menaikkan kuota render menjadi 4.500 karakter.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di unit test `test_render_repair_directive_canonical_ordering_and_quota_4500`, 80/80 passed).
+- **Kriteria 2 (Pengujian Terkontrol Run 4 cli_t1):** Run 4 dieksekusi selama 759.25 detik (~12.65 menit) untuk 10 loop penuh di bawah kondisi terkunci ketat (Model `qwen2.5-coder:7b`, Frozen Oracle `0bd5b598...` intact, QA=0, Executor SAFE).  
+  *Hasil:* ✅ Terpenuhi (Run ID: `pv_pilot_cli_t1_rep1_20260911_153134`).
+- **Kriteria 3 (Penerimaan Treatment Resep B5):** Developer pada Loop 1 terbukti langsung menerima resep B5, membuang Pydantic `BaseModel`, mengimplementasikan `Matrix(data)` murni berbasis native list, dan seketika melonjak ke tingkat kelulusan 3/5 TESTS PASSED (60.0%).  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 4 (Pembuktian Zero Functional Regression):** Dari 30 peluang regresi fungsional sepanjang 10 loops (10 loops × 3 invarian terbukti), **tingkat regresi adalah 0.0% (0 / 30)**. Ketiga tes (`test_matrix_addition`, `test_matrix_subtraction`, `test_matrix_multiplication`) berstatus **100% PASS** di seluruh loop.  
+  *Hasil:* ✅ Terpenuhi (Menjawab pertanyaan riset IA: model terbukti mampu melakukan perbaikan tanpa merusak invarian proven!).
+- **Kriteria 5 (Identifikasi Root Cause Stagnasi 2 Uji Dimensi):** Model mengalami *Function Boundary Blind Spot* (E-057) di mana `raise ValueError` dideklarasikan dan dipanggil di dalam fungsi `parse_matrix()`, sedangkan fungsi operasi aljabar `add_matrices()` dan `multiply_matrices()` tidak memvalidasi kesesuaian dimensi sehingga `DID NOT RAISE <class 'ValueError'>`.  
+  *Hasil:* ✅ Teridentifikasi deterministik (Solusi D-082: Perluasan *Function-Level Symbol Binding* pada detektor B5).
+- **Kriteria 6 (Frozen Oracle Immutability):** Hash SHA-256 Frozen Oracle `cli_t1/test_main.py` (`0bd5b598...`) terbukti 100% cocok dan tidak tersentuh.  
+  *Hasil:* ✅ Terpenuhi.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi Resmi:**
+  - ✅ **PASS — Delivery Hypothesis** (Mekanisme pengiriman sukses 100%, Developer menerima resep B5 dan langsung melonjak ke 3/5 PASS pada Loop 1).
+  - ✅ **PASS — Invariant Preservation Hypothesis** (Behavioral Invariant Lock terbukti bekerja sebagai *regression containment*, 0.0% regresi fungsional pada 30 peluang).
+  - ❌ **FAIL — Full Repair / Convergence** (Hasil akhir tetap stagnan pada 3/5 PASS, dua failure target perbaikan belum selesai: `delivery ≠ convergence`).
+  - 🔍 **NEW FINDING — Function-Level Causal Attribution Gap** (Model memahami `raise ValueError`, namun menaruhnya di `parse_matrix()` alih-alih `add_matrices`/`multiply_matrices` yang diuji langsung oleh Oracle).
+- **Waktu Ketetapan:** 2026-09-11 16:30 WIB
+- **Pelaksana Implementasi & Eksperimen:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut yang Ditetapkan IA:**
+  1. Menegakkan koreksi epistemik: dilarang mengklaim konvergensi atau menggunakan frasa overreach ("secara absolut"); luaran akhir adalah bukti parsial perbaikan dan preservasi invarian (`delivery ≠ convergence`).
+  2. Pertahankan 100% seluruh guardrail dan variabel yang telah terbukti (zero mutation on guards: model, context, budget, Oracle, Executor, QA=0, invariant lock, canonical ordering, quota 4.500).
+  3. Rancang dan eksekusi eksperimen Run 5 dengan satu variabel bebas tunggal: *Function-Targeted Prescription* yang menyebut fungsi target eksplisit (`add_matrices`, `multiply_matrices`) dan verifikasi langsung (`pytest.raises(ValueError)`).
+  4. Amati metrik baru: *First Correct Causal Target* untuk mengukur loop pertama di mana model memodifikasi fungsi yang tepat.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: CONTROLLED RUN 5 CLI_T1 (FUNCTION-TARGETED PRESCRIPTION & PRE-EXECUTION GATE B3 DEADLOCK) — 2026-09-11 16:47 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Implementasi Function-Level Symbol Binding):** Modul `backend/context_assembler.py` dilengkapi fungsi `extract_oracle_tested_exception_functions` berbasis AST parser untuk memetakan fungsi target yang diuji Oracle (`add_matrices`, `multiply_matrices`) ke dalam resep `RX-B5-EXC-COMPAT-001`.  
+  *Hasil:* ✅ Terpenuhi (Terverifikasi di unit test `test_b5_function_level_symbol_binding_resolution`, 82/82 contextual tests PASS, 268/268 Pre-Flight Gates A–I PASS).
+- **Kriteria 2 (Pengujian Terkontrol Run 5 cli_t1):** Run 5 dieksekusi selama 573.64 detik (~9.56 menit) untuk 10 loop penuh di bawah kondisi terkunci ketat (Model `qwen2.5-coder:7b`, Frozen Oracle `0bd5b598...` intact, QA=0, Executor SAFE).  
+  *Hasil:* ✅ Terpenuhi (Run ID: `pv_pilot_cli_t1_rep1_20260911_163409`).
+- **Kriteria 3 (Integritas Mutlak Frozen Oracle):** Hash SHA-256 Frozen Oracle `cli_t1/test_main.py` (`0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124`) terbukti **100% INTACT & TIDAK TERSENTUH**.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 4 (Isolasi QA Tester LLM):** QA Tester LLM terbukti 0 pemanggilan (100% Bypassed via Frozen Oracle route).  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 5 (Pengujian Status Gate B3 & Karantina Sandbox):** Seluruh 10 loop (Loop 0–9) ditolak secara deterministik oleh gerbang statis **Gate B3 (`B3_DEVELOPER_PRE_EXECUTION`)** dengan pelanggaran `Data Models mandatory kontrak tidak dideklarasikan: ['dengan']`. Akibat penolakan ini, kode tidak pernah dilepas ke eksekusi sandbox pytest (0 eksekusi).  
+  *Hasil:* ✅ Teridentifikasi deterministik.
+- **Kriteria 6 (Analisis Kausal Regex Generator Kontrak):** Investigasi terhadap `backend/agents/architect.py:200` membuktikan bahwa regex ekstraksi data model `re.findall(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", arch_plan)` secara naif menangkap frasa penjelas bahasa Indonesia: `- \`Matrix\` class dengan metode...`, sehingga mengikat kata sambung `"dengan"` sebagai Data Model wajib pada kontrak FROZEN.  
+  *Hasil:* ✅ Teridentifikasi deterministik (Kasus Baru E-058: *Natural Language Specification Ingestion & Permissive Class Regex Misattribution*).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi Resmi:** 🔍 **INCONCLUSIVE TERHADAP HIPOTESIS H5 (PRE-EXECUTION GATE B3 DEADLOCK)**
+  - Treatment perbaikan B5 (*Function-Targeted Prescription*) berada di hilir eksekusi sandbox pytest. Karena kode terhenti di gerbang verifikasi statis hulu Gate B3, prescription B5 tidak pernah dibangkitkan ataupun diuji oleh model.
+  - Hasil Run 5 bukan falsifikasi ataupun konfirmasi terhadap H5, melainkan demonstrasi ketatnya penegakan kontrak oleh Gate B3 terhadap artefak ekstraksi hulu.
+- **Waktu Ketetapan:** 2026-09-11 16:47 WIB
+- **Pelaksana Implementasi & Eksperimen:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Rekomendasi Tindak Lanjut untuk IA:**
+  1. Perketat regex ekstraksi kelas pada `backend/agents/architect.py:200` agar hanya mencocokkan sintaks deklarasi kelas Python yang sah (`r"class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*\(.*?\))?\s*:"`) dan mengabaikan stop words bahasa Indonesia/Inggris (seperti `dengan`, `and`, `or`, `for`, `in`, `is`, `as`).
+  2. Uji ulang Controlled Run 5.1 dengan perbaikan regex tersebut guna memastikan pengujian Hipotesis H5 berjalan bersih tanpa perancu hulu Gate B3.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: CONTROLLED RUN 5.1 CLI_T1 (RESOLUSI E-058 & INTERFACE MISMATCH AUTOPSY) — 2026-09-11 17:55 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal (Micro Loop Agen)
+- **Kriteria 1 (Resolusi Defek Ekstraksi Hulu E-058):** Regex ekstraksi kelas formal berbasis sintaks Python (`backend/agents/architect.py:200`) terbukti hanya mengekstrak `['Matrix']` (`models_count = 1`). Kata sambung `"dengan"` lenyap 100%.  
+  *Hasil:* ✅ Terpenuhi (8/8 tests architect validator PASS, 269 Pre-Flight Gates A–I PASS).
+- **Kriteria 2 (Pengujian Status Gate B3 & Tembusnya Sandbox):** Pada Loop 0 (17:32:39 WIB), Gate B3 memberikan verdict `PASS`. Kode Developer dialirkan langsung ke runner sandbox Frozen Oracle. Deadlock Run 5 terpecahkan 100%.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 3 (Pengujian Terkontrol Run 5.1 cli_t1):** Run 5.1 dieksekusi selama 1.157,43 detik (~19.29 menit) untuk 10 loop penuh di bawah kondisi terkunci ketat (Model `qwen2.5-coder:7b`, Frozen Oracle `0bd5b598...` intact, QA=0, Executor SAFE).  
+  *Hasil:* ✅ Terpenuhi (Run ID: `pv_pilot_cli_t1_rep1_20260911_172558`).
+- **Kriteria 4 (Integritas Mutlak Frozen Oracle):** Hash SHA-256 Frozen Oracle `cli_t1/test_main.py` (`0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124`) terbukti **100% INTACT & TIDAK TERSENTUH**.  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 5 (Isolasi QA Tester LLM):** QA Tester LLM terbukti 0 pemanggilan (100% Bypassed via Frozen Oracle route).  
+  *Hasil:* ✅ Terpenuhi.
+- **Kriteria 6 (Autopsi Hasil Uji & Penemuan Interface Mismatch):** Seluruh 10 loop menghasilkan 0/5 PASS (0.0%). Investigasi trace mengungkap bahwa kelas `Matrix` tidak memiliki dunder `__add__`, sehingga test runner memanggil `main.add_matrices(a, b)` dengan argumen raw `list`. Fungsi Developer mengasumsikan instance `Matrix` (`return a.add(b)`), memicu `AttributeError: 'list' object has no attribute 'add'` di semua 5 pengujian.  
+  *Hasil:* ✅ Teridentifikasi deterministik (Kasus E-059).
+- **Kriteria 7 (Evaluasi Metrik First Correct Causal Target):** Developer tidak pernah mengubah `add_matrices` atau `multiply_matrices` sepanjang 10 loop (*First Correct Causal Target = FAILED / N/A*) akibat terjebak dalam *Priority Masking Trap* oleh error tipe built-in `list`.  
+  *Hasil:* ✅ Teridentifikasi empiris.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ MENUNGGU TINJAUAN & PUTUSAN RESMI INTENT ARCHITECT (POST-RUN 5.1)
+- **Waktu Laporan:** 2026-09-11 17:55 WIB
+- **Pelaksana Implementasi & Eksperimen:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Rekomendasi Tindak Lanjut untuk IA:**
+  1. Penanganan *Interface Impedance Mismatch* pada fungsi-fungsi publik modul aljabar: instruksi preskriptif harus mencakup penanganan tipe polimorfik: `if isinstance(a, list): a = Matrix(a)`.
+  2. Alternatif arsitektural: penegakan dunder operator (`__add__`, `__sub__`, `__mul__`) pada kelas model data numerik di fase Architect Validator.
+
+
 
