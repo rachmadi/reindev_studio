@@ -522,6 +522,46 @@ def check_oracle_interface_consistency(
                     f"jangan mengimprovisasi atau menyingkat interface."
                 )
 
+        # 3. Kasus Dart / Flutter test (Widget Test & Dart Unit Test)
+        if fname.endswith(".dart"):
+            dart_framework_types = {
+                "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
+                "Container", "Card", "Text", "Center", "Row", "Column", "Padding",
+                "WidgetTester", "Key", "Colors", "Icon", "Icons", "ConsumerWidget",
+                "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Widget",
+                "Expanded", "Flexible", "ListView", "SingleChildScrollView", "AppBar",
+                "FloatingActionButton", "ElevatedButton", "TextButton", "IconButton",
+                "Stack", "Positioned", "Align", "Duration", "Future", "Stream",
+                "ValueNotifier", "ChangeNotifier", "StateNotifier", "Provider",
+                "StateProvider", "FutureProvider", "StreamProvider", "NotifierProvider",
+                "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
+                "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
+            }
+            dart_tested_symbols = set()
+            # 3a. find.byType(WidgetName)
+            for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
+                if sym not in dart_framework_types:
+                    dart_tested_symbols.add(sym)
+            # 3b. Widget constructors in test widget trees (body: WidgetName(, child: WidgetName(, home: WidgetName()
+            for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
+                if sym not in dart_framework_types:
+                    dart_tested_symbols.add(sym)
+            # 3c. General class/widget invocations in test bodies (fallback if no byType / tree calls)
+            if not dart_tested_symbols:
+                for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
+                    if sym not in dart_framework_types:
+                        dart_tested_symbols.add(sym)
+
+            if dart_tested_symbols and contract_symbols:
+                common = contract_symbols.intersection(dart_tested_symbols)
+                if not common:
+                    return False, (
+                        f"Contract interface {sorted(contract_symbols)} tidak konsisten dengan authoritative acceptance call-site "
+                        f"{sorted(dart_tested_symbols)} pada berkas pengujian '{fname}'. "
+                        f"Otoritas pengujian acceptance menuntut antarmuka {sorted(dart_tested_symbols)}. "
+                        f"Tinjau kembali rencana arsitektur dan selaraskan interface_contracts terhadap acceptance call-site sebelum kontrak dapat dibekukan (FROZEN)."
+                    )
+
     return True, None
 
 

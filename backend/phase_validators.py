@@ -597,7 +597,8 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
         "blueprint_ast_consistency",
         "contract_frozen_status",
         "contract_sha256_seal_integrity",
-        "public_interfaces_defined"
+        "public_interfaces_defined",
+        "contract_oracle_consistency",
     ]
 
     # 1. Blueprint presence
@@ -670,6 +671,9 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
         "expected": {"status": "FROZEN", "sha256": "64-hex-chars"},
         "status": "VALID" if (is_frozen and has_sha) else "INVALID"
     })
+    gate_errors = state.get("contract_validation_errors") or []
+    has_oracle_inconsistency = any("Oracle Consistency" in str(e) or "inconsistent with the frozen test" in str(e) for e in gate_errors)
+
     if not is_frozen:
         violations.append({
             "criterion": "contract_frozen_status",
@@ -677,13 +681,14 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
             "message": f"Status kontrak belum FROZEN (status saat ini: {contract_status})",
             "location": "contract"
         })
-        gate_errors = state.get("contract_validation_errors") or []
         for gerr in gate_errors:
+            crit_name = "contract_oracle_consistency" if ("Oracle Consistency" in gerr or "inconsistent with the frozen test" in gerr) else "contract_gate_p0_2_1"
             violations.append({
-                "criterion": "contract_gate_p0_2_1",
+                "criterion": crit_name,
                 "severity": "CRITICAL",
                 "message": gerr,
-                "location": "contract"
+                "location": "contract",
+                "expected": "Seluruh interface contract selaras dengan pemanggilan Acceptance Oracle pada berkas pengujian independen" if crit_name == "contract_oracle_consistency" else "Kontrak lolos validasi 4 Pilar",
             })
     if not has_sha:
         violations.append({
@@ -710,6 +715,15 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
             "location": "contract"
         })
 
+    # 5. Contract–Oracle Consistency Check (Church of Goat Doctrine 🐐)
+    evidence.append({
+        "item": "contract_oracle_interface_consistency",
+        "evidence_class": "DETERMINISTIC",
+        "observed": "Inconsistent with Frozen Oracle acceptance call-site" if has_oracle_inconsistency else "Consistent / Valid",
+        "expected": "Interface contracts strictly consistent with authoritative Frozen Oracle call-sites",
+        "status": "INVALID" if has_oracle_inconsistency else "VALID"
+    })
+
     verdict = "FAIL" if any(v["severity"] == "CRITICAL" for v in violations) else "PASS"
 
     contract_rev = state.get("contract_revision_count", 0)
@@ -717,11 +731,18 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
     remaining_contract_budget = max(0, max_contract_rev - contract_rev)
 
     if verdict == "FAIL":
-        required_repairs.append({
-            "target_phase": "ARCHITECT",
-            "action": "REFINE_ARCHITECTURE_AND_CONTRACT",
-            "details": "Perbaiki inkonsistensi simbol pada blueprint dan pastikan kontrak berstatus FROZEN dengan interface contracts lengkap."
-        })
+        if has_oracle_inconsistency:
+            required_repairs.append({
+                "target_phase": "ARCHITECT",
+                "action": "ALIGN_CONTRACT_WITH_ORACLE",
+                "details": "Selaraskan nama dan signature interface_contracts terhadap pemanggilan aktual Acceptance Oracle sebelum kontrak dapat dibekukan (FROZEN)."
+            })
+        else:
+            required_repairs.append({
+                "target_phase": "ARCHITECT",
+                "action": "REFINE_ARCHITECTURE_AND_CONTRACT",
+                "details": "Perbaiki inkonsistensi simbol pada blueprint dan pastikan kontrak berstatus FROZEN dengan interface contracts lengkap."
+            })
 
     # Iterasi 7: Assemble ContextualEvidencePackage on FAIL
     cep_dict_b2: Optional[Dict[str, Any]] = None

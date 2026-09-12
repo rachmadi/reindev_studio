@@ -1238,15 +1238,15 @@ def synthesize_b5_actionable_prescriptions(
             f_path = m.group("file") or default_test_file
             l_no = int(m.group("line")) if m.group("line") else 0
             call_site = _extract_dart_callsite(test_files, f_path, l_no, code_files=code_files)
-            if "Oracle test call site" in call_site:
+            if "Oracle test call site" in call_site or "[AUTHORITATIVE ORACLE CALL-SITE]" in call_site:
                 req_change = (
-                    f"Symbol '{symbol}' is invoked or referenced by the caller at {call_site} but is not defined or exported in '{auth_file}'. "
-                    f"Define or export class/method '{symbol}' with the interface expected by the caller."
+                    f"The implementation must satisfy the authoritative '{symbol}' call-site at {call_site} "
+                    f"while preserving all valid frozen external requirements."
                 )
             else:
                 req_change = (
-                    f"Symbol '{symbol}' is referenced at {call_site} but is not defined or exported in '{auth_file}'. "
-                    f"Define or export class/method '{symbol}' to satisfy the interface requirement."
+                    f"The implementation must satisfy reference to symbol '{symbol}' at {call_site} "
+                    f"while preserving all valid frozen external requirements."
                 )
             rx = ActionableRepairPrescription(
                 prescription_id=f"RX-B5-DART-SYMBOL-{len(prescriptions)+1:03d}",
@@ -1257,14 +1257,14 @@ def synthesize_b5_actionable_prescriptions(
                 evidence_basis="DART_COMPILER_DIAGNOSTIC_TRACE",
                 required_change=req_change,
                 repair_boundary_allowed=[
-                    f"Define or export class or method '{symbol}' in '{auth_file}'",
+                    f"Implement or expose '{symbol}' in '{auth_file}' to satisfy caller invocation while maintaining contract integrity",
                     f"Align constructor parameters and attributes of '{symbol}' to match caller invocation",
                 ],
                 repair_boundary_forbidden=[
                     "Do NOT modify Frozen Oracle test files",
                     "Do NOT alter frozen contract status",
                 ],
-                expected_post_repair_state=f"Symbol '{symbol}' is defined and accessible to the test runner without compiler error.",
+                expected_post_repair_state=f"Invocation of '{symbol}' satisfies caller requirement without compiler error.",
                 verification_evidence=f"Dart compiler compiles '{auth_file}' without reporting missing symbol '{symbol}'.",
             )
             _record_or_merge_dart_rx(rx.implementation_symbol, rx, call_site, f_path, l_no, max_new=3)
