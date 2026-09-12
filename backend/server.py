@@ -27,6 +27,12 @@ BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+from dotenv import load_dotenv
+load_dotenv(BACKEND_DIR / ".env")
+
+os.environ.setdefault("OLLAMA_NUM_CTX", "8192")
+os.environ.setdefault("OLLAMA_NUM_PREDICT", "3000")
+
 from backend.state import SquadState
 from backend.graph import squad_graph
 from backend.tracer import RunTracer, get_tracer, compute_sha256, compute_dict_hashes

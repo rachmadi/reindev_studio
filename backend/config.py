@@ -1,8 +1,11 @@
 import os
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
 
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(_ENV_PATH)
 load_dotenv()
 
 def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
@@ -73,15 +76,13 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
         from langchain_ollama import ChatOllama
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         model = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
-        # Fix A (Iterasi 7): num_ctx 4096→8192 (headroom context untuk prompt panjang),
-        # architect 1500→2800 (forensik: attempt 1 terpotong di char 1224 saat tulis code_scaffold JSON).
-        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
         
         role_num_predict = {
-            "pm": 800,
-            "architect": 2800,
-            "developer": 1500,
-            "tester": 1200,
+            "pm": 300,
+            "architect": 350,
+            "developer": 1000,
+            "tester": 1000,
             "reviewer": 1000,
         }
         num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", str(role_num_predict.get(role, 600))))
