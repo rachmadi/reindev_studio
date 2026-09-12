@@ -268,13 +268,20 @@ def developer_agent(state: SquadState) -> dict:
             qa_test_str = "\n".join(qa_test_blocks) if qa_test_blocks else "(Belum ada test)"
 
             if os.environ.get("REINDEV_TREATMENT_B_R3", "0") == "1":
-                r3_directive = (
-                    "3. [CONTRACT BOUNDARY PRINCIPLE]:\n"
-                    "   Status Frozen berlaku ketat pada elemen kontrak eksternal yang disegel:\n"
-                    "   - Target File Authoritative, nama kelas/interface publik, route endpoint, HTTP verbs, dan schema kontrak yang disegel.\n"
-                    "   Detail implementasi internal yang tidak disegel secara eksplisit (seperti representasi field internal, nilai default parameter/field, adapter, atau pemetaan internal) DAPAT disesuaikan bila diperlukan oleh bukti deterministik, asalkan seluruh invarian eksternal yang disegel tetap terjaga 100%.\n"
-                    f"4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
-                )
+                if os.environ.get("REINDEV_R3_TREATMENT_AUTHORITY", "0") == "1":
+                    r3_directive = (
+                        "3. [CONTRACT BOUNDARY & ORACLE AUTHORITY PRINCIPLE]:\n"
+                        "   Acceptance Oracle memiliki otoritas lebih tinggi daripada detail implementasi internal yang tidak secara eksplisit dibekukan. Jika Oracle secara deterministik mensyaratkan sebuah symbol/interface yang belum tercakup dalam frozen contract invariant, Developer wajib memenuhi requirement tersebut; hal itu bukan pelanggaran Contract Boundary.\n"
+                        f"4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
+                    )
+                else:
+                    r3_directive = (
+                        "3. [CONTRACT BOUNDARY PRINCIPLE]:\n"
+                        "   Status Frozen berlaku ketat pada elemen kontrak eksternal yang disegel:\n"
+                        "   - Target File Authoritative, nama kelas/interface publik, route endpoint, HTTP verbs, dan schema kontrak yang disegel.\n"
+                        "   Detail implementasi internal yang tidak disegel secara eksplisit (seperti representasi field internal, nilai default parameter/field, adapter, atau pemetaan internal) DAPAT disesuaikan bila diperlukan oleh bukti deterministik, asalkan seluruh invarian eksternal yang disegel tetap terjaga 100%.\n"
+                        f"4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
+                    )
             else:
                 r3_directive = (
                     f"3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"

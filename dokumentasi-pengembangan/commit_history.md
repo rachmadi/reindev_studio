@@ -506,4 +506,97 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/experiments/flutter_t1_cross_ecosystem_forensic_investigation_report.md` (NEW — Laporan forensik Run 1 s.d. Run 4).
   - `dokumentasi-pengembangan/`: Sinkronisasi 10 berkas tata kelola IIDD (`decision_log.md` D-095..D-100, `human_intervention.md` #106..#110, `error_log.md` E-063..E-067, `catatan_riset_pengujian_preset.md`, `validation_log.md`, `context_drift_log.md`, `waktu_estimasi_vs_realisasi.md`, `durasi_per_fitur.md`, `conversation_log.md`, `commit_history.md`).
 
+---
 
+### Commit: b438ef1 — 2026-09-12
+- **Commit Hash:** `b438ef1`
+- **Status:** TERVERIFIKASI PENUH (8/8 Semantic State Preservation tests PASS, 419/419 backend regression tests PASS, Preflight Gates A–I PASS)
+- **Tipe:** `feat(contract)` / `feat(validator)`
+- **Pesan Commit:** `feat(contract): implement authority-state separation (D-103) and semantic state preservation across serialization repair (D-104)`
+- **Waktu:** 2026-09-12 10:45 WIB
+- **Cakupan Perubahan:**
+  - `backend/contract.py`: Ekstraksi deterministik `extract_proven_semantic_interfaces` dan `extract_oracle_tested_symbols`.
+  - `backend/context_assembler.py`: Pemisahan authority state pada B2 CEP, klasifikasi `REJECTED_CONTRACT` sebagai diagnostic-only, penerbitan `PROVEN_SEMANTIC_INVARIANT`, preskripsi `RX-B2-SEMANTIC-PRESERVE-001`.
+  - `backend/phase_validators.py`: Pemisahan evaluasi `blueprint_ast_validity` vs `contract_oracle_interface_consistency` dan deteksi otomatis `SEMANTIC_REGRESSION`.
+  - `backend/graph.py`: Timing Turn-0 fix dan propagasi `proven_semantic_interfaces` lintas iterasi perbaikan.
+  - `backend/agents/architect.py`: Preservasi invarian semantik terbukti pada `aligned_contract`.
+  - `backend/tests/test_b2_authority_state.py` (NEW — 6 unit tests).
+  - `backend/tests/test_semantic_state_preservation.py` (NEW — 8 unit tests).
+
+---
+
+### Commit: c592ae8 — 2026-09-12
+- **Commit Hash:** `c592ae8`
+- **Status:** TERVERIFIKASI PENUH (Fresh Flutter Pilot pv_pilot_flutter_t1_rep1_20260912_105346 Completed, Stop Rule Reached, Moratorium Aktif)
+- **Tipe:** `docs(forensics)` / `docs(iid)`
+- **Pesan Commit:** `docs(forensics): forensic investigation report of fresh flutter pilot pv_pilot_flutter_t1_rep1_20260912_105346 and full IIDD sync`
+- **Waktu:** 2026-09-12 11:22 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/flutter_t1_d104_pilot_forensic_investigation_report.md` (NEW — Laporan forensik 54 event telemetri fresh pilot).
+  - `dokumentasi-pengembangan/decision_log.md`: Entri D-105 (Evaluasi Empiris D-104 & Diagnostik Model Sekunder).
+  - `dokumentasi-pengembangan/human_intervention.md`: Entri #115 (Otorisasi Pilot Pasca D-104) & #116 (Perintah Audit Forensik & Sinkronisasi).
+  - `dokumentasi-pengembangan/validation_log.md`: Validasi D-103, D-104, dan Fresh Flutter Pilot Run.
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Bagian 30 (Validasi Doktrin Church of Goat, D-104, dan Hasil Forensik Fresh Pilot).
+  - `dokumentasi-pengembangan/error_log.md`: Kasus E-068, E-069, E-070.
+  - `dokumentasi-pengembangan/conversation_log.md`: Log percakapan 09:40 s.d. 11:18 WIB.
+  - `dokumentasi-pengembangan/commit_history.md`: Pemutakhiran rekam jejak commit.
+
+---
+
+### Commit: e982fa1 — 2026-09-12
+- **Commit Hash:** `e982fa1`
+- **Status:** TERVERIFIKASI PENUH (12/12 Targeted V6 Tests PASS, 251/251 Backend Tests PASS, Preflight Gates A–I PASS, Oracle SHA Intact)
+- **Tipe:** `fix(validator)` / `feat(reviewer)`
+- **Pesan Commit:** `fix(reviewer): implement V6 intent classification and reviewer cognitive symmetry (D-112)`
+- **Waktu:** 2026-09-12 14:35 WIB
+- **Cakupan Perubahan:**
+  - `backend/phase_validators.py`: Penggantian raw substring matching `"ubah kontrak"` dengan parser intent auditable `classify_contract_mutation_demand()`.
+  - `backend/agents/reviewer.py`: Integrasi Doktrin #6 (Caller Consistency) dan Hierarki Bukti Rekayasa ke `REVIEWER_SYSTEM_PROMPT` dan `audit_directive`.
+  - `backend/tests/test_v6_reviewer_hardening.py`: Penambahan 3 unit test baru untuk 5 kasus mandat IA (12/12 PASS).
+  - Verifikasi Kriptografis: Frozen Oracle `card_metric_test.dart` SHA-256 (`4589e15c...`) terverifikasi 100% utuh pre, in, dan post-flight.
+
+---
+
+### Commit: f710bc4 — 2026-09-12
+- **Commit Hash:** `f710bc4`
+- **Status:** TERVERIFIKASI PENUH (Ornith 9B Re-Run PASS, Qwen 3.5 9B Confirmation Completed, IIDD Synchronized)
+- **Tipe:** `test(ablation)` / `docs(iid)`
+- **Pesan Commit:** `test(ablation): controlled re-run of ornith:9b (PASS) and qwen3.5:9b confirmation run with full IIDD sync`
+- **Waktu:** 2026-09-12 15:05 WIB
+- **Cakupan Perubahan:**
+  - Re-Run `ornith:9b` (`pv_ablation_dev_r3_ornith_9b_flutter_t1_rep1_20260912_143026`, durasi 418.98s): Konvergensi penuh 2/2 tests PASS, Reviewer APPROVED, Final PASS.
+  - Confirmation Run `qwen3.5:9b` (`pv_ablation_dev_r3_qwen35_9b_flutter_t1_rep1_20260912_144208`, durasi 873.37s): Zero Downstream Leakage, Developer Stagnation confirmed.
+  - `dokumentasi-pengembangan/`: Sinkronisasi 10 berkas tata kelola IIDD (`decision_log.md` D-112, `human_intervention.md` #123..#124, `error_log.md`, `catatan_riset_pengujian_preset.md`, `validation_log.md`, `waktu_estimasi_vs_realisasi.md`, `durasi_per_fitur.md`, `conversation_log.md`, `commit_history.md`).
+
+---
+
+### Commit: a839ef2 — 2026-09-12
+- **Commit Hash:** `a839ef2`
+- **Status:** TERVERIFIKASI PENUH (Cross-Domain Generalization FastAPI & CLI PASS, Flutter All-7B Investigated, IIDD Synchronized)
+- **Tipe:** `test(generalization)` / `docs(iidd)`
+- **Pesan Commit:** `test(generalization): verify locked invariants on FastAPI & CLI (PASS) and audit Flutter 7B boundary (D-116)`
+- **Waktu:** 2026-09-12 18:05 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/fastapi_t1_generalization_locked_invariants_report.md`: Laporan formal uji generalisasi FastAPI pada Ornith:9b Dev (PASS) dan Qwen 7B Dev (PASS).
+  - `dokumentasi-pengembangan/experiments/cli_t1_generalization_locked_invariants_qwen7b_report.md`: Laporan formal uji generalisasi CLI pada All Qwen 7B (PASS).
+  - `dokumentasi-pengembangan/experiments/flutter_t1_generalization_locked_invariants_qwen7b_report.md`: Laporan formal uji Flutter All-7B dan audit investigasi kegagalan stagnasi kelas.
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Penambahan Bagian 22 (FastAPI & CLI Generalization) dan Bagian 23 (Flutter All-7B Comparative Audit).
+  - `dokumentasi-pengembangan/`: Sinkronisasi 8 berkas tata kelola IIDD (`decision_log.md` D-116, `error_log.md` E-081, `human_intervention.md` #128-#131, `validation_log.md`, `durasi_per_fitur.md`, `waktu_estimasi_vs_realisasi.md`, `commit_history.md`, `conversation_log.md`).
+---
+
+### Sesi Validasi Resmi: Iterasi 6 Mendapatkan Status PASS dari Intent Architect (2026-09-12 19:18 WIB)
+- **Status:** ✅ **RESMI TERVALIDASI (STATUS PASS DIBERIKAN OLEH INTENT ARCHITECT)**
+- **Tipe:** `docs(iidd)` / `feat(validation)`
+- **Waktu:** 2026-09-12 19:18 WIB
+- **Pesan Log:** `docs(iteration6): official validation gate PASS by Intent Architect post 3-preset verification and full IIDD sync`
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/validation_log.md`: Pengesahan kelulusan TC-IA-01 s.d. TC-IA-06 dan penetapan status resmi PASS untuk Iterasi 6.
+  - `dokumentasi-pengembangan/decision_log.md`: Keputusan arsitektural D-117 (Penutupan resmi Iterasi 6 pasca pembuktian keberhasilan 3 preset).
+  - `dokumentasi-pengembangan/durasi_per_fitur.md`: Penambahan Sesi 25 dan penutupan status Iterasi 6 menjadi CLOSED & FULLY PASSED.
+  - `dokumentasi-pengembangan/waktu_estimasi_vs_realisasi.md`: Pemutakhiran status validasi Iterasi 6 menjadi PASS.
+  - `dokumentasi-pengembangan/context_drift_log.md`: Penutupan siklus drift Iterasi 6 secara definitif.
+  - `dokumentasi-pengembangan/human_intervention.md`: Pencatatan intervensi IA #132 s.d. #136.
+  - `dokumentasi-pengembangan/error_log.md`: Dokumentasi kasus E-082 dan E-083.
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Bagian 28 (Konsolidasi 5-Way Matrix dan Replikasi ke-2 Ornith 9B).
+  - `dokumentasi-pengembangan/conversation_log.md`: Pencatatan putusan resmi IA dan konfirmasi agen.
+  - Verifikasi Kualitas: 273/273 unit tests backend lulus 100%, Frozen Oracles 100% utuh pre & post-flight.

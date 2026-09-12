@@ -56,3 +56,9 @@ class SquadState(TypedDict):
     invariant_regression_history: Optional[Dict[str, Any]]
     review_verdict: Optional[str]
     expected_oracle_sha: Optional[str]
+    locked_invariants: Optional[Dict[str, Any]]  # Invarian deterministik yang berstatus PROVEN/LOCKED
+    oscillation_history: Optional[List[Dict[str, Any]]]  # Riwayat osilasi regresi-pemulihan
+    # Evidence dari turn sebelumnya untuk discovery kandidat lintas-turn
+    # PENTING: hanya digunakan sebagai sumber kandidat, BUKAN sebagai bukti PROVEN langsung
+    previous_diagnostic_evidence: Optional[Dict[str, Any]]  # diagnostic_evidence turn N-1
+    previous_executor_stderr: Optional[str]  # Stderr kompilasi turn N-1

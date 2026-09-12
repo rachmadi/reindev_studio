@@ -193,16 +193,38 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
         if success:
             sha256_seal = frozen_contract.get("provenance", {}).get("contract_sha256", "")
 
+    # Ekstraksi dan propagasi invarian semantik terbukti (Semantic Invariant Preservation)
+    try:
+        from .contract import extract_proven_semantic_interfaces
+    except (ImportError, ValueError):
+        try:
+            from contract import extract_proven_semantic_interfaces
+        except ImportError:
+            def extract_proven_semantic_interfaces(*args, **kwargs): return []
+
+    target_lang = state.get("target_language", "python").strip()
+    eval_target_contract = frozen_contract if success else (contract or {})
+    c_ifaces = eval_target_contract.get("interface_contracts", []) if isinstance(eval_target_contract, dict) else []
+    curr_proven = extract_proven_semantic_interfaces(c_ifaces, frozen_oracle_path, target_lang)
+    prior_proven = state.get("proven_semantic_interfaces") or []
+    merged_proven = sorted(list(set(prior_proven + curr_proven)))
+
     # 2. Evaluate Architect Phase Contract & Blueprint
     temp_state = dict(state)
+    temp_state["proven_semantic_interfaces"] = merged_proven
     if success:
         temp_state["contract"] = frozen_contract
         temp_state["contract_status"] = ContractStatus.FROZEN.value
         temp_state["contract_sha256"] = sha256_seal
+        temp_state["contract_validation_errors"] = []
+        temp_state["contract_feedback"] = None
     else:
         temp_state["contract_status"] = ContractStatus.REJECTED.value
+        temp_state["contract_validation_errors"] = errors
+        temp_state["contract_feedback"] = "\n\n".join(errors) if errors else ""
 
     val_contract = validate_architect_phase(temp_state)
+
 
     if success and val_contract.get("verdict") == "PASS":
         verdict = "PASS"
@@ -223,6 +245,7 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
     res: Dict[str, Any] = {
         "architect_validator_contract": val_contract,
         "contract_revision_count": count + 1,
+        "proven_semantic_interfaces": merged_proven,
         "logs": logs
     }
 
@@ -250,12 +273,16 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
                     rendered = render_repair_directive(pkg)
                     feedback_str = (rendered + "\n\n" + feedback_str).strip()
 
+            res["contract"] = frozen_contract if success else contract
             res["contract_status"] = ContractStatus.REJECTED.value
             res["contract_validation_errors"] = errors
             res["contract_feedback"] = feedback_str
+            res["proven_semantic_interfaces"] = merged_proven
         else:
+            res["contract"] = frozen_contract if success else contract
             res["contract_status"] = ContractStatus.REJECTED.value
             res["status"] = "terminal_failure_architect_boundary"
+            res["proven_semantic_interfaces"] = merged_proven
 
     return res
 
@@ -596,7 +623,14 @@ def executor_validator_node(state: SquadState) -> Dict[str, Any]:
         "executor_iteration_validator_contract": contract,
         "previous_passed_tests": current_passed,
         "invariant_regression_history": history_map,
-        "logs": logs
+        "locked_invariants": contract.get("locked_invariants", {}),
+        "oscillation_history": contract.get("oscillation_history", []),
+        "logs": logs,
+        # Simpan evidence turn SAAT INI sebagai "previous" untuk turn berikutnya.
+        # Digunakan oleh discover_newly_proven_invariants sebagai sumber kandidat saja
+        # (bukan sebagai bukti PROVEN langsung — dual gate tetap menentukan status PROVEN).
+        "previous_diagnostic_evidence": (state.get("test_results") or {}).get("diagnostic_evidence") or {},
+        "previous_executor_stderr": (state.get("test_results") or {}).get("stderr") or "",
     }
 
     if verdict == "FAIL":

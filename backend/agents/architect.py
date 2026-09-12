@@ -501,6 +501,17 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
         else:
             aligned_contract = _build_default_aligned_contract(draft_contract, user_task, target_lang, arch_plan)
 
+    # Preservasi Invarian Semantik Terbukti (Semantic State Preservation Across Serialization Repair)
+    proven_ifaces = state.get("proven_semantic_interfaces") or []
+    if proven_ifaces and aligned_contract.get("interface_contracts"):
+        c_idents = {ifc.get("identifier") for ifc in aligned_contract["interface_contracts"]}
+        for p_ident in proven_ifaces:
+            if p_ident not in c_idents:
+                aligned_contract["interface_contracts"][0]["identifier"] = p_ident
+                if aligned_contract.get("testable_assertions"):
+                    aligned_contract["testable_assertions"][0]["target_symbol"] = p_ident
+                    aligned_contract["testable_assertions"][0]["input_fixture"] = f"{p_ident}()"
+
     # Observability: Catat penyelarasan kontrak ALIGNED
     tracer = get_tracer(state.get("run_id"))
     if tracer:

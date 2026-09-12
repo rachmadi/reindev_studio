@@ -136,7 +136,7 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 - Total Waktu Pengujian & Uji Ulang (Test): 1.216 detik (20.27 menit / 0.34 jam)
 - Total Waktu Perbaikan & Adaptasi (Fix): 2.758 detik (45.97 menit / 0.77 jam)
 - **TOTAL WAKTU REALISASI ITERASI 6:** **4.646 detik (~77 menit 26 detik / 1.29 jam)**
-- Status Validasi Intent Architect: **⏳ PENDING EVALUATION IA (Siap Diuji di http://localhost:8085/)**
+- Status Validasi Intent Architect: **✅ PASS (Disetujui Penuh oleh Intent Architect pada 2026-09-12 19:18 WIB pasca pengujian dan verifikasi 3 misi preset)**
 
 ---
 
@@ -201,9 +201,11 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **P0-1 & P0-2** | Machine-Readable Contract, Frontier & Dynamic Depth | — | 22.00 | 1.320,0 m | — | 2026-09-10 (P0-2, Frontier 9-Run, Gemma 4, A5/D5, D10) |
 | **Deterministic CEP** | Phase-End Validation Pilot & Controlled Runs 1–5.1 | — | 5.21 | 312.7 m | — | 2026-09-11 (B1–B6, CEP, Runs 3, 4, 5, 5.1) |
 | **JSON & V5 Hardening** | JSON Migration, V5 Evidence & Forensic Ablation Study | — | 6.50 | 390.0 m | — | 2026-09-11 s.d. 2026-09-12 (6.50 jam) |
+| **Treatment A & Flutter** | Provenance Deduplication, Run 1–4, Hierarchy Failure | — | 2.10 | 126.0 m | — | 2026-09-12 04:36 s.d. 06:37 WIB (2.10 jam) |
+| **D-103, D-104 & Pilot** | Consistency Gate, Preservation, Fresh Pilot & Forensic | — | 1.70 | 102.0 m | — | 2026-09-12 09:40 s.d. 11:22 WIB (1.70 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **53.28** | **3.196,8 m** | **+7.28** | **Termasuk 50.02 jam riset, eksperimen, validasi formal & autopsi kausal** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **57.08** | **3.424,8 m** | **+11.08** | **Termasuk 53.82 jam riset, eksperimen, validasi formal & autopsi kausal** |
 
 ---
 
@@ -239,9 +241,117 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | Implementasi Provenance Deduplication, Run 4 & Autopsi Otoritas | — | 0.35 | 21.0 m | — | Provenance preservation 10/10 tests PASS, Run 4 (179s), penemuan Hierarchy-of-Authority |
 | **Total Sesi Riset Lintas Ekosistem (2026-09-12)** | **—** | **2.10** | **126.0 m** | **—** | **Kumulatif Riset: 52.12 jam** |
 
-*Ringkasan Grand Total Kumulatif Proyek Terbaru:*
+*Ringkasan Grand Total Kumulatif Proyek Sesi 04:36–06:37 WIB:*
 - Total Keseluruhan (Fitur + Riset + Eksperimen): **55.38 jam (3.322,8 menit)**
 - Total Riset, Eksperimen & Forensik: **52.12 jam**
 - Status: **✅ SELESAI & DIVERIFIKASI (Investigasi Forensik Run 4 Tuntas — Moratorium Run 5 Aktif)**
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI IMPLEMENTASI D-103, D-104, FRESH FLUTTER PILOT & FORENSIK D-104 — 2026-09-12 09:40 s.d. 11:22 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Implementasi D-103 (Contract-Oracle Gate, Authority State, Unit Tests 6/6 PASS) | — | 0.50 | 30.0 m | — | Pemisahan wewenang state, Turn-0 timing fix, 411 backend tests PASS |
+| Implementasi D-104 (Semantic State Preservation across Serialization Repair) | — | 0.22 | 13.0 m | — | Invariant preservation, deteksi semantic regression, 8/8 unit tests PASS |
+| Eksekusi Fresh Flutter Pilot flutter_t1 (pv_pilot_flutter_t1_rep1_20260912_105346) | — | 0.27 | 16.2 m | — | 191.55s, 5 loops, 54 event trace, Gate V2 FROZEN Turn 0, 0 regresi semantik |
+| Audit Forensik 54 Event, Dekomposisi Kausal Hilir & Sinkronisasi Tata Kelola IIDD | — | 0.71 | 42.8 m | — | Rekonstruksi prompt 11.876 char, identifikasi selective attention & boundary tension |
+| **Total Sesi D-103, D-104 & Fresh Pilot (2026-09-12)** | **—** | **1.70** | **102.0 m** | **—** | **Kumulatif Riset: 53.82 jam** |
+
+*Rincian Formula Sesi 2026-09-12 09:40 s.d. 11:22 WIB:*
+- Waktu Pengembangan & Implementasi Arsitektur (Dev): 2.580 detik (43.00 menit / 0.72 jam)
+- Total Waktu Pengujian Terkontrol & Eksekusi Pilot (Test): 974 detik (16.23 menit / 0.27 jam)
+- Total Waktu Analisis Forensik & Dokumentasi Riset (Fix/Doc): 2.566 detik (42.77 menit / 0.71 jam)
+- **TOTAL WAKTU REALISASI SESI:** **6.120 detik (~102 menit 00 detik / 1.70 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Sesi 09:40–11:22 WIB:*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **57.08 jam (3.424,8 menit)**
+- Total Riset, Eksperimen & Forensik: **53.82 jam**
+- Status: **✅ SELESAI & DIVERIFIKASI (D-104 Terbukti Efektif di Hulu — Moratorium Pilot Aktif Menunggu Arahan IA)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI MODEL SCALE BENCHMARK, V6 REPAIR & CONFIRMATION ABLATION — 2026-09-12 11:50 s.d. 15:05 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Rekayasa Runner Ablasi R-3 & Gateway Integrasi (Qwen 14B, Ollama switch) | — | 0.25 | 15.0 m | — | Isolasi Developer, injeksi kontrak FROZEN CardMetric, bypass Architect |
+| Benchmark Model Scale (Qwen 7B, 14B, DeepSeek 6.7B, Gemma 8B, Qwen 3.5, Ornith 9B) | — | 0.67 | 40.0 m | — | 6 model diuji terkontrol: penemuan 14B PASS, Ornith PASS sandbox, Reviewer Drift |
+| Implementasi D-112 (V6 Intent Classifier & Reviewer Doktrin #6 Cognitive Symmetry) | — | 0.20 | 12.0 m | — | `classify_contract_mutation_demand` eliminasi false-positive, 12/12 unit tests PASS |
+| Verifikasi Deterministik (251 Backend Tests, Preflight Gates A–I 422 tests, Oracle SHA) | — | 0.04 | 2.3 m | — | 100% ALL PASS, Frozen Oracle SHA-256 `4589e15c...` 100% utuh |
+| Re-Run Terkontrol Ornith 9B pasca D-112 (419.0s, Final PASS) | — | 0.12 | 7.0 m | — | 2/2 tests PASS, Reviewer APPROVED mengutip Doktrin #6, Gate V6 PASS |
+| Confirmation Run Qwen 3.5 9B pasca D-112 (873.4s, Zero Downstream Leakage) | — | 0.24 | 14.6 m | — | Reproduksi self-syntax trapping & byte-identical stagnation, tertahan di sandbox |
+| Analisis Forensik 6 Model & Sinkronisasi 10 Dokumen Tata Kelola IIDD | — | 1.18 | 70.9 m | — | Laporan komparasi 6 model, D-112, E-077, E-078, sinkronisasi penuh |
+| **Total Sesi Benchmark & D-112 (2026-09-12)** | **—** | **2.70** | **161.8 m** | **—** | **Kumulatif Riset: 56.52 jam** |
+
+*Rincian Formula Sesi 2026-09-12 11:50 s.d. 15:05 WIB:*
+- Waktu Pengembangan & Implementasi Arsitektur (Dev): 1.620 detik (27.00 menit / 0.45 jam)
+- Total Waktu Pengujian Terkontrol & Eksekusi Benchmark (Test): 3.886 detik (64.77 menit / 1.08 jam)
+- Total Waktu Analisis Forensik & Dokumentasi Riset (Fix/Doc): 4.200 detik (70.00 menit / 1.17 jam)
+- **TOTAL WAKTU REALISASI SESI:** **9.706 detik (~161 menit 46 detik / 2.70 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Sesi D-112:*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **59.78 jam (3.586,8 menit)**
+- Total Riset, Eksperimen & Forensik: **56.52 jam**
+- Status: **✅ SELESAI & DIVERIFIKASI (D-112 Sukses Konvergen — Ornith 9B PASS, Zero Downstream Leakage Terbukti)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI LOCKED_INVARIANTS ENGINE & CONVERGENT ABLATION (D-113 & D-114) — 2026-09-12 15:10 s.d. 16:45 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Desain & Implementasi Engine `locked_invariants.py` & Refactoring Multi-Source | — | 0.78 | 47.0 m | — | Lifecycle `PROVEN → LOCKED`, dual-gate evaluator, 4D context, cross-turn state |
+| Pengujian Unit (21 tests) & Cross-Turn Integration Test (273/273 PASS) | — | 0.10 | 6.1 m | — | 100% test pass, Frozen Oracle SHA-256 `4589e15c...` 100% intact |
+| Eksekusi Ablasi Terkontrol Ornith 9B Pasca Discovery Fix (PASS 2/2) | — | 0.07 | 4.4 m | — | Konvergensi 2 loop, Reviewer APPROVED, locked invariants terisi penuh |
+| Audit Forensik Discovery Blindspot, Dart Scanner vs AST & Dokumentasi IIDD | — | 0.58 | 35.0 m | — | D-113, D-114, Bagian XX catatan riset, walkthrough, validation log |
+| **Total Sesi LOCKED_INVARIANTS (2026-09-12)** | **—** | **1.54** | **92.5 m** | **—** | **Kumulatif Riset: 58.06 jam** |
+
+*Rincian Formula Sesi D-113/D-114:*
+- Total Waktu Realisasi: 2.820s (Dev) + 627s (Test) + 2.100s (Doc/Forensik) = **5.547 detik (~92 menit 27 detik / 1.54 jam)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI REPLIKASI TERKONTROL 3-RUN LOCKED_INVARIANTS (D-115) — 2026-09-12 16:45 s.d. 17:05 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Konfigurasi Otomasi Replikasi Batch & Isolasi Lingkungan | — | 0.02 | 1.3 m | — | Runner 3-run otomatis, seed terkontrol, watchdog timer 2 menit |
+| Eksekusi Replikasi Batch 3-Run (Rep 1, Rep 2, Rep 3) | — | 0.25 | 15.0 m | — | Rep 1 PASS (263.6s), Rep 2 PASS (342.4s), Rep 3 FAIL (295.1s) |
+| Audit Forensik Trajektori Rep 3 (Akar Masalah Duplicate Text Layout) | — | 0.04 | 2.2 m | — | Ekstraksi trace, diff T2 vs T4, demarkasi pergeseran ruang masalah |
+| Pemutakhiran 10 Dokumen Tata Kelola IIDD | — | 0.05 | 3.3 m | — | D-115, validasi 3-run, human intervention, error log, sinkronisasi penuh |
+| **Total Sesi Replikasi 3-Run (2026-09-12)** | **—** | **0.36** | **21.7 m** | **—** | **Kumulatif Riset: 58.42 jam** |
+
+*Rincian Formula Sesi D-115:*
+- Total Waktu Realisasi: 75s (Dev) + 901s (Test) + 325s (Doc/Forensik) = **1.301 detik (~21 menit 41 detik / 0.36 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Terkini:*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **61.68 jam (3.700,9 menit)**
+- Total Riset, Eksperimen & Forensik: **58.42 jam**
+- Status: **✅ SELESAI & DIVERIFIKASI (D-115 Terbukti Konsisten — 100% Locking Rate, 100% Zero Oscillation, 66.7% Release Pass Rate)**
+
+
+
+
+
+| Uji Generalisasi LOCKED_INVARIANTS FastAPI (Ornith 9B & Qwen 7B) | — | 0.26 | 15.6 m | — | Runner setup, eksekusi 2 run, validasi AST, laporan formal |
+| Uji Generalisasi LOCKED_INVARIANTS CLI (All Qwen 7B) | — | 0.16 | 9.5 m | — | Runner setup, eksekusi 1 run, validasi parameter, laporan formal |
+| Uji Komparatif Flutter UI (All Qwen 7B) & Audit Forensik | — | 0.21 | 12.8 m | — | Eksekusi 5 loops, bedah trace 30 events, konfirmasi ketiadaan cheat solver |
+| Pemutakhiran Komprehensif 8 Dokumen Tata Kelola IIDD | — | 0.11 | 6.4 m | — | D-116, E-081, #128-#131, validation log, durasi, estimasi, commit history |
+| **Total Sesi Uji Generalisasi & Forensik (2026-09-12)** | **—** | **0.74** | **44.2 m** | **—** | **Kumulatif Riset: 59.16 jam** |
+
+*Rincian Formula Sesi D-116:*
+- Total Waktu Realisasi: 780s (Dev) + 1.114s (Test) + 760s (Doc/Forensik) = **2.654 detik (~44 menit 14 detik / 0.74 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Terkini:*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **62.42 jam (3.745,1 menit)**
+- Total Riset, Eksperimen & Forensik: **59.16 jam**
+- Status: **SELESAI & DIVERIFIKASI (D-116 Terbukti - Generalisasi Lintas Domain Python AST & Dart Structural Scanner Bekerja Konsisten)**

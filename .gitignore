@@ -40,4 +40,4 @@ backend/output/*
 backend/sandbox/
 output/
 backend/scratch_*.json
-
+scratch/

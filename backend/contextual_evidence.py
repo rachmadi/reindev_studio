@@ -38,9 +38,15 @@ ENGINEERING_DOCTRINE: List[str] = [
     "5. [DETERMINISTIC VERIFICATION]: Repairs are verified deterministically against Frozen Oracle. Zero regression required.",
 ]
 if os.environ.get("REINDEV_TREATMENT_B_R3", "0") == "1":
-    ENGINEERING_DOCTRINE.append(
-        "6. [CONTRACT BOUNDARY PRINCIPLE]: Frozen status applies strictly to external contract elements (routes, identifiers, verbs). Implementation details (internal fields, default values, mappings) may be adjusted to satisfy Oracle evidence while preserving frozen invariants."
-    )
+    if os.environ.get("REINDEV_R3_TREATMENT_AUTHORITY", "0") == "1":
+        doctrine_6 = (
+            "6. [CONTRACT BOUNDARY & ORACLE AUTHORITY PRINCIPLE]: Acceptance Oracle memiliki otoritas lebih tinggi daripada detail implementasi internal yang tidak secara eksplisit dibekukan. Jika Oracle secara deterministik mensyaratkan sebuah symbol/interface yang belum tercakup dalam frozen contract invariant, Developer wajib memenuhi requirement tersebut; hal itu bukan pelanggaran Contract Boundary."
+        )
+    else:
+        doctrine_6 = (
+            "6. [CONTRACT BOUNDARY PRINCIPLE]: Frozen status applies strictly to external contract elements (routes, identifiers, verbs). Implementation details (internal fields, default values, mappings) may be adjusted to satisfy Oracle evidence while preserving frozen invariants."
+        )
+    ENGINEERING_DOCTRINE.append(doctrine_6)
 
 
 # ===========================================================================
@@ -524,24 +530,26 @@ def _build_repair_directive_lines(
     locked_invariants = [inv for inv in pkg.preserved_invariants if getattr(inv, "status", "") != "REGRESSED"]
 
     if regressed_invariants:
-        lines.append(f"\n[5A. CRITICAL REGRESSIONS DETECTED — MUST BE RESTORED ({len(regressed_invariants)} broken)]")
+        lines.append(f"\n[5A. CRITICAL REGRESSIONS DETECTED — FORMERLY PROVEN, NOW BROKEN ({len(regressed_invariants)} broken)]")
         for inv in regressed_invariants:
             lines.append(f"- [REGRESSION] [{inv.invariant_id}] [{inv.category}] {inv.description}")
             if inv.target:
                 lines.append(f"  Target: {inv.target}")
             if inv.regression_evidence:
                 lines.append(f"  Failure Evidence: {inv.regression_evidence}")
+            lines.append(f"  Required Action: WAJIB PULIHKAN KONDISI INI! Jangan hapus atau ganti nama!")
 
-    lines.append(f"\n[5. PRESERVED INVARIANTS ({len(locked_invariants)} locked — BEHAVIORAL_MUTATION: FORBIDDEN)]")
+    lines.append(f"\n[5. PRESERVED INVARIANTS & LOCKED INVARIANTS ({len(locked_invariants)} locked — ONCE PROVEN, LOCK IT)]")
     for inv in locked_invariants:
         reg_info = f" [PROVEN AGAIN — WITH PRIOR REGRESSION (count: {inv.regression_count})]" if getattr(inv, "ever_regressed", False) else ""
         lines.append(f"- [LOCKED]{reg_info} [{inv.invariant_id}] [{inv.category}] {inv.description}")
         if inv.target:
             lines.append(f"  Behavioral Target: {inv.target}")
         ev_str = str(inv.evidence_value)
-        if len(ev_str) > 60:
-            ev_str = ev_str[:60] + "..."
+        if len(ev_str) > 80:
+            ev_str = ev_str[:80] + "..."
         lines.append(f"  Evidence: {ev_str}")
+        lines.append(f"  Status: PROVEN (Mutation: CONDITION MUST REMAIN TRUE)")
 
     # 6. Engineering Doctrine (doctrine - mandatory for developer/executor)
     if getattr(pkg, "causal_owner", "") == "DEVELOPER" or getattr(pkg, "phase", "") in ("DEVELOPER", "EXECUTOR"):

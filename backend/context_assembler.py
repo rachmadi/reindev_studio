@@ -182,23 +182,27 @@ def _collect_passing_test_invariants(state: SquadState) -> List[PreservedInvaria
     return invariants[:10]
 
 
-def _standard_forbidden_changes(target_lang: str) -> List[str]:
-    """Mengembalikan daftar larangan standard yang berlaku pada semua repair."""
+def _standard_forbidden_changes(target_lang: str, is_contract_frozen: bool = True) -> List[str]:
+    """Mengembalikan daftar larangan standard yang berlaku pada repair."""
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
     forbidden = [
         "Modify Frozen Oracle (test files)",
-        "Unfreeze or amend FROZEN contract",
+    ]
+    if is_contract_frozen:
+        forbidden.append("Unfreeze or amend FROZEN contract")
+        forbidden.append("Rename authoritative interface names defined in contract")
+    forbidden.extend([
         "Invent speculative public interfaces not in contract",
-        "Rename authoritative interface names defined in contract",
         "Modify already-proven passing tests",
         "Create hidden repair budget or extra repair loops",
-    ]
+    ])
     if is_dart:
         forbidden += [
             "Use deprecated StateNotifier, ChangeNotifier, or StateProvider",
             "Split widget code into multiple files outside lib/",
         ]
     return forbidden
+
 
 
 # ===========================================================================
@@ -417,10 +421,61 @@ def synthesize_b2_actionable_prescriptions(
                 expected_post_repair_state="ArchitecturalBlueprint validates successfully against Pydantic schema.",
                 verification_evidence="validate_architect_blueprint returns True with 0 schema violations.",
             )
+        # Case 4: Contract-Oracle consistency (Non-Solver Requirement-Level)
+        elif "contract_oracle_consistency" in crit or "oracle consistency" in obs.lower() or "inconsistent with the frozen test" in obs.lower() or "acceptance call-site" in obs.lower():
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-ORACLE-CONSISTENCY-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="AUTHORITATIVE_ORACLE_ACCEPTANCE_CHECK",
+                implementation_symbol=f"proposed interface contracts in '{auth_file}'",
+                evidence_basis="FROZEN_ORACLE_ACCEPTANCE_INTERFACE_CONSISTENCY_GATE",
+                required_change=(
+                    "The proposed interface contracts must be consistent with the authoritative "
+                    "acceptance call-sites before the contract can be frozen."
+                ),
+                repair_boundary_allowed=[
+                    f"Align proposed interface names, routes, and signatures in files['{auth_file}'] with authoritative acceptance call-sites",
+                    "Update data models and constructor parameter mappings to satisfy acceptance criteria",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle (test files)",
+                    "Do NOT unfreeze or amend already FROZEN contracts",
+                    "Do NOT invent speculative interfaces not verified by acceptance requirements",
+                ],
+                expected_post_repair_state="All proposed interface contracts are consistent with authoritative acceptance call-sites, and contract passes verification gate to achieve FROZEN status.",
+                verification_evidence="check_oracle_interface_consistency returns True with 0 interface discrepancies.",
+            )
+            prescriptions.append(rx)
+            rx_count += 1
+        # Case 5: Semantic invariant regression
+        elif "semantic_invariant_regression" in crit or "regresi semantik" in obs.lower():
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-REGRESSION-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="AUTHORITATIVE_ORACLE_ACCEPTANCE_CHECK",
+                implementation_symbol=f"interface contracts in '{auth_file}'",
+                evidence_basis="SEMANTIC_INVARIANT_REGRESSION_DETECTOR",
+                required_change=(
+                    "Restore the proven semantic interfaces that were previously verified consistent with "
+                    "the authoritative acceptance call-site."
+                ),
+                repair_boundary_allowed=[
+                    f"Restore proven interface contracts in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT discard proven semantic interfaces during repair",
+                    "Do NOT modify Frozen Oracle (test files)",
+                ],
+                expected_post_repair_state="All proven semantic interface invariants are restored and preserved.",
+                verification_evidence="validate_architect_phase passes with 0 semantic regressions.",
+            )
             prescriptions.append(rx)
             rx_count += 1
 
     return prescriptions
+
 
 
 def assemble_b2_evidence(
@@ -430,20 +485,68 @@ def assemble_b2_evidence(
     run_id: str = "",
     iteration: int = 0,
 ) -> ContextualEvidencePackage:
-    """Merakit ContextualEvidencePackage untuk kegagalan B2 (Architect Phase-End)."""
+    """
+    Merakit ContextualEvidencePackage untuk kegagalan B2 (Architect Phase-End).
+    Authority is a property of artifact state:
+    - FROZEN contract: interfaces & models are authoritative.
+    - DRAFT / REJECTED contract: interfaces are unproven proposals, NEVER authoritative.
+    """
     has_fail = any(v.severity == "CRITICAL" for v in violations)
     verdict = "FAIL" if has_fail else "PASS"
 
     target_lang = (state.get("target_language") or "python").lower()
     auth_file = _get_authoritative_target_file(state)
-    interfaces = _get_authoritative_interfaces(state)
-    models = _get_authoritative_models(state)
     contract_sha = state.get("contract_sha256") or ""
     contract_status = state.get("contract_status") or "UNKNOWN"
+    is_contract_frozen = (contract_status == "FROZEN")
 
-    # Kategorisasi kegagalan
+    # Authority is a property of state
+    proven_interfaces: List[str] = []
+    if is_contract_frozen:
+        required_interfaces = _get_authoritative_interfaces(state)
+        required_models = _get_authoritative_models(state)
+        proposed_interfaces: List[str] = []
+        oracle_interfaces: List[str] = []
+    else:
+        required_interfaces = []
+        required_models = []
+        proposed_interfaces = _get_authoritative_interfaces(state)
+        proposed_models = _get_authoritative_models(state)
+
+        frozen_oracle_path = state.get("frozen_oracle_path") or ""
+        try:
+            from .contract import extract_oracle_tested_symbols, extract_proven_semantic_interfaces
+        except (ImportError, ValueError):
+            try:
+                from contract import extract_oracle_tested_symbols, extract_proven_semantic_interfaces
+            except ImportError:
+                def extract_oracle_tested_symbols(*args, **kwargs): return set()
+                def extract_proven_semantic_interfaces(*args, **kwargs): return []
+
+        oracle_interfaces = sorted(list(extract_oracle_tested_symbols(frozen_oracle_path, target_lang)))
+
+        # Ekstraksi invarian semantik yang telah terbukti secara deterministik
+        contract_ifaces = state.get("contract", {}).get("interface_contracts", []) if isinstance(state.get("contract"), dict) else []
+        proven_from_eval = extract_proven_semantic_interfaces(contract_ifaces, frozen_oracle_path, target_lang)
+        state_proven = state.get("proven_semantic_interfaces") or []
+        proven_interfaces = sorted(list(set(state_proven + proven_from_eval)))
+
+    # Kategorisasi kegagalan & deteksi kondisi serialisasi
     ast_violations = [v for v in violations if "symbol" in v.criterion or "ast" in v.criterion.lower()]
     contract_violations = [v for v in violations if "contract" in v.criterion.lower() or "interface" in v.criterion.lower()]
+
+    has_oracle_violation = any(
+        "contract_oracle_consistency" in v.criterion
+        or "oracle consistency" in v.observed_state.lower()
+        or "inconsistent with the frozen test" in v.observed_state.lower()
+        or "acceptance call-site" in v.observed_state.lower()
+        for v in violations
+    )
+    has_representation_violation = any(
+        any(k in v.criterion.lower() for k in ("schema", "json", "ast", "symbol"))
+        for v in violations
+    )
+    is_serialization_repair = bool(proven_interfaces and not has_oracle_violation and has_representation_violation)
 
     root_causes = []
     if ast_violations:
@@ -467,10 +570,34 @@ def assemble_b2_evidence(
                 rationale="Blueprint AST must be clean before contract can be sealed.",
             ))
 
-    # Preserved invariants
+    # Preserved invariants: Oracle invariants are always preserved;
+    # contract invariants are ONLY preserved if contract is actually FROZEN.
+    # Semantics invariants yang PROVEN dipreservasi lintas perbaikan serialisasi.
     preserved = []
     oracle_inv = _collect_oracle_invariants(state)
     preserved.extend(oracle_inv)
+    if is_contract_frozen:
+        con_inv = _collect_contract_invariant(state)
+        if con_inv:
+            preserved.append(con_inv)
+    elif proven_interfaces:
+        for p_idx, p_iface in enumerate(proven_interfaces, 1):
+            preserved.append(PreservedInvariant(
+                invariant_id=f"INV-SEM-{p_idx:03d}",
+                category="PROVEN_SEMANTIC_INVARIANT",
+                description=f"Interface consistency for '{p_iface}' with authoritative acceptance call-site has been proven and must be preserved during serialization repair.",
+                evidence_value=f"ORACLE_CONSISTENCY_CHECK:{p_iface}",
+                status="PROVEN",
+                target=p_iface,
+                state="LOCKED",
+                mutation="FORBIDDEN",
+                provenance_evidence={
+                    "provenance": "PROVEN_SEMANTIC_INVARIANT",
+                    "oracle_call_site": "AUTHORITATIVE_ORACLE_ACCEPTANCE_CHECK",
+                    "evidence_class": "DETERMINISTIC",
+                    "status": "PROVEN",
+                }
+            ))
 
     # Required changes
     required_changes = []
@@ -490,6 +617,112 @@ def assemble_b2_evidence(
 
     # Actionable prescriptions for B2
     prescriptions = synthesize_b2_actionable_prescriptions(violations, auth_file, target_lang)
+    if is_serialization_repair:
+        prescriptions.insert(0, ActionableRepairPrescription(
+            prescription_id="RX-B2-SEMANTIC-PRESERVE-001",
+            evidence_ref="PROVEN_SEMANTIC_INVARIANT",
+            observed_failure="Blueprint schema/serialization failure during artifact representation.",
+            oracle_call_site="AUTHORITATIVE_ORACLE_ACCEPTANCE_CHECK",
+            implementation_symbol=f"proven interface contracts in '{auth_file}': {proven_interfaces}",
+            evidence_basis="FROZEN_ORACLE_ACCEPTANCE_INTERFACE_CONSISTENCY_GATE",
+            required_change=(
+                "The interface consistency with the authoritative acceptance call-site has been proven "
+                "and must be preserved while repairing the current serialization/schema failure."
+            ),
+            repair_boundary_allowed=[
+                "Emit valid JSON conforming to ArchitecturalBlueprint schema",
+                "Ensure files dictionary contains valid scaffold for each file in file_tree",
+            ],
+            repair_boundary_forbidden=[
+                f"Do NOT alter or re-infer proven semantic interfaces: {proven_interfaces}",
+                "Do NOT perform semantic redesign during representation/serialization repair",
+            ],
+            expected_post_repair_state=(
+                f"Blueprint schema validates with 0 errors while strictly preserving proven semantic interfaces: {proven_interfaces}."
+            ),
+            verification_evidence="validate_architect_phase passes with blueprint_ast_validity VALID and semantic interfaces intact.",
+        ))
+
+    # Authoritative context & Expected post-repair state (State-Aware)
+    authoritative_context: Dict[str, Any] = {
+        "authoritative_target_file": auth_file,
+        "contract_status": contract_status,
+        "contract_sha256": (contract_sha[:16] + "...") if (is_contract_frozen and contract_sha) else "UNSEALED",
+    }
+    if is_contract_frozen:
+        authoritative_context["required_interfaces"] = required_interfaces
+        authoritative_context["required_models"] = required_models
+        expected_interfaces_rule = f"Interface contracts exactly match: {required_interfaces}"
+    else:
+        authoritative_context["oracle_interface_consistency"] = "PROVEN" if proven_interfaces else ("FAIL" if has_oracle_violation else "UNPROVEN")
+        authoritative_context["blueprint_schema"] = "FAIL" if has_representation_violation else "VALID"
+        authoritative_context["contract_freeze"] = "NOT_AUTHORIZED"
+        if proven_interfaces:
+            authoritative_context["proven_semantic_invariants"] = proven_interfaces
+        if has_representation_violation:
+            authoritative_context["unproven_failed_representation_properties"] = [
+                v.criterion for v in violations if any(k in v.criterion.lower() for k in ("schema", "json", "ast", "symbol"))
+            ]
+        if oracle_interfaces:
+            authoritative_context["authoritative_oracle_interfaces"] = oracle_interfaces
+        if proposed_interfaces:
+            authoritative_context["proposed_contract_interfaces"] = proposed_interfaces
+        if is_serialization_repair:
+            expected_interfaces_rule = f"Proven semantic interfaces {proven_interfaces} must be preserved while repairing serialization"
+        else:
+            expected_interfaces_rule = "Interface contracts must be consistent with authoritative acceptance call-sites before contract can be frozen"
+
+    # Repair Boundary allowed & forbidden
+    allowed_changes = [
+        "Add missing import statements to blueprint code blocks",
+        f"Consolidate implementation into single authoritative file: {auth_file}",
+        "Remove duplicate data model definitions",
+    ]
+    if is_contract_frozen:
+        allowed_changes.append("Replace speculative interfaces with exact authoritative interfaces from contract")
+    elif is_serialization_repair:
+        allowed_changes.append("Repair JSON syntax and blueprint structure to conform to ArchitecturalBlueprint schema")
+        allowed_changes.append("Ensure files dictionary contains valid scaffold for each file in file_tree")
+    else:
+        allowed_changes.append("Align proposed interface names, routes, and signatures with authoritative acceptance call-sites")
+    allowed_changes.append("Add explicit constructor parameter alignment")
+
+    forbidden_changes = _standard_forbidden_changes(target_lang, is_contract_frozen=is_contract_frozen)
+    if is_serialization_repair:
+        forbidden_changes.append(f"Do NOT alter or re-infer proven semantic interfaces: {proven_interfaces}")
+        forbidden_changes.append("Do NOT perform semantic redesign when only serialization/schema repair is required")
+
+    # Enriched diagnostic evidence with provenance
+    enriched_evidence = list(evidence)
+    if not is_contract_frozen and proposed_interfaces:
+        enriched_evidence.append({
+            "item": "proposed_contract_interfaces",
+            "evidence_class": "DIAGNOSTIC",
+            "provenance": "REJECTED_CONTRACT" if contract_status == "REJECTED" else "PROPOSED_CONTRACT",
+            "observed": proposed_interfaces,
+            "expected": oracle_interfaces or "Consistent with acceptance call-sites",
+            "fact": f"Architect proposed {proposed_interfaces}, which is not frozen (status: {contract_status})",
+            "status": "UNPROVEN_DRAFT",
+        })
+    if oracle_interfaces:
+        enriched_evidence.append({
+            "item": "authoritative_oracle_interfaces",
+            "evidence_class": "DETERMINISTIC",
+            "provenance": "AUTHORITATIVE_ORACLE_INTERFACE",
+            "observed": oracle_interfaces,
+            "expected": "Acceptance authority demand",
+            "status": "VALID",
+        })
+    if proven_interfaces:
+        for p_iface in proven_interfaces:
+            enriched_evidence.append({
+                "item": "proven_semantic_invariant",
+                "evidence_class": "DETERMINISTIC",
+                "provenance": "PROVEN_SEMANTIC_INVARIANT",
+                "observed": p_iface,
+                "expected": "Must be preserved across serialization repair",
+                "status": "PROVEN",
+            })
 
     return ContextualEvidencePackage(
         package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "B2_ARCHITECT_PHASE_END", iteration),
@@ -506,13 +739,7 @@ def assemble_b2_evidence(
         root_causes=root_causes,
         violations=violations,
         violation_dependencies=violation_deps,
-        authoritative_context={
-            "authoritative_target_file": auth_file,
-            "required_interfaces": interfaces,
-            "required_models": models,
-            "contract_status": contract_status,
-            "contract_sha256": (contract_sha[:16] + "...") if contract_sha else "UNSEALED",
-        },
+        authoritative_context=authoritative_context,
         active_constraints={
             "target_language": target_lang,
             "max_files": 2,
@@ -521,22 +748,16 @@ def assemble_b2_evidence(
         },
         preserved_invariants=preserved,
         repair_boundary=RepairBoundary(
-            allowed_changes=[
-                "Add missing import statements to blueprint code blocks",
-                f"Consolidate implementation into single authoritative file: {auth_file}",
-                "Remove duplicate data model definitions",
-                "Replace speculative interfaces with exact authoritative interfaces from contract",
-                "Add explicit constructor parameter alignment",
-            ],
-            forbidden_changes=_standard_forbidden_changes(target_lang),
+            allowed_changes=allowed_changes,
+            forbidden_changes=forbidden_changes,
         ),
-        forbidden_changes=_standard_forbidden_changes(target_lang),
+        forbidden_changes=forbidden_changes,
         required_changes=required_changes,
         expected_post_repair_state=[
             "All referenced decorators and class bases resolve to valid imports",
             "Blueprint AST parses with 0 errors across all code blocks",
-            f"Contract status == FROZEN with valid SHA-256 seal",
-            f"Interface contracts exactly match: {interfaces}",
+            "Contract status == FROZEN with valid SHA-256 seal",
+            expected_interfaces_rule,
             "No duplicate model names in data_models",
             "Preserved invariants remain verified",
         ],
@@ -546,11 +767,12 @@ def assemble_b2_evidence(
             "contract_status == 'FROZEN'",
             "B2 verdict == 'PASS'",
         ],
-        source_of_truth=f"CONTRACT_GATE_P0_2.1:{contract_sha[:16] if contract_sha else 'UNSEALED'}",
-        evidence=evidence,
+        source_of_truth=f"CONTRACT_GATE_P0_2.1:{contract_sha[:16] if (is_contract_frozen and contract_sha) else 'UNSEALED'}",
+        evidence=enriched_evidence,
         remaining_budget=remaining,
         actionable_prescriptions=prescriptions,
     )
+
 
 
 # ===========================================================================
@@ -1974,6 +2196,33 @@ def assemble_b5_evidence(
     if contract_inv:
         preserved.append(contract_inv)
     preserved.extend(_collect_passing_test_invariants(state))
+
+    # Include explicit LockedInvariants from state (ONCE PROVEN, LOCK IT)
+    locked_dict = state.get("locked_invariants") or {}
+    existing_ids = {inv.invariant_id for inv in preserved}
+    for l_id, l_data in locked_dict.items():
+        if l_id in existing_ids:
+            continue
+        l_status = l_data.get("status", "PROVEN")
+        l_state = "LOCKED" if l_status == "PROVEN" else "VIOLATED"
+        status_str = "REGRESSED" if l_status == "REGRESSION" else "PROVEN"
+        p_inv = PreservedInvariant(
+            invariant_id=l_data.get("invariant_id", l_id),
+            category=l_data.get("category", "LOCKED_INVARIANT"),
+            description=l_data.get("description", ""),
+            evidence_value=l_data.get("evidence", ""),
+            status=status_str,
+            target=l_data.get("target_symbol", ""),
+            state=l_state,
+            mutation="FORBIDDEN",
+            provenance_evidence=l_data.get("provenance"),
+            regression_evidence=l_data.get("regression_history", [{}])[-1] if l_data.get("regression_history") else None,
+            ever_regressed=(l_data.get("regression_count", 0) > 0),
+            regression_count=l_data.get("regression_count", 0),
+            regression_history=l_data.get("regression_history", []),
+        )
+        preserved.append(p_inv)
+        existing_ids.add(l_id)
 
     # Oracle call site from test_files (crucial context for semantic fixation)
     test_files = state.get("test_files") or {}

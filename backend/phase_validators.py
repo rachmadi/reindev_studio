@@ -35,6 +35,9 @@ try:
         assemble_b1_evidence, assemble_b2_evidence, assemble_b3_evidence,
         assemble_b4_evidence, assemble_b5_evidence, assemble_b6_evidence,
     )
+    from .locked_invariants import (
+        LockedInvariant, revalidate_locked_invariants, discover_newly_proven_invariants,
+    )
 except (ImportError, ValueError):
     from state import SquadState
     try:
@@ -60,12 +63,18 @@ except (ImportError, ValueError):
             assemble_b1_evidence, assemble_b2_evidence, assemble_b3_evidence,
             assemble_b4_evidence, assemble_b5_evidence, assemble_b6_evidence,
         )
+        from locked_invariants import (
+            LockedInvariant, revalidate_locked_invariants, discover_newly_proven_invariants,
+        )
     except ImportError:
         ContextualEvidencePackage = None
         CEPViolationItem = None
         render_repair_directive = lambda pkg, **kw: ""
         assemble_b1_evidence = assemble_b2_evidence = assemble_b3_evidence = None
         assemble_b4_evidence = assemble_b5_evidence = assemble_b6_evidence = None
+        LockedInvariant = None
+        revalidate_locked_invariants = lambda *a, **kw: ({}, [], [])
+        discover_newly_proven_invariants = lambda *a, **kw: []
 
 
 
@@ -719,10 +728,66 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
     evidence.append({
         "item": "contract_oracle_interface_consistency",
         "evidence_class": "DETERMINISTIC",
-        "observed": "Inconsistent with Frozen Oracle acceptance call-site" if has_oracle_inconsistency else "Consistent / Valid",
+        "observed": "Inconsistent with Frozen Oracle acceptance call-site" if has_oracle_inconsistency else "PROVEN consistent with Frozen Oracle acceptance call-site",
         "expected": "Interface contracts strictly consistent with authoritative Frozen Oracle call-sites",
         "status": "INVALID" if has_oracle_inconsistency else "VALID"
     })
+
+    # 5B. Proven Semantic Invariant Regression Check
+    regressions: List[Dict[str, Any]] = []
+    proven_invariants = state.get("proven_semantic_invariants") or state.get("proven_semantic_interfaces") or []
+    if proven_invariants:
+        current_symbols = set()
+        for ifc in ifaces:
+            if isinstance(ifc, dict):
+                ident = ifc.get("identifier", "").strip()
+                if_type = ifc.get("interface_type", "")
+            elif hasattr(ifc, "identifier"):
+                ident = getattr(ifc, "identifier", "").strip()
+                if_type = getattr(ifc, "interface_type", "")
+            else:
+                ident = str(ifc).strip()
+                if_type = ""
+            parts = re.split(r"[.\(]", ident)
+            clean_parts = [p.strip(" )\"'") for p in parts if p.strip(" )\"'")]
+            current_symbols.update(clean_parts)
+            if if_type == "HTTP_ENDPOINT":
+                current_symbols.add(re.sub(r"/\{[^}]+\}", "", ident).rstrip("/"))
+
+        for pinv in proven_invariants:
+            if isinstance(pinv, str):
+                target_sym = pinv
+                inv_id = f"INV-SEM-{target_sym}"
+            elif isinstance(pinv, dict):
+                target_sym = pinv.get("target", "")
+                inv_id = pinv.get("invariant_id", "")
+            else:
+                target_sym = getattr(pinv, "target", "")
+                inv_id = getattr(pinv, "invariant_id", "")
+
+            if target_sym and target_sym not in current_symbols:
+                reg_record = {
+                    "invariant_id": inv_id,
+                    "target": target_sym,
+                    "type": "SEMANTIC_REGRESSION",
+                    "details": f"Antarmuka yang sebelumnya PROVEN ('{target_sym}') dihilangkan atau diubah tanpa bukti deterministik baru."
+                }
+                regressions.append(reg_record)
+                violations.append({
+                    "criterion": "semantic_invariant_regression",
+                    "severity": "CRITICAL",
+                    "message": f"Regresi semantik: Antarmuka terbukti '{target_sym}' hilang dari rancangan kontrak baru.",
+                    "location": "contract",
+                    "expected": f"Antarmuka semantik terbukti '{target_sym}' wajib dipertahankan selama perbaikan serialisasi.",
+                    "observed_symbol": target_sym
+                })
+                if hasattr(pinv, "record_regression"):
+                    pinv.record_regression(failure_evidence=reg_record, iteration=state.get("iteration_count", 0))
+                elif isinstance(pinv, dict):
+                    pinv["status"] = "REGRESSED"
+                    pinv["state"] = "VIOLATED"
+        if regressions:
+            criteria.append("semantic_invariant_regression")
 
     verdict = "FAIL" if any(v["severity"] == "CRITICAL" for v in violations) else "PASS"
 
@@ -731,7 +796,13 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
     remaining_contract_budget = max(0, max_contract_rev - contract_rev)
 
     if verdict == "FAIL":
-        if has_oracle_inconsistency:
+        if any(v["criterion"] == "semantic_invariant_regression" for v in violations):
+            required_repairs.append({
+                "target_phase": "ARCHITECT",
+                "action": "RESTORE_PROVEN_SEMANTIC_INTERFACES",
+                "details": "Pulihkan antarmuka yang telah terbukti konsisten dengan Acceptance Oracle sebelum melanjutkan perbaikan blueprint."
+            })
+        elif has_oracle_inconsistency:
             required_repairs.append({
                 "target_phase": "ARCHITECT",
                 "action": "ALIGN_CONTRACT_WITH_ORACLE",
@@ -760,7 +831,7 @@ def validate_architect_phase(state: SquadState) -> ValidatorContract:
         "criteria_checked": criteria,
         "evidence": evidence,
         "violations": violations,
-        "regressions": [],
+        "regressions": regressions,
         "required_repairs": required_repairs,
         "repair_owner": "ARCHITECT" if verdict == "FAIL" else "NONE",
         "remaining_budget": remaining_contract_budget,
@@ -1274,23 +1345,104 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
                     "message": f"Regresi terdeteksi: tes '{prev_t}' sebelumnya lulus tetapi kini gagal"
                 })
 
+    # 4. Locked Invariant Evaluation & Explicit State Preservation (ONCE PROVEN, LOCK IT)
+    existing_locked = dict(state.get("locked_invariants") or {})
+    code_files = state.get("code_files") or {}
+    target_lang = (state.get("target_language") or "python").lower()
+    auth_file = "lib/card_metric.dart" if ("dart" in target_lang or "flutter" in target_lang) else "main.py"
+    if isinstance(state.get("contract"), dict):
+        tf = state.get("contract", {}).get("task_intent", {}).get("authoritative_target_file")
+        if tf:
+            auth_file = tf
+
+    updated_locked_invariants, newly_regressed_invariants, maintained_locked = revalidate_locked_invariants(
+        locked_invariants=existing_locked,
+        code_files=code_files,
+        test_results=test_results,
+        target_lang=target_lang,
+        turn=iteration
+    )
+
+    for reg_inv in newly_regressed_invariants:
+        reg_msg = f"CRITICAL REGRESSION: Invariant '{reg_inv.invariant_id}' ({reg_inv.description}) was PROVEN but is now BROKEN by recent repair"
+        regressions.append({
+            "test_or_invariant": reg_inv.target_symbol,
+            "invariant_id": reg_inv.invariant_id,
+            "previous_status": "PROVEN",
+            "current_status": "FAIL",
+            "message": reg_msg,
+            "failure_evidence": reg_inv.regression_history[-1].get("failure_evidence") if reg_inv.regression_history else ""
+        })
+        violations.append({
+            "criterion": "zero_regression_invariant",
+            "severity": "CRITICAL",
+            "message": reg_msg,
+            "location": f"{reg_inv.target_file}:{reg_inv.target_symbol}",
+            "expected": reg_inv.condition,
+            "observed_symbol": reg_inv.target_symbol,
+        })
+
+    # Discover newly proven conditions from deterministic evidence
+    prev_contract = state.get("executor_iteration_validator_contract") or {}
+    prev_violations = prev_contract.get("violations", []) if isinstance(prev_contract, dict) else []
+    compiler_err_str = output_text
+
+    # Evidence sources tambahan — digunakan sebagai kandidat saja, bukan bukti PROVEN
+    # diagnostic_evidence: galat turn SAAT INI (untuk param detection)
+    curr_diag_ev = test_results.get("diagnostic_evidence") or {}
+    # previous_diagnostic_evidence: galat turn SEBELUMNYA (tersimpan dari executor_validator_node)
+    prev_diag_ev = state.get("previous_diagnostic_evidence") or {}
+    # previous_executor_stderr: stderr mentah turn SEBELUMNYA
+    prev_exec_stderr = state.get("previous_executor_stderr") or ""
+
+    newly_proven = discover_newly_proven_invariants(
+        code_files=code_files,
+        test_results=test_results,
+        compiler_output=compiler_err_str,
+        target_lang=target_lang,
+        authoritative_file=auth_file,
+        previous_violations=prev_violations,
+        current_violations=violations,
+        turn=iteration,
+        diagnostic_evidence=curr_diag_ev,
+        previous_diagnostic_evidence=prev_diag_ev,
+        previous_stderr=prev_exec_stderr,
+    )
+
+    for np in newly_proven:
+        if np.invariant_id not in updated_locked_invariants or updated_locked_invariants[np.invariant_id].status != "REGRESSION":
+            updated_locked_invariants[np.invariant_id] = np
+
+    # Telemetry: Oscillation History
+    oscillation_history = list(state.get("oscillation_history") or [])
+    for inv in updated_locked_invariants.values():
+        if getattr(inv, "oscillation_detected", False):
+            oscillation_history.append({
+                "invariant_id": inv.invariant_id,
+                "target_symbol": inv.target_symbol,
+                "turn": iteration,
+                "regression_count": inv.regression_count,
+                "status": inv.status
+            })
+
     if regressions:
         evidence.append({
             "item": "regression_detection",
             "evidence_class": "DETERMINISTIC",
-            "observed": f"{len(regressions)} regressed tests",
+            "observed": f"{len(regressions)} regressed tests/invariants",
             "expected": "0 regressions",
             "status": "INVALID"
         })
         for reg in regressions:
-            violations.append({
-                "criterion": "zero_regression_invariant",
-                "severity": "CRITICAL",
-                "message": reg["message"],
-                "location": reg["test_or_invariant"],
-                "expected": f"Pengujian '{reg['test_or_invariant']}' tetap berstatus PASS",
-                "observed_symbol": reg["test_or_invariant"],
-            })
+            if not any(v.get("message") == reg["message"] for v in violations):
+                violations.append({
+                    "criterion": "zero_regression_invariant",
+                    "severity": "CRITICAL",
+                    "message": reg["message"],
+                    "location": reg["test_or_invariant"],
+                    "expected": f"Invarian/Pengujian '{reg['test_or_invariant']}' tetap berstatus PROVEN/PASS",
+                    "observed_symbol": reg["test_or_invariant"],
+                })
     else:
         evidence.append({
             "item": "regression_detection",
@@ -1306,8 +1458,14 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         required_repairs.append({
             "target_phase": "DEVELOPER",
             "action": "SELF_HEALING_REPAIR",
-            "details": f"Perbaiki {failed_count} kegagalan uji sandbox dengan mempertahankan fungsionalitas yang telah lulus."
+            "details": f"Perbaiki {failed_count} kegagalan uji sandbox dengan mempertahankan seluruh kondisi invariant yang telah terkunci."
         })
+
+    # Injeksi state locked invariants terupdate ke dalam state sebelum assemble_b5_evidence
+    locked_dict_for_state = {k: inv.to_dict() for k, inv in updated_locked_invariants.items()}
+    augmented_state = dict(state)
+    augmented_state["locked_invariants"] = locked_dict_for_state
+    augmented_state["oscillation_history"] = oscillation_history
 
     # Iterasi 7: Assemble ContextualEvidencePackage on FAIL
     cep_dict_b5: Optional[Dict[str, Any]] = None
@@ -1315,7 +1473,7 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         cep_violations = _make_cep_violations(violations)
         run_id = state.get("run_id", "")
         iteration_num = state.get("iteration_count", 0)
-        cep = assemble_b5_evidence(state, cep_violations, regressions, evidence, run_id=run_id, iteration=iteration_num)
+        cep = assemble_b5_evidence(augmented_state, cep_violations, regressions, evidence, run_id=run_id, iteration=iteration_num)
         cep_dict_b5 = cep.to_dict()
 
     return {
@@ -1334,12 +1492,101 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         "source_of_truth": f"SANDBOX_RUNNER:exit_code_{exit_code}",
         "contextual_evidence_package": cep_dict_b5,
         "current_passed_tests": current_passed_tests,
+        "locked_invariants": locked_dict_for_state,
+        "oscillation_history": oscillation_history,
     }
 
 
 # ==============================================================================
-# B6: Reviewer Phase Validator (Phase-End Validation of Reviewer)
+# B6: Contract Mutation Demand Classifier & Phase Validator
 # ==============================================================================
+
+_V6_DEMAND_PATTERNS = [
+    # 1. Actionable request: Mohon/Tolong/Harap/Silakan/Wajib/Harus/Perlu/Minta/Instruksikan ubah/revisi/ganti/amend/unfreeze kontrak
+    re.compile(r'\b(?:tolong|mohon|harap|silakan|wajib|harus|perlu|minta|instruksi(?:kan)?)\s+(?:(?:meng)?ubah|(?:me)?revisi|amend|ganti|unfreeze)\s+(?:kontrak|contract|model\s+kontrak|endpoint\s+kontrak)\b', re.IGNORECASE),
+    # 2. Passive modal demand: Kontrak harus/perlu/wajib/mohon di-unfreeze/di-ubah/di-revisi/di-amend
+    re.compile(r'\b(?:kontrak|contract)\s+(?:harus|perlu|wajib|mohon|minta)\s+(?:di-?unfreeze|di-?ubah|di-?revisi|di-?amend)\b', re.IGNORECASE),
+    # 3. Direct imperative start: Ubah kontrak..., Revisi kontrak..., Ganti model kontrak...
+    re.compile(r'(?:^|[\]\)\.:;!\?,\-\n]|\b(?:maka|jadi|untuk\s+itu)\b)\s*(?:ubah|revisi|ganti)\s+(?:kontrak|model\s+kontrak|endpoint\s+kontrak)\b', re.IGNORECASE),
+    # 4. Direct unfreeze command: Unfreeze contract..., Amend contract...
+    re.compile(r'\b(?:unfreeze|amend)\s+contract\b', re.IGNORECASE),
+    # 5. Direct phrase: ganti model kontrak, ganti endpoint kontrak
+    re.compile(r'\b(?:ganti|ubah)\s+(?:model|endpoint)\s+kontrak\b', re.IGNORECASE)
+]
+
+_V6_PROHIBITION_PATTERNS = [
+    re.compile(r'\b(?:tidak\s+boleh|dilarang|jangan|bukan|tidak\s+perlu|tidak\s+dapat)\s+(?:(?:meng)?ubah|(?:me)?revisi|amend|unfreeze)\s+(?:frozen\s+)?(?:kontrak|contract)\b', re.IGNORECASE),
+    re.compile(r'\b(?:tanpa|bebas\s+dari)\s+(?:(?:meng)?ubah|(?:me)?revisi)\s+(?:frozen\s+)?(?:kontrak|contract)\b', re.IGNORECASE),
+]
+
+_V6_DESCRIPTIVE_PATTERNS = [
+    re.compile(r'\b(?:implementasi|kode|perubahan|widget|class|fungsi|method|ini|hal\s+ini)\s+(?:ini\s+)?(?:meng?ubah|merevisi)\s+(?:kontrak|antarmuka|kontrak\s+antarmuka)\b', re.IGNORECASE),
+]
+
+def classify_contract_mutation_demand(notes: str) -> Dict[str, Any]:
+    """
+    Mengklasifikasikan intensi catatan Reviewer terhadap kontrak ke dalam:
+    - 'DEMAND': Tuntutan imperatif aktif/pasif untuk mengubah/meng-unfreeze kontrak (is_mutation_demand=True).
+    - 'DESCRIPTIVE': Observasi analitis, deskripsi perilaku kode, atau larangan mutasi kontrak (is_mutation_demand=False).
+    - 'NONE': Catatan teknis biasa tanpa penyebutan mutasi kontrak (is_mutation_demand=False).
+    """
+    if not notes:
+        return {"classification": "NONE", "matched_pattern": None, "matched_text": None, "is_mutation_demand": False}
+
+    # 1. Evaluasi pola larangan/prohibisi eksplisit terlebih dahulu (contoh: "tidak boleh mengubah kontrak")
+    for pat in _V6_PROHIBITION_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            return {
+                "classification": "DESCRIPTIVE",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": False
+            }
+
+    # 2. Evaluasi tuntutan imperatif aktif/pasif (DEMAND)
+    for pat in _V6_DEMAND_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            # Periksa apakah ada negasi lokal tepat sebelum match (window 25 karakter)
+            start = max(0, m.start() - 25)
+            prefix = notes[start:m.start()].lower()
+            if any(neg in prefix for neg in ["tidak boleh", "jangan", "dilarang", "tidak "]):
+                return {
+                    "classification": "DESCRIPTIVE",
+                    "matched_pattern": pat.pattern,
+                    "matched_text": m.group(0),
+                    "is_mutation_demand": False
+                }
+            return {
+                "classification": "DEMAND",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": True
+            }
+
+    # 3. Evaluasi observasi deskriptif (contoh: "implementasi ini mengubah kontrak antarmuka")
+    for pat in _V6_DESCRIPTIVE_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            return {
+                "classification": "DESCRIPTIVE",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": False
+            }
+
+    # 4. Fallback kata kunci umum non-imperatif
+    if any(k in notes.lower() for k in ["kontrak", "contract", "unfreeze"]):
+        return {
+            "classification": "DESCRIPTIVE",
+            "matched_pattern": "generic_keyword",
+            "matched_text": None,
+            "is_mutation_demand": False
+        }
+
+    return {"classification": "NONE", "matched_pattern": None, "matched_text": None, "is_mutation_demand": False}
+
 
 def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes: str = "") -> ValidatorContract:
     """
@@ -1403,23 +1650,29 @@ def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes
         # Aturan 2: NEEDS_REVISION hanya sah jika causal owner adalah Developer (artefak kode masih mutable)
         # dan remaining budget Developer > 0.
         # Kontrak yang sudah FROZEN tidak boleh di-unfreeze.
-        demands_contract_change = any(k in review_notes.lower() for k in [
-            "ubah kontrak", "revisi kontrak", "amend contract", "unfreeze", "ganti endpoint kontrak", "ganti model kontrak"
-        ])
+        classification_res = classify_contract_mutation_demand(review_notes)
+        demands_contract_change = classification_res["is_mutation_demand"]
         evidence.append({
             "item": "frozen_contract_immutability_check",
             "evidence_class": "DETERMINISTIC",
-            "observed": {"demands_contract_change": demands_contract_change, "contract_status": contract_status},
+            "observed": {
+                "demands_contract_change": demands_contract_change,
+                "mutation_classification": classification_res["classification"],
+                "matched_pattern": classification_res.get("matched_pattern"),
+                "matched_text": classification_res.get("matched_text"),
+                "contract_status": contract_status
+            },
             "expected": {"demands_contract_change": False, "contract_status": "FROZEN"},
             "status": "INVALID" if demands_contract_change else "VALID"
         })
 
         if demands_contract_change:
             validator_verdict = "FAIL"
+            matched_info = f" (pola terdeteksi: '{classification_res.get('matched_text', '')}')" if classification_res.get("matched_text") else ""
             violations.append({
                 "criterion": "frozen_contract_immutability",
                 "severity": "CRITICAL",
-                "message": "Reviewer menuntut perubahan pada kontrak yang sudah FROZEN. Kontrak FROZEN mutlak immutable (tidak ada mekanisme unfreeze).",
+                "message": f"Reviewer menuntut perubahan pada kontrak yang sudah FROZEN{matched_info}. Kontrak FROZEN mutlak immutable (tidak ada mekanisme unfreeze).",
                 "location": "review_notes"
             })
         elif remaining_dev_budget <= 0:
