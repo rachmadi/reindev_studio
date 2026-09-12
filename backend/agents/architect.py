@@ -125,17 +125,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
     task_l = task.lower()
 
     if is_dart:
-        data_models = [
-            {
-                "model_name": "CardMetricData",
-                "target_file": "lib/card_metric.dart",
-                "fields": [
-                    {"field_name": "title", "field_type": "String", "is_required": False, "description": "Judul metrik"},
-                    {"field_name": "value", "field_type": "double", "is_required": False, "description": "Nilai numerik metrik"},
-                    {"field_name": "unit", "field_type": "String", "is_required": False, "description": "Satuan metrik"}
-                ]
-            }
-        ]
+        data_models = []
         interface_contracts = [
             {
                 "interface_id": "IFC-01",
@@ -144,7 +134,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                 "http_method": None,
                 "target_file": "lib/card_metric.dart",
                 "parameters": [
-                    {"param_name": "data", "param_type": "CardMetricData", "param_location": "PROP", "is_required": False}
+                    {"param_name": "data", "param_type": "dynamic", "param_location": "PROP", "is_required": False}
                 ],
                 "expected_return": {
                     "return_type": "Widget",

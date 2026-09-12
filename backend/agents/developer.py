@@ -429,12 +429,12 @@ INSTRUKSI PERBAIKAN:
         lang_rule = (
             "ATURAN DART / FLUTTER (WAJIB):\n"
             "- Tulis kode Dart murni dengan Sound Null Safety dan Strong Typing.\n"
-            "- Konsolidasikan seluruh implementasi (model data, Riverpod provider, dan ConsumerWidget) dalam 1 file di lib/ (contoh: === FILE: lib/card_metric.dart ===).\n"
+            f"- Konsolidasikan seluruh implementasi (model data, Riverpod provider, dan ConsumerWidget) dalam 1 file di lib/ (contoh: === FILE: {authoritative_target_file} ===).\n"
             "- DILARANG menulis file pubspec.yaml atau file test (fokus hanya pada file kode produksi di lib/).\n"
-            "- Untuk Widget dengan Riverpod: Jika method `build` menerima `WidgetRef ref` (contoh: `Widget build(BuildContext context, WidgetRef ref)`), WAJIB mendeklarasikan kelas sebagai `class MyWidget extends ConsumerWidget {`.\n"
-            "- Jika menggunakan Card widget, tetapkan properti visual: `Card(color: Colors.white, elevation: 2.0, child: ...)`.\n"
-            "- Untuk model data Dart, berikan nilai default pada konstruktor named parameter: `CardMetricData({this.value = 75, this.title = 'CPU', this.unit = '%'});` agar aman diinisialisasi tanpa argumen maupun dengan argumen.\n"
-            "- Untuk State Management Riverpod, gunakan `Provider<T>`: `final cardMetricProvider = Provider<CardMetricData>((ref) => CardMetricData());`.\n"
+            "- Untuk Widget dengan Riverpod: Jika method `build` menerima `WidgetRef ref` (contoh: `Widget build(BuildContext context, WidgetRef ref)`), deklarasikan kelas sebagai `class ... extends ConsumerWidget {`.\n"
+            "- Jika menggunakan Card widget, gunakan Material Design 3 Card.\n"
+            "- Untuk model data Dart, gunakan konstruktor named parameter dengan Sound Null Safety (gunakan default value atau tipe nullable `?` jika opsional) agar aman diinisialisasi.\n"
+            "- Untuk State Management Riverpod, gunakan `Provider<T>` standar (contoh: `final ...Provider = Provider<...>((ref) => ...)`).\n"
             "- DILARANG menggunakan `StateProvider`, `ChangeNotifierProvider`, atau `StateNotifier` (deprecated/hilang pada Riverpod terbaru)."
         )
     else:

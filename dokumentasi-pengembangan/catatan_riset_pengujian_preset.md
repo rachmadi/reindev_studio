@@ -1198,3 +1198,95 @@ Untuk menguji secara definitif apakah kegagalan ini disebabkan oleh batas kecerd
    - **R-2 (Static AST Payload-to-Model Cross-Auditor):** Membandingkan keys payload test dengan field Pydantic model secara deterministik di B5 `context_assembler.py` dan menghasilkan preskripsi kausal tingkat field.
    - **R-3 (Harmonisasi Batasan Kontrak Developer):** Memisahkan batas beku arsitektur (nama file/class) dengan kebebasan adaptasi field/default values pada model data.
    - **R-4 (Penyelarasan Epistemik Hulu):** Defensive Pydantic scaffolding pada Arsitek dan spesifikasi payload minimal pada PM Spec.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## BAGIAN 27: VALIDASI EMPIRIS TREATMENT A (FASTAPI_T1) & KALIBRASI EPISTEMIK — 2026-09-12 05:15 WIB s.d. 05:35 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### A. Profil Eksekusi Pilot Treatment A (fastapi_t1)
+* **Run ID:** `pv_pilot_fastapi_t1_rep1_20260912_051508`
+* **Model Squad:** `qwen2.5-coder:7b` (Unified Local Squad via Ollama, `num_ctx=8192`, `num_predict=3000`)
+* **Frozen Oracle SHA-256:** `a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63` (**100% INTACT & TIDAK BERMUTASI**)
+* **Treatment B (R-3):** **NONAKTIF** (`REINDEV_TREATMENT_B_R3="0"`)
+* **Hasil Pengujian Sandbox:** **5/5 PASS (100%)**
+* **Total Loops:** 2 loops (Konvergensi cepat pada Loop 1)
+* **Verdict Akhir:** **PASS** (Approved by Reviewer Gate V6)
+* **Durasi Eksekusi:** 173,28 detik (~2,88 menit)
+
+### B. Kalibrasi Epistemik Otoritas Intent Architect
+1. **Bukti Terbukti:** Arsitektur Staged Causal Evidence membuktikan secara empiris bahwa `qwen2.5-coder:7b` mampu melakukan pemulihan otonom (*autonomous self-healing*) dari status gagal menuju 5/5 PASS dalam 1 putaran tanpa regresi dan tanpa melanggar immutability orakel.
+2. **Koreksi Epistemik:** Treatment yang diuji secara aktual merupakan bundel:
+   $$\text{Treatment Aktual} = \text{R-1} + \text{Delivery Fix (is_repair_mode)} + \text{Compact Repair Context}$$
+   Kontribusi individual R-2 (schema cross-auditor) belum terisolasi secara terpisah pada run ini karena kegagalan Turn 1 adalah HTTP 405 (method mismatch), bukan HTTP 422.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## BAGIAN 28: EKSPERIMEN LINTAS EKOSISTEM DART/FLUTTER (FLUTTER_T1) & INVESTIGASI FORENSIK RUN 1–3 — 2026-09-12 05:45 WIB s.d. 06:18 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### A. Latar Belakang & Pertanyaan Riset Lintas Ekosistem
+Setelah keberhasilan Treatment A pada ekosistem Python/FastAPI, eksperimen dilanjutkan ke ekosistem Dart/Flutter (`flutter_t1`) untuk menguji:
+*"Apakah kapasitas pemulihan otonom Staged Causal Evidence mampu menyeberang ke framework Dart/Flutter secara murni tanpa case-specific solver?"*
+Berdasarkan arahan IA, Treatment B (R-3) tetap dinonaktifkan (`0`), Oracle tetap `4589e15c...` immutable, preskripsi diposisikan sebagai *WHAT* (bukan *HOW*), dan atribusi call-site wajib diverifikasi secara faktual.
+
+### B. Trajektori Eksekusi Pilot Run 1 s.d. Run 3
+1. **Pilot Run 1 (`pv_pilot_flutter_t1_rep1_20260912_054611`):**
+   - Mendeteksi adanya *Silent Context Truncation*: Section 4 (Prescriptions) dan Section 5 (Invariants) terpotong pada prompt perbaikan karena Section 1B memakan kuota karakter berlebih.
+   - Solusi: Merombak algoritma rendering menjadi multi-pass priority-aware compactification dan menaikkan kuota batas render dari 5500 ke 7500 karakter di `backend/contextual_evidence.py`.
+2. **Pilot Run 2 (`pv_pilot_flutter_t1_rep1_20260912_055738`):**
+   - Rendering berhasil utuh (7.340 karakter). Namun Developer tetap memunculkan kelas `CardMetricData` karena adanya bias template hardcoded pada Environment Fact Card & Contract Builder.
+   - Solusi: De-biasing kanonikal template Riverpod menjadi struktur generik (`ItemState` & `ItemWidget`) di `backend/knowledge_catalog.py` dan `backend/agents/architect.py`.
+3. **Pilot Run 3 (`pv_pilot_flutter_t1_rep1_20260912_060619`):**
+   - Durasi: 163.3s, 5 loops, Verdict: FAIL.
+   - Audit 54 event telemetri mengungkap temuan krusial:
+     * **Kepatuhan Developer pada CEP:** Developer mematuhi preskripsi `MetricData` dan named parameter `data` 100%! Developer sukses mendeklarasikan `class MetricData { ... }` dengan 3 field (`title`, `value`, `color`) dan menyematkan parameter `data` pada widget.
+     * **Dua Akar Kebuntuan Sistemik:**
+       1. *Harvester Deduplication Shadowing:* Harvester mendeteksi `CardMetric isn't a type` di `lib/card_metric.dart:4` (sisa riverpod provider) mendahului `test/card_metric_test.dart:13` (`body: CardMetric`), sehingga konteks pemanggilan Oracle test call site terbuang saat deduplikasi simbol.
+       2. *Contract Gridlock:* Architect membekukan `interface_contracts: [ {"identifier": "CardMetricWidget"} ]` karena halusinasi sufiks `Widget`. Developer terjebak antara larangan mengubah interface kontrak dengan kebutuhan mendefinisikan `CardMetric`.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## BAGIAN 29: HASIL EKSPERIMEN RUN 4 (FLUTTER_T1), PEMBUKTIAN PROVENANCE PRESERVATION, DAN PENEMUAN HIERARCHY-OF-AUTHORITY FAILURE — 2026-09-12 06:24 WIB s.d. 06:37 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### A. Profil Eksekusi Pilot Run 4 (flutter_t1)
+* **Run ID:** `pv_pilot_flutter_t1_rep1_20260912_062738`
+* **Waktu Eksekusi:** 2026-09-12 06:27:38 WIB s.d. 06:30:38 WIB (Durasi: 179.0 detik)
+* **Model Squad:** `qwen2.5-coder:7b` (Unified Local Squad via Ollama, `num_ctx=8192`, `num_predict=3000`)
+* **Frozen Oracle SHA-256:** `4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528` (**100% INTACT & IMMUTABLE**)
+* **Treatment B (R-3):** **NONAKTIF** (`REINDEV_TREATMENT_B_R3="0"`)
+* **Hasil Pengujian Sandbox:** **0/3 PASS (0%)** | **Loops:** 5 | **Verdict:** **FAIL**
+
+### B. Keberhasilan Mutlak Lapisan Evidence: Provenance-Preserving Deduplication
+Audit telemetri Event 20 membuktikan bahwa perbaikan Evidence Layer bekerja 100% sempurna:
+1. **Zero Shadowing:** Ketika kompiler mengeluarkan error pada berkas draft internal (`lib/card_metric.dart:4`) dan berkas test acceptance (`test/card_metric_test.dart:13`), deduplikasi tidak membuang call-site Oracle.
+2. **Authoritative Tagging:** Preskripsi B5 merekam:
+   - `RX-B5-DART-SYMBOL-001` (`MetricData`): `[AUTHORITATIVE ORACLE CALL-SITE] Oracle test call site at test/card_metric_test.dart:14 -> body: CardMetric( data: MetricData(title: 'Revenue', value: '1000', color: Colors.blue),`
+   - `RX-B5-DART-SYMBOL-002` (`CardMetric`): `[AUTHORITATIVE ORACLE CALL-SITE] Oracle test call site at test/card_metric_test.dart:13 -> home: Scaffold( body: CardMetric(`
+   - `REQUIRED CHANGE (CONTRACT)`: Secara eksplisit menuntut pemenuhan pemanggilan `CardMetric(...)` oleh acceptance authority.
+
+### C. Penemuan Kritis Forensik: Hierarchy-of-Authority Failure
+Meskipun preskripsi B5 telah benar dan jelas, Developer pada Iterasi 2 (Event 25) dan Iterasi 3 (Event 41) **tetap mempertahankan nama `class CardMetricWidget`** dan menolak mengganti nama menjadi `CardMetric`.
+Audit mendalam terhadap prompt Developer Event 21 mengungkap terjadinya kontradiksi direktif internal yang melumpuhkan penalaran model (*Semantic Paralyzation*):
+* **Perintah Kontrak FROZEN:** `Antarmuka Resmi: CardMetricWidget, updateCardMetric` | `! Rename authoritative interface names defined in contract` | `Batasan: DILARANG menambah endpoint, fungsi, atau model di luar kontrak resmi ini!`
+* **Perintah Preskripsi B5:** `Symbol 'CardMetric' is invoked or referenced by the caller... Define or export class/method 'CardMetric' with the interface expected by the caller.`
+
+Developer mematuhi larangan kontrak resmi dan menolak me-rename interface, sehingga pengujian acceptance tetap gagal kompilasi.
+
+### D. Putusan Otoritatif Intent Architect (Church of Goat 🐐)
+Intent Architect menerbitkan putusan ilmiah:
+1. **STOP Pilot Run 5:** Tidak boleh mengulang run dengan arsitektur saat ini.
+2. **NO-GO Solusi Pragmatis Berbahaya:**
+   - Menolak keras mengizinkan Developer melanggar status Frozen Contract. Status beku tidak boleh memiliki pengecualian ad-hoc.
+   - Menolak keras mengubah kontrak secara manual menjadi `CardMetric` (prematur, validator dilarang memilih desain implementasi).
+   - Menolak keras menyuntikkan naming prior Flutter PascalCase (menjaga eksperimen bebas dari bias arsitektur).
+3. **Doktrin Baru Gate V2/B2 (Contract–Oracle Consistency Gate):**
+   $$\text{"No contract may become immutable before its consistency with the immutable acceptance authority has been deterministically established."}$$
+   Kontrak tidak boleh dibekukan sebelum terbukti konsisten dengan acceptance authority. Jika interface usulan Architect (`CardMetricWidget`) bertentangan dengan call-site pemanggil Oracle (`CardMetric`), Gate V2 WAJIB berstatus FAIL di hulu, bukan menunggu Gate V5 di hilir.
+4. **Penyempurnaan Non-Solver ke Level Requirement Murni:**
+   - Bukti: `[AUTHORITATIVE ORACLE CALL-SITE] CardMetric(...)`
+   - Preskripsi: *"The implementation must satisfy the authoritative CardMetric call-site while preserving all valid frozen external requirements."* (Bukan solusi: *"Define or export class/method CardMetric"*).

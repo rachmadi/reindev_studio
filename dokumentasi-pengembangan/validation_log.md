@@ -1052,3 +1052,74 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
 - **Pelaksana Audit:** Antigravity (Agentic Pair-Programmer)
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
 - **Tindak Lanjut:** Dokumentasi hasil riset tuntas dan persiapan eksekusi Roadmap Rekomendasi R-1 s.d. R-4.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI EMPIRIS: TREATMENT A FASTAPI_T1 (5/5 PASS) & KALIBRASI GLOBAL IA — 2026-09-12 05:35 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal & Telemetri Run
+- **Run ID:** `pv_pilot_fastapi_t1_rep1_20260912_051508`
+- **Model:** `qwen2.5-coder:7b` (Unified Local Squad)
+- **Integritas Frozen Oracle:** `a1db9bb1...` **100% INTACT & MATCH**.
+- **Hasil Eksekusi Sandbox:** **5/5 PASS (100%)** dalam 1 repair turn (Turn 1).
+- **Vonis Reviewer (B6):** **APPROVED (PASS)**.
+- **Rantai Kausal:** Runtime evidence enrichment R-1 menangkap HTTP 405 body -> Developer menyintesis endpoint GET -> 5/5 PASS tanpa regresi.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ✅ **PASS — AUTONOMOUS REPAIR CAPABILITY PROVEN EMPIRICALLY**
+- **Kalibrasi Epistemik:** Menegaskan bundel perlakuan aktual ($R-1 + \text{Delivery Fix} + \text{Compact Context}$) dan mengoreksi batasan klaim atas komponen R-2.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI FORENSIK LINTAS EKOSISTEM: PILOT FLUTTER_T1 RUN 1–3 — 2026-09-12 06:18 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal & Investigasi Forensik Run 3
+- **Run ID:** `pv_pilot_flutter_t1_rep1_20260912_060619`
+- **Model:** `qwen2.5-coder:7b` (Unified Local Squad)
+- **Integritas Frozen Oracle:** `4589e15c...` **100% INTACT & MATCH**.
+- **Hasil Eksekusi:** 0/1 PASS (FAIL, 5 loops consumed, 163.3s).
+- **Temuan Kunci Forensik:**
+  1. **Validasi Kepatuhan Kausal Developer:** Developer mematuhi preskripsi `MetricData` dan parameter `data` 100% pada Iterasi 2.
+  2. **Deduplication Shadowing di Harvester:** Baris error implementasi mendahului baris error test runner, menutupi Oracle test call site.
+  3. **Contract Gridlock:** Pembekuan nama `CardMetricWidget` oleh Architect membelenggu Developer dari penyesuaian nama widget menjadi `CardMetric`.
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ⏳ **INVESTIGATION OPEN — RESOLVED IN RUN 4 AUDIT**
+- **Pelaksana Audit:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## VALIDASI FORENSIK RUN 4 & PUTUSAN OTORITATIF INTENT ARCHITECT — 2026-09-12 06:37 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Evaluasi Internal & Telemetri Run 4
+- **Run ID:** `pv_pilot_flutter_t1_rep1_20260912_062738`
+- **Model:** `qwen2.5-coder:7b` (Unified Local Squad via Ollama, `num_ctx=8192`, `num_predict=3000`)
+- **Integritas Frozen Oracle:** `4589e15c...` **100% INTACT & MATCH**.
+- **Hasil Eksekusi Sandbox:** 0/3 PASS (FAIL, 5 loops consumed, 179.0s).
+- **Temuan Kunci Forensik:**
+  1. **Pembuktian Empiris Provenance Preservation:** Perbaikan *Provenance-Preserving Deduplication* di Evidence Layer bekerja 100% sempurna: preskripsi `CardMetric` dan `MetricData` sukses dipreservasi dengan tag `[AUTHORITATIVE ORACLE CALL-SITE]`.
+  2. **Penemuan Hierarchy-of-Authority Failure:** Developer menerima preskripsi B5 `CardMetric`, namun menolak me-rename kelas `CardMetricWidget` sepanjang Iterasi 2 dan 3 karena Dokumen Kontrak resmi dan Section 5 Invariants mengunci `Antarmuka Resmi: CardMetricWidget` dan melarang me-rename interface kontrak. Developer terjebak dalam kontradiksi antara Frozen Contract vs Acceptance Oracle.
+
+### 2. Status Validation Gate & Putusan Otoritatif IA (Church of Goat 🐐)
+- **Status Validasi:** 🛑 **STOP — NO PILOT RUN 5 WITH CURRENT ARCHITECTURE**
+- **Putusan Epistemik:**
+  - 🟢 **GO:** Provenance-Preserving Deduplication & Oracle Call-Site Provenance dipertahankan.
+  - 🔒 **LOCK:** Treatment B (R-3) tetap OFF (`0`).
+  - ❌ **NO-GO:** Pelanggaran Frozen Contract oleh Developer dilarang mutlak (merusak konsep immutable contract).
+  - ❌ **NO-GO:** Modifikasi kontrak manual menjadi `CardMetric` dilarang (prematur; validator dilarang memilih desain).
+  - ❌ **NO-GO:** Penyuntikan aturan konvensi penamaan PascalCase dilarang (architectural prior).
+  - 🟢 **GO:** Implementasi **Contract–Oracle Consistency Gate** pada Gate V2/B2 sebelum status kontrak disegel menjadi `FROZEN`.
+  - 🟢 **GO:** Penyempurnaan preskripsi Non-Solver ke level requirement murni (*"The implementation must satisfy the authoritative CardMetric call-site while preserving all valid frozen external requirements"*).
+- **Doktrin Otoritas Baru:**
+  $$\text{"No contract may become immutable before its consistency with the immutable acceptance authority has been deterministically established."}$$
+- **Waktu Ketetapan:** 2026-09-12 06:37 WIB
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Tindak Lanjut:** Moratorium Run 5 aktif. Perancangan dan implementasi Contract–Oracle Consistency Gate pada Gate V2/B2.
+
+

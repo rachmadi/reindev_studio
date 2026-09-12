@@ -225,3 +225,23 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 - Total Waktu Perbaikan, Forensik & Dokumentasi (Fix): 11.400 detik (190.00 menit / 3.16 jam)
 - **TOTAL WAKTU REALISASI SESI:** **23.400 detik (~6 jam 30 menit / 6.50 jam)**
 - Status: **✅ SELESAI & DIVERIFIKASI (Dokumentasi Tersinkronisasi Penuh)**
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RISET & VALIDASI LINTAS EKOSISTEM: Treatment A & Flutter T1 — 2026-09-12 04:36 s.d. 06:37 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Implementasi R-1 & Validasi Pilot Treatment A (fastapi_t1) | — | 0.75 | 45.0 m | — | conftest enricher, 5/5 PASS, kalibrasi klaim IA |
+| Ekstraksi Dart Harvester & Multi-pass Rendering Hardening | — | 0.50 | 30.0 m | — | test_dart_diagnostic_harvester, rendering 7500 chars |
+| Eksekusi Pilot flutter_t1 (Run 1–3) & Forensik 54 Event | — | 0.50 | 30.0 m | — | Telemetri 54 event, pembuktian kepatuhan CEP, contract gridlock |
+| Implementasi Provenance Deduplication, Run 4 & Autopsi Otoritas | — | 0.35 | 21.0 m | — | Provenance preservation 10/10 tests PASS, Run 4 (179s), penemuan Hierarchy-of-Authority |
+| **Total Sesi Riset Lintas Ekosistem (2026-09-12)** | **—** | **2.10** | **126.0 m** | **—** | **Kumulatif Riset: 52.12 jam** |
+
+*Ringkasan Grand Total Kumulatif Proyek Terbaru:*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **55.38 jam (3.322,8 menit)**
+- Total Riset, Eksperimen & Forensik: **52.12 jam**
+- Status: **✅ SELESAI & DIVERIFIKASI (Investigasi Forensik Run 4 Tuntas — Moratorium Run 5 Aktif)**
+
+

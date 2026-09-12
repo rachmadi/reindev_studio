@@ -69,7 +69,7 @@ def test_knowledge_catalog_riverpod_v3():
     assert "riverpod_v2_plus_no_state_notifier" in rule_ids
     rule = next(r for r in rules if r.id == "riverpod_v2_plus_no_state_notifier")
     assert "StateNotifier" in rule.prohibited_patterns
-    assert "Provider<CardMetricData>" in rule.positive_template
+    assert "Provider<ItemState>" in rule.positive_template
 
 
 def test_knowledge_catalog_pydantic_v2():
@@ -118,7 +118,7 @@ def test_generate_fact_card_developer_dart():
     assert "[ENVIRONMENT FACT CARD" in card
     assert "AUTHORITATIVE PRECEDENCE" in card
     assert "POLA KANONIKAL YANG WAJIB DIGUNAKAN" in card
-    assert "Provider<CardMetricData>" in card
+    assert "Provider<ItemState>" in card
     # Pastikan tidak ada ambiguitas "StateNotifierProvider HANYA di riverpod <2.0"
     assert "HANYA di riverpod <2.0" not in card
 

@@ -267,3 +267,34 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Major (Positive Epistemic & Methodological Hardening)** — Pergeseran mendasar yang menyelamatkan integritas penelitian: dari kesimpulan keliru yang menyalahkan model AI menuju dekonstruksi ilmiah yang membuktikan kelemahan instrumen pengujian runtime (Pytest response truncation) dan kontradiksi batasan direktif sistem.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI VALIDASI LINTAS EKOSISTEM DART/FLUTTER (FLUTTER_T1) — 2026-09-12 05:45 s.d. 06:18 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penegakan Staged Causal Evidence Non-Solver pada Dart (D-095) | Positif (Menguji generalisasi mandiri pipeline tanpa solver kasus tertentu) | Intent Architect |
+| Multi-Pass Priority-Aware Compactification pada CEP Renderer (E-063) | Positif (Menjamin preskripsi dan invarian tidak terpotong oleh batasan konteks) | Agen |
+| Provenance-Preserving Deduplication pada Dart Harvester (D-096, E-065) | Positif (Memelihara call-site acceptance authority dan deklarasi internal secara berjenjang) | Agen & IA |
+| Penolakan Naming Prior & Pelanggaran Frozen Contract (D-097, D-098) | Positif (Mencegah confounder arsitektur dan menjaga immutability kontrak mutlak) | Intent Architect |
+| Contract–Oracle Consistency Gate Sebelum Status FROZEN (D-099, E-067) | Positif (Menyelaraskan klaim spekulatif Architect terhadap Acceptance Authority di hulu sebelum kontrak beku) | Intent Architect |
+| Requirement-Level Pure Non-Solver Prescription (D-100) | Positif (Menyatakan requirement kontrak murni dan mencegah validator mendikte solusi kode) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Pembuatan 10 unit test komprehensif pada `test_dart_diagnostic_harvester.py` untuk membuktikan preservasi provenance simetris dua arah (internal-first & test-first).
+- **B2 (Keputusan Teknis):**
+  - Rekonstruksi prompt Developer Event 21 dan autopsi event trace Run 4 yang membuktikan terjadinya *Hierarchy-of-Authority Deadlock* antara kontrak resmi vs acceptance authority.
+
+### Ringkasan Distribusi Sumber Drift Sesi 2026-09-12 (Flutter T1 Run 4):
+- **Intent Architect:** 70.0% (STOP Run 5, penolakan naming prior & pelanggaran kontrak, penetapan doktrin Contract-Oracle gate sebelum freeze, pemurnian requirement-level non-solver)
+- **Agen:** 30.0% (Implementasi Provenance-Preserving Deduplication, 10 unit tests PASS, audit telemetri Event 20 & 21 Run 4)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Critical & Fundamental (Architectural Authority Realignment)** — Penemuan struktural paling berharga pada Iterasi 7: membuktikan bahwa end-phase validation pada Gate V2 bukan sekadar alat linter, melainkan benteng pencegah klaim arsitektur spekulatif menjadi immutable authority sebelum konsistensinya terhadap Acceptance Authority terbukti secara deterministik.
+
+

@@ -788,51 +788,67 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Run 5.1 cli_t1):
-- **Diselesaikan Mandiri oleh Agen:** 26 kasus
-- **Diselesaikan atas Intervensi IA:** 5 kasus
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 8 kasus
-- **Total Galat Terdokumentasi:** 59 kasus (E-001 s/d E-059)
 ---
 
-### Kasus E-060: Pytest TestClient Semantic Diagnostic Truncation (Missing Response Body on HTTP 422)
-- **Waktu:** 2026-09-11 ~22:46 WIB (Pilot `fastapi_t1` Run `pv_pilot_fastapi_t1_rep1_20260911_224623`)
-- **Tingkat Keparahan:** High (Runtime Diagnostic Deficit / Blindspot)
-- **Gejala:** Pytest berhenti pada baris `assert response.status_code == 201` saat request POST menghasilkan HTTP 422. Output terminal hanya memuat `AssertionError: assert 422 == 201` tanpa mencetak payload body JSON yang berisi pesan validasi Pydantic.
-- **Akar Masalah:** Test runner standar pytest tidak mengekstrak atau mencetak atribut objek lokal `response.text` / `response.json()` ketika assertion status code gagal, sehingga fakta kegagalan skema lenyap sebelum sampai ke CEP.
-- **Tindakan Korektif (R-1):** Menginjeksi hook pytest `conftest.py` pada sandbox runner yang secara otomatis mengekstrak dan mencetak isi response body saat status HTTP bernilai 4xx atau 5xx.
-- **Sumber Solusi:** AGEN (Audit Investigasi Forensik Pilot `fastapi_t1`).
-- **Status:** Teridentifikasi & Terdokumentasi (R-1 siap diimplementasikan).
+### Kasus E-063: Context Truncation of Actionable Prescriptions & Invariants pada Multi-Section CEP Directives
+- **Waktu:** 2026-09-12 ~05:46 WIB (Pilot `flutter_t1` Run 1)
+- **Tingkat Keparahan:** High (Directive Delivery Truncation)
+- **Gejala:** Preskripsi perbaikan penting (`RX-B5-DART-SYMBOL-001`) dan batasan invarian terbukti terpotong dari prompt Developer, menyebabkan model tidak menerima sinyal perbaikan.
+- **Akar Masalah:** Kuota render 5.500 karakter habis terkonsumsi oleh seksi awal (Section 1B failure summary & traceback) sebelum seksi aksi perbaikan (Section 4 & 5) selesai dirender.
+- **Tindakan Korektif:** Merombak fungsi `render_repair_directive` menjadi multi-pass priority-aware compactification: Pass 1 membatasi excerpt raw Section 1B maksimal 350 karakter; Pass 2 memangkas doktrin sekunder jika kuota menipis demi menjamin Section 4 (Prescriptions) dan Section 5 (Invariants) 100% utuh; menaikkan kuota batas render menjadi 7.500 karakter.
+- **Sumber Solusi:** AGEN (Micro Loop Engineering).
+- **Status:** Tuntas (Resolved & Verified 100% pada Run 2).
 
 ---
 
-### Kasus E-061: Negative Constraint Priming & Double-Bind pada Prompt Developer
-- **Waktu:** 2026-09-11 ~22:48 WIB
-- **Tingkat Keparahan:** High (Directive Cognitive Impasse)
-- **Gejala:** Developer model (`qwen2.5-coder:7b`) menolak memodifikasi atribut field pada kelas `Product` (misal menambah `quantity` atau memberi default pada `price`/`stock`), meskipun pengujian gagal akibat HTTP 422.
-- **Akar Masalah:** Prompt sistem Developer menyertakan larangan keras dengan huruf kapital dan peringatan terminasi kegagalan: `[KONTRAK RESMI (STRICTLY FROZEN - WAJIB 100%)]: DILARANG KERAS MENGUBAH ATAU MEMODIFIKASI FROZEN CONTRACT!`. Model 7B memprioritaskan kepatuhan larangan ini di atas saran perbaikan, menciptakan situasi *double-bind*.
-- **Tindakan Korektif (R-3):** Menyelaraskan batasan kontrak pada prompt: menegaskan bahwa nama kelas dan file bersifat FROZEN, namun mutasi atribut data model (penambahan field, nilai default) adalah TINDAKAN PEMULIHAN YANG DIWAJIBKAN.
-- **Sumber Solusi:** AGEN & INTENT ARCHITECT (Audit Forensik Kausal).
-- **Status:** Teridentifikasi & Terdokumentasi (R-3 siap diimplementasikan).
+### Kasus E-064: False Invariant Regression Trigger dari Baris Loader Kompilasi Flutter Test
+- **Waktu:** 2026-09-12 ~05:52 WIB
+- **Tingkat Keparahan:** Medium (False Negative Pipeline Abort)
+- **Gejala:** State validator menganggap kompilasi awal mengalami regresi tes yang lolos, padahal tes belum pernah dieksekusi.
+- **Akar Masalah:** Output loader flutter test (`00:00 +0: loading ...`) diparsing oleh regex pelacak tes lolos secara keliru, menganggap baris loader sebagai 1 passed test.
+- **Tindakan Korektif:** Menambahkan guard ketat `passed_count > 0` dan memfilter pola baris `loading ...` pada fungsi pelacakan invarian di `backend/phase_validators.py`.
+- **Sumber Solusi:** AGEN (Micro Loop Engineering).
+- **Status:** Tuntas (Resolved).
 
 ---
 
-### Kasus E-062: Upstream-to-Oracle Schema Disparity & Static AST Audit Absence
-- **Waktu:** 2026-09-11 ~22:49 WIB
-- **Tingkat Keparahan:** High (Upstream Ambiguity & Reasoning Burden)
-- **Gejala:** Terjadi benturan atribut antara spesifikasi Arsitek (`price`, `stock`) dengan ekspektasi Frozen Oracle (`quantity`), memicu kegagalan sistemik 4/5 pengujian di sandbox.
-- **Akar Masalah:** PM Task Specification terlalu abstrak, Arsitek berspekulasi menambahkan field e-commerce tanpa nilai default, dan sistem preskripsi B5 tidak memiliki auditor statis berbasis AST untuk membandingkan kunci payload pengujian dengan atribut kelas Pydantic.
-- **Tindakan Korektif (R-2 & R-4):**
-  1. Membangun Static AST Payload-to-Model Cross-Auditor pada B5 untuk menyintesis preskripsi tingkat field secara deterministik (R-2).
-  2. Menerapkan pedoman defensive scaffolding pada Arsitek (field sekunder wajib memiliki default value) (R-4).
-- **Sumber Solusi:** AGEN & INTENT ARCHITECT (Controlled Ablation Study).
-- **Status:** Teridentifikasi & Terdokumentasi (R-2 & R-4 siap diimplementasikan).
+### Kasus E-065: Oracle Test Call-Site Deduplication Shadowing pada Dart Diagnostic Harvester
+- **Waktu:** 2026-09-12 ~06:08 WIB (Pilot `flutter_t1` Run 3)
+- **Tingkat Keparahan:** High (Diagnostic Signal Masking)
+- **Gejala:** Preskripsi simbol `CardMetric` hanya menampilkan rujukan deklarasi internal `lib/card_metric.dart:4`, sementara pemanggilan dari orakel uji `test/card_metric_test.dart:13` hilang dari CEP.
+- **Akar Masalah:** Kompiler Dart mengeluarkan error pada berkas kode sebelum berkas test. Harvester memproses baris sekuensial dan mendeduplikasi simbol `CardMetric` berdasarkan temuan pertama, sehingga konteks pemanggilan test runner Oracle terabaikan.
+- **Tindakan Korektif:** Mengimplementasikan *Provenance-Preserving Deduplication* di `synthesize_b5_actionable_prescriptions`: jika suatu simbol/parameter ditemukan di kedua lokasi (internal dan test), keduanya wajib dipreservasi dengan Oracle test call-site diberi label otoritas tertinggi (`[AUTHORITATIVE ORACLE CALL-SITE]`) dan deklarasi internal dicatat sebagai pendukung (`[INTERNAL IMPLEMENTATION REFERENCE]`).
+- **Sumber Solusi:** AGEN (Audit Forensik Run 3 & Arahan IA D-096).
+- **Status:** Tuntas (Resolved & Verified 100% via 10 unit test dan bukti empiris Event 20 Run 4).
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Investigasi Forensik Pilot fastapi_t1):
-- **Diselesaikan Mandiri oleh Agen:** 26 kasus
-- **Diselesaikan atas Intervensi IA:** 6 kasus
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 9 kasus
-- **Kasus Forensik & Rekomendasi Terbuka:** 3 kasus (E-060, E-061, E-062)
-- **Total Galat Terdokumentasi:** 62 kasus (E-001 s/d E-062)
+### Kasus E-066: Architect Redundant Widget Suffix Hallucination & Penolakan Naming Prior
+- **Waktu:** 2026-09-12 ~06:09 WIB (Pilot `flutter_t1` Run 3)
+- **Tingkat Keparahan:** High (Architectural Interface Gridlock)
+- **Gejala:** Developer mengalami perulangan kode identik pada Iterasi 4 dan gagal konvergen akibat benturan nama `CardMetricWidget` (kontrak) vs `CardMetric` (oracle).
+- **Akar Masalah Awal:** Architect memecah konsep kartu metrik menjadi model `CardMetric` dan widget `CardMetricWidget`, membekukan `CardMetricWidget` ke dalam kontrak resmi, sedangkan Frozen Oracle memanggil widget dengan nama `CardMetric`.
+- **Koreksi Epistemik IA (D-097):** Usulan menambahkan aturan PascalCase Flutter (`CardMetric, bukan CardMetricWidget`) ditolak mutlak (NO-GO) oleh Intent Architect karena merupakan *architectural prior* / *confounder*. Eksperimen harus membuktikan sinyal evidence dapat membimbing model tanpa mendikte arsitektur.
+- **Status:** Direvisi ke level arsitektural yang lebih dalam (Lihat Kasus E-067).
+
+---
+
+### Kasus E-067: Hierarchy-of-Authority Deadlock between Speculative Contract Interface & Acceptance Oracle Call-Site
+- **Waktu:** 2026-09-12 ~06:30 WIB (Pilot `flutter_t1` Run 4)
+- **Tingkat Keparahan:** Critical (Architectural Deadlock / Premature Contract Freeze)
+- **Gejala:** Developer menerima preskripsi B5 yang benar (`CardMetric` dengan call-site `[AUTHORITATIVE ORACLE CALL-SITE]`), namun menolak mengganti nama kelas `CardMetricWidget` sepanjang Iterasi 2 dan 3, sehingga pengujian acceptance tetap gagal kompilasi (0/3 passed).
+- **Akar Masalah:** Terjadi kegagalan hierarki wewenang (*Hierarchy-of-Authority failure*): Architect mengajukan interface spekulatif `CardMetricWidget` yang langsung dibekukan menjadi status `FROZEN` sebelum diuji konsistensinya terhadap acceptance authority. Prompt perbaikan B5 melarang Developer melanggar kontrak frozen (`! Rename authoritative interface names defined in contract`), sementara Preskripsi B5 menuntut `CardMetric`. Developer terperangkap dalam kontradiksi antara Frozen Contract vs Acceptance Oracle.
+- **Tindakan Korektif (Arahan IA D-098 & D-099):** Membangun Contract–Oracle Consistency Gate pada Gate V2/B2 *sebelum* status kontrak disegel menjadi `FROZEN`. Jika klaim interface Architect bertentangan dengan call-site pemanggil acceptance Oracle, Gate V2 WAJIB berstatus `FAIL`. Menegakkan doktrin: *"No contract may become immutable before its consistency with the immutable acceptance authority has been deterministically established."*
+- **Sumber Solusi:** IA (Putusan Otoritatif Evaluasi Forensik Run 4) & AGEN.
+- **Status:** Investigated & Validated by IA (STOP Pilot Run 5; Architecture Refactor Pending).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Lintas Ekosistem flutter_t1):
+- **Diselesaikan Mandiri oleh Agen:** 29 kasus (termasuk E-065)
+- **Diselesaikan atas Intervensi IA:** 7 kasus
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
+- **Kasus Forensik & Rekomendasi Terbuka:** 5 kasus (E-060, E-061, E-062, E-066, E-067)
+- **Total Galat Terdokumentasi:** 67 kasus (E-001 s/d E-067)
+
+

@@ -384,23 +384,14 @@ class ContextualEvidencePackage:
 # 3. Markdown Renderer — Single-Unit Repair Directive
 # ===========================================================================
 
-_MAX_RENDER_CHARS = 5500   # Batas kompaktasi untuk num_ctx=8192 pada model 7B (parameter engineering terukur)
+_MAX_RENDER_CHARS = 7500   # Batas kompaktasi untuk num_ctx=8192 pada model 7B (parameter engineering terukur)
 
-def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MAX_RENDER_CHARS) -> str:
-    """
-    Menghasilkan satu unit Markdown terpadu yang diinjeksikan ke prompt causal owner.
-
-    Urutan kanonikal linier penentu tindakan (Evidence Priority):
-      1. Deterministic Facts & Failure Summary (failure)
-      1B. Deterministic Sandbox Failure Evidence (failing tests, assertions, traceback)
-      2. Derived Deterministic Diagnosis / Root Cause (causal evidence)
-      3. Complete Violation Roster & Causal Evidence (causal evidence)
-      4. Actionable Repair Prescriptions — Deterministic (prescription)
-      5. Preserved Invariants & Behavioral Locks (invariant)
-      6. Engineering Doctrine & Compatibility Principles (doctrine)
-      7. Deterministic Verification & Required Changes (verification)
-      8. Secondary Context: Repair Boundaries & Active Constraints
-    """
+def _build_repair_directive_lines(
+    pkg: ContextualEvidencePackage,
+    include_raw_sandbox: bool = True,
+    full_doctrine: bool = True,
+    max_detailed_tests: int = 4,
+) -> str:
     lines: List[str] = []
 
     _sep = "=" * 80
@@ -435,7 +426,8 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
         lines.append("\n[DETERMINISTIC SANDBOX FAILURE EVIDENCE]")
         if failing_tests_ev and isinstance(failing_tests_ev, list):
             lines.append(f"Failing Tests ({len(failing_tests_ev)} failing):")
-            for ft in failing_tests_ev:
+            detailed_tests = failing_tests_ev[:max_detailed_tests]
+            for ft in detailed_tests:
                 if isinstance(ft, dict):
                     tname = ft.get("test_name", "unknown")
                     ftype = ft.get("failure_type", "failure")
@@ -452,11 +444,17 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
                     if sfile or sline:
                         lines.append(f"    Location: {sfile or ''}:{sline or ''}")
                     tb = ft.get("traceback_excerpt")
-                    if tb:
-                        lines.append(f"    Traceback: {tb.strip()}")
+                    if tb and tb.strip() != msg.strip():
+                        tb_clean = tb.strip()
+                        if len(tb_clean) > 200:
+                            tb_clean = tb_clean[:200] + "..."
+                        lines.append(f"    Traceback: {tb_clean}")
+            if len(failing_tests_ev) > max_detailed_tests:
+                lines.append(f"  ... and {len(failing_tests_ev) - max_detailed_tests} more failing test(s)")
+
         if runtime_diag_ev and isinstance(runtime_diag_ev, list):
             lines.append("\nGeneric Runtime Diagnostics:")
-            for diag in runtime_diag_ev:
+            for diag in runtime_diag_ev[:3]:
                 dtype = diag.get("type", "DIAGNOSTIC")
                 lines.append(f"  • Type: {dtype}")
                 if "status_code" in diag:
@@ -464,18 +462,26 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
                 if "response_body" in diag:
                     body_val = diag["response_body"]
                     body_str = json.dumps(body_val) if isinstance(body_val, (dict, list)) else str(body_val)
-                    lines.append(f"    Response Body: {body_str[:800]}")
+                    lines.append(f"    Response Body: {body_str[:300]}")
                 if "validation_detail" in diag:
                     detail_val = diag["validation_detail"]
                     detail_str = json.dumps(detail_val) if isinstance(detail_val, (dict, list)) else str(detail_val)
-                    lines.append(f"    Validation Detail: {detail_str[:800]}")
+                    lines.append(f"    Validation Detail: {detail_str[:300]}")
                 if "exception_type" in diag:
                     lines.append(f"    Exception Type: {diag['exception_type']}")
                 if "exception_message" in diag:
                     lines.append(f"    Exception Message: {diag['exception_message']}")
-        if sandbox_ev:
+        if sandbox_ev and include_raw_sandbox:
             lines.append("\nRaw Test Runner Output Excerpt:")
-            lines.append(str(sandbox_ev).strip())
+            raw_s = str(sandbox_ev).strip()
+            raw_lines = [l for l in raw_s.splitlines() if l.strip()]
+            if len(raw_lines) > 8:
+                compact_raw = "\n".join(raw_lines[:8]) + f"\n... [{len(raw_lines) - 8} more lines omitted for context efficiency]"
+            else:
+                compact_raw = "\n".join(raw_lines)
+            if len(compact_raw) > 350:
+                compact_raw = compact_raw[:350] + "... [truncated]"
+            lines.append(compact_raw)
 
     # 2. Root Cause (causal evidence)
     lines.append("\n[2. DERIVED DETERMINISTIC DIAGNOSIS (ROOT CAUSE)]")
@@ -540,7 +546,8 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
     # 6. Engineering Doctrine (doctrine - mandatory for developer/executor)
     if getattr(pkg, "causal_owner", "") == "DEVELOPER" or getattr(pkg, "phase", "") in ("DEVELOPER", "EXECUTOR"):
         lines.append("\n[ENGINEERING DOCTRINE & COMPATIBILITY PRINCIPLES (MANDATORY)]")
-        for doc in ENGINEERING_DOCTRINE:
+        docs = ENGINEERING_DOCTRINE if full_doctrine else ENGINEERING_DOCTRINE[:2]
+        for doc in docs:
             lines.append(f"- {doc}")
 
     # 7. Verification Criteria & Required Changes (verification)
@@ -579,19 +586,51 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
         lines.append("\nAuthoritative Context:")
         for k, val in auth.items():
             if val:
-                val_str = ", ".join(str(x) for x in val) if isinstance(val, list) else str(val)
+                if isinstance(val, list):
+                    val_str = ", ".join(str(x) for x in val)
+                else:
+                    val_str = str(val).strip()
+                    if len(val_str) > 250:
+                        val_str = val_str[:250] + "... [excerpt truncated]"
                 lines.append(f"  - {k}: {val_str}")
 
     lines.append("\n" + _sep)
+    return "\n".join(lines)
 
-    full_text = "\n".join(lines)
 
-    # Kompaktasi deterministik jika melebihi batas token konteks
-    if len(full_text) > max_chars:
-        suffix = "\n...(dipotong untuk efisiensi konteks)\n" + _sep
-        full_text = full_text[:max_chars - len(suffix)] + suffix
+def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MAX_RENDER_CHARS) -> str:
+    """
+    Menghasilkan satu unit Markdown terpadu yang diinjeksikan ke prompt causal owner.
 
-    return full_text
+    Urutan kanonikal linier penentu tindakan (Evidence Priority):
+      1. Deterministic Facts & Failure Summary (failure)
+      1B. Deterministic Sandbox Failure Evidence (failing tests, assertions, traceback)
+      2. Derived Deterministic Diagnosis / Root Cause (causal evidence)
+      3. Complete Violation Roster & Causal Evidence (causal evidence)
+      4. Actionable Repair Prescriptions — Deterministic (prescription)
+      5. Preserved Invariants & Behavioral Locks (invariant)
+      6. Engineering Doctrine & Compatibility Principles (doctrine)
+      7. Deterministic Verification & Required Changes (verification)
+      8. Secondary Context: Repair Boundaries & Active Constraints
+
+    Menggunakan strategi compactification bertingkat (multi-pass) agar Section 4
+    (Actionable Prescriptions) dan Section 5 (Preserved Invariants) selalu terkirim utuh.
+    """
+    # Pass 1: Render standar terkompaksi (bounded raw excerpt & failing tests)
+    text = _build_repair_directive_lines(pkg, include_raw_sandbox=True, full_doctrine=True, max_detailed_tests=4)
+    if len(text) <= max_chars:
+        return text
+
+    # Pass 2: Jika melebihi max_chars, lepaskan raw excerpt sekunder dan ringkas doktrin
+    # untuk memastikan Actionable Prescriptions dan Invariants tidak pernah terpotong
+    text = _build_repair_directive_lines(pkg, include_raw_sandbox=False, full_doctrine=False, max_detailed_tests=2)
+    if len(text) <= max_chars:
+        return text
+
+    # Pass 3: Fallback pemotongan ekor hanya jika max_chars diset ke batas artifisial sangat kecil
+    _sep = "=" * 80
+    suffix = "\n...(dipotong untuk efisiensi konteks)\n" + _sep
+    return text[:max_chars - len(suffix)] + suffix
 
 
 # ===========================================================================

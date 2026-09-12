@@ -1228,14 +1228,20 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
     # 3. Regression Detection & Passed Tests Extraction
     current_passed_tests = list(test_results.get("passed_test_names", []) or [])
     output_text = test_results.get("output") or test_results.get("stdout") or ""
-    if not current_passed_tests and output_text:
+    passed_count = test_results.get("passed_count", 0)
+    if not current_passed_tests and output_text and passed_count > 0:
         matched_passes = re.findall(r"([\w\.:]+)\s+PASSED", output_text)
         if matched_passes:
             current_passed_tests = matched_passes
         else:
             flutter_passes = re.findall(r"\+\d+:\s+([^\n\r]+)", output_text)
             if flutter_passes:
-                current_passed_tests = [p.strip() for p in flutter_passes if "test" in p.lower() or "pump" in p.lower()]
+                current_passed_tests = [
+                    p.strip() for p in flutter_passes
+                    if ("test" in p.lower() or "pump" in p.lower())
+                    and not p.strip().lower().startswith("loading ")
+                    and not "all tests passed" in p.strip().lower()
+                ]
 
     if previous_passed_tests:
         for prev_t in previous_passed_tests:

@@ -88,14 +88,14 @@ DEFAULT_RULES: List[DeprecationRule] = [
         ),
         positive_template=(
             "// POLA RIVERPOD KANONIKAL:\n"
-            "final metricProvider = Provider<CardMetricData>((ref) => CardMetricData());\n\n"
+            "final itemProvider = Provider<ItemState>((ref) => ItemState());\n\n"
             "// ConsumerWidget membaca provider secara langsung via ref.watch():\n"
-            "class CardMetric extends ConsumerWidget {\n"
-            "  const CardMetric({super.key});\n"
+            "class ItemWidget extends ConsumerWidget {\n"
+            "  const ItemWidget({super.key});\n"
             "  @override\n"
             "  Widget build(BuildContext context, WidgetRef ref) {\n"
-            "    final data = ref.watch(metricProvider);\n"
-            "    return Card(child: Text(data.title));\n"
+            "    final data = ref.watch(itemProvider);\n"
+            "    return Card(child: Text(data.toString()));\n"
             "  }\n"
             "}"
         ),

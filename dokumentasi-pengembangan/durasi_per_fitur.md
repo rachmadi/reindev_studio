@@ -778,3 +778,51 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Waktu Pencatatan Checkpoint:** 2026-09-12 04:48:00 WIB
 - **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI VALIDASI EMPIRIS TREATMENT A & LINTAS EKOSISTEM DART/FLUTTER — 2026-09-12 04:48 s.d. 06:18 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan & Adaptasi Lintas Ekosistem (Development Time)
+| No | Aktivitas Pengembangan Fitur & Modul | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Implementasi hook conftest_runtime_enricher.py (R-1) & perbaikan is_repair_mode di developer.py | 04:50:00 | 05:10:00 | 1.200 s | 20.00 m (0.33 j) |
+| 2 | Perbaikan multi-pass priority-aware compactification & ekspansi kuota 7500 chars di contextual_evidence.py | 05:46:00 | 05:55:00 | 540 s | 9.00 m (0.15 j) |
+| 3 | De-biasing canonical template Riverpod di knowledge_catalog.py & contract builder rchitect.py | 05:58:00 | 06:05:00 | 420 s | 7.00 m (0.12 j) |
+| 4 | Implementasi Provenance-Preserving Deduplication (otoritas ganda) di `context_assembler.py` & perluasan unit test | 06:22:00 | 06:27:00 | 300 s | 5.00 m (0.08 j) |
+| | **Subtotal Waktu Pengembangan & Adaptasi** | | | **2.460 s** | **41.00 m (0.68 jam)** |
+
+### Komponen 2: Waktu Pengujian Terkontrol & Eksekusi Pilot (Testing Time)
+| No | Aktivitas Pengujian & Re-testing | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi Controlled Pilot Treatment A fastapi_t1 (pv_pilot_fastapi_t1_rep1_20260912_051508, 5/5 PASS in 173s) | 05:15:08 | 05:18:01 | 173,28 s | 2.89 m (0.05 j) |
+| 2 | Eksekusi unit tests test_runtime_evidence_enrichment.py & pre-flight Gates A–I (381 passed) | 05:10:00 | 05:15:00 | 300 s | 5.00 m (0.08 j) |
+| 3 | Eksekusi unit tests test_dart_diagnostic_harvester.py (10 passed) & 114 evidence tests | 05:55:00 | 05:57:00 | 120 s | 2.00 m (0.03 j) |
+| 4 | Eksekusi Controlled Pilot flutter_t1 Run 1 s.d. Run 3 (pv_pilot_flutter_t1_rep1_20260912_060619, 163.3s) | 05:46:00 | 06:09:02 | 1.382 s | 23.03 m (0.38 j) |
+| 5 | Eksekusi Controlled Pilot flutter_t1 Run 4 (pv_pilot_flutter_t1_rep1_20260912_062738, 179.0s, 0/3 PASS, Oracle Intact) | 06:27:38 | 06:30:38 | 179,0 s | 2.98 m (0.05 j) |
+| 6 | Eksekusi unit tests regresi pasca-Run 4 (test_dart_diagnostic_harvester 10/10 PASS) | 06:30:40 | 06:31:40 | 60 s | 1.00 m (0.02 j) |
+| | **Subtotal Waktu Pengujian Terkontrol** | | | **2.214,28 s** | **36.90 m (0.62 jam)** |
+
+### Komponen 3: Waktu Analisis Forensik & Dokumentasi Riset (Fixing / Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Evaluasi Global Validation IA terhadap Treatment A & penyusunan laporan kalibrasi epistemik | 05:25:00 | 05:40:00 | 900 s | 15.00 m (0.25 j) |
+| 2 | Deteksi dan resolusi context truncation & false invariant loader Flutter | 05:50:00 | 06:00:00 | 600 s | 10.00 m (0.17 j) |
+| 3 | Audit forensik 54 event Run 3 (dekonstruksi kepatuhan Developer pada CEP, contract gridlock, dan deduplication shadowing) | 06:09:00 | 06:18:00 | 540 s | 9.00 m (0.15 j) |
+| 4 | Penyusunan laporan forensik formal flutter_t1_cross_ecosystem_forensic_investigation_report.md (Seksi 1–5) | 06:18:00 | 06:22:00 | 240 s | 4.00 m (0.07 j) |
+| 5 | Analisis forensik telemetri Run 4 (Event 20 s.d. 45), penemuan Hierarchy-of-Authority Failure & Directive Deadlock | 06:30:38 | 06:35:00 | 262 s | 4.37 m (0.07 j) |
+| 6 | Perumusan doktrin Church of Goat, keputusan IA D-098 s.d. D-100, pemutakhiran Seksi 6 & 7 laporan forensik, moratorium Run 5 | 06:35:00 | 06:41:00 | 360 s | 6.00 m (0.10 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **2.902 s** | **48.37 m (0.81 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 2026-09-12 (Treatment A & Flutter T1):
+\mathbf{\text{Total Waktu Realisasi} = 2.460\text{ s (Dev)} + 2.214,28\text{ s (Test)} + 2.902\text{ s (Doc/Forensik)} = 7.576,28\text{ detik} \approx 126\text{ menit } 16\text{ detik} (2.10\text{ jam})}
+- **Waktu Mulai Sesi:** 2026-09-12 04:36:00 WIB
+- **Waktu Pencatatan Checkpoint:** 2026-09-12 06:41:00 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING — MORATORIUM PILOT RUN 5 AKTIF)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+

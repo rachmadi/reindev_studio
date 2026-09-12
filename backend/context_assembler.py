@@ -21,6 +21,7 @@ import hashlib
 import re
 import ast
 import json
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 try:
@@ -1082,6 +1083,58 @@ def audit_caller_callee_schema_compatibility(
     return None
 
 
+def _extract_dart_callsite(
+    test_files: Dict[str, str],
+    file_path: str,
+    line_no: int,
+    code_files: Optional[Dict[str, str]] = None,
+) -> str:
+    """
+    Ekstraksi deterministik lokasi call-site HANYA jika terbukti secara faktual (Epistemic Attribution).
+    - Jika file_path terbukti merujuk ke berkas dalam test_files -> kembalikan Oracle call site faktual.
+    - Jika file_path merujuk ke berkas implementasi (code_files / lib/) -> tandai sebagai implementation site,
+      bukan Oracle call site.
+    - Dilarang keras mengarang atau melakukan fallback asumtif ke file test sembarang.
+    """
+    if not file_path or line_no <= 0:
+        return "Unattributed compiler diagnostic (no verified call site)"
+
+    fp_basename = Path(file_path).name
+
+    # 1. Cek apakah file_path secara faktual ada di test_files (Proven Oracle Call Site)
+    proven_test_content = None
+    proven_test_path = None
+    for tf_path, content in test_files.items():
+        if tf_path == file_path or Path(tf_path).name == fp_basename or (file_path and file_path in tf_path):
+            proven_test_content = content
+            proven_test_path = tf_path
+            break
+
+    if proven_test_content:
+        lines = proven_test_content.splitlines()
+        if 1 <= line_no <= len(lines):
+            call_line = lines[line_no - 1].strip()
+            if line_no > 1 and ":" in call_line and not call_line.endswith("{"):
+                prev_line = lines[line_no - 2].strip()
+                if prev_line.endswith("(") or (any(c.isalnum() for c in prev_line) and "(" in prev_line and not prev_line.endswith(";")):
+                    call_line = f"{prev_line} {call_line}"
+            return f"Oracle test call site at {proven_test_path}:{line_no} -> `{call_line}`"
+        return f"Oracle test call site at {proven_test_path}:{line_no}"
+
+    # 2. Cek apakah file_path merujuk ke code_files / lib (Implementation Declaration Site)
+    is_code = False
+    if code_files:
+        for cf_path in code_files.keys():
+            if cf_path == file_path or Path(cf_path).name == fp_basename or (file_path and file_path in cf_path):
+                is_code = True
+                break
+    if is_code or "lib/" in file_path or file_path.startswith("lib"):
+        return f"Implementation declaration at {file_path}:{line_no} (compiler diagnostic on source file)"
+
+    # 3. Lokasi eksternal / generated / tidak dapat dibuktikan
+    return f"Compiler location at {file_path}:{line_no} (unmapped to Oracle test files)"
+
+
 def synthesize_b5_actionable_prescriptions(
     state: SquadState,
     violations: List[ViolationItem],
@@ -1111,6 +1164,255 @@ def synthesize_b5_actionable_prescriptions(
         target_language=target_lang,
         runtime_diagnostics=runtime_diagnostics,
     )
+
+    # 0. Pattern: Dart / Flutter Compiler & Test Failures
+    is_dart = any(k in target_lang.lower() for k in ("dart", "flutter")) or ".dart" in output or "flutter" in output.lower()
+    if is_dart:
+        def _record_or_merge_dart_rx(
+            target_symbol_key: str,
+            rx: ActionableRepairPrescription,
+            call_site: str,
+            f_path: str,
+            l_no: int,
+            max_new: int = 3,
+        ) -> None:
+            is_oracle = "Oracle test call site" in call_site
+            is_internal = "Implementation declaration" in call_site
+
+            # 1. Tentukan tag provenance deterministik
+            if is_oracle:
+                provenance_tag = f"[AUTHORITATIVE ORACLE CALL-SITE] {call_site}"
+            elif is_internal:
+                provenance_tag = f"[INTERNAL IMPLEMENTATION REFERENCE] {call_site}"
+            else:
+                provenance_tag = call_site
+
+            # 2. Cari apakah simbol sudah ada di prescriptions (deduplikasi berbasis simbol implementasi)
+            existing = next((p for p in prescriptions if p.implementation_symbol == target_symbol_key), None)
+            if existing is None:
+                # Simbol baru: tambahkan jika belum mencapai batas maksimum resep baru
+                if len(prescriptions) < max_new:
+                    rx.oracle_call_site = provenance_tag
+                    prescriptions.append(rx)
+                return
+
+            # 3. Simbol sudah ada: terapkan Provenance-Preserving Deduplication
+            has_authoritative = "[AUTHORITATIVE ORACLE CALL-SITE]" in existing.oracle_call_site
+            has_internal = "[INTERNAL IMPLEMENTATION REFERENCE]" in existing.oracle_call_site
+
+            if is_oracle:
+                if not has_authoritative:
+                    # Temuan Oracle call-site baru! Elevasi ke otoritas tertinggi di atas referensi internal yang telah ada sebelumnya
+                    prev_site = existing.oracle_call_site
+                    existing.oracle_call_site = f"{provenance_tag}\n  {prev_site}"
+                    existing.observed_failure = f"{rx.observed_failure} (authoritative test requirement; prior diagnostic: {existing.observed_failure})"
+                    existing.required_change = rx.required_change
+                    existing.evidence_ref = rx.evidence_ref
+                    existing.evidence_basis = rx.evidence_basis
+                elif call_site not in existing.oracle_call_site:
+                    # Sudah ada authoritative call-site lain dari Oracle test suite
+                    existing.oracle_call_site = f"{existing.oracle_call_site}; also at {f_path}:{l_no}"
+            elif is_internal:
+                if not has_internal:
+                    # Tambahkan referensi internal sebagai bukti pendukung
+                    existing.oracle_call_site = f"{existing.oracle_call_site}\n  {provenance_tag}"
+                elif call_site not in existing.oracle_call_site:
+                    existing.oracle_call_site = f"{existing.oracle_call_site}; also at {f_path}:{l_no}"
+                if f"{f_path}:{l_no}" not in existing.observed_failure:
+                    existing.observed_failure += f"; also referenced at {f_path}:{l_no}"
+            else:
+                if call_site not in existing.oracle_call_site:
+                    existing.oracle_call_site = f"{existing.oracle_call_site}; also at {f_path}:{l_no}"
+
+        default_test_file = list(test_files.keys())[0] if test_files else auth_file
+
+        # Dart Pattern 1: Missing/Undefined Symbol / Method Not Found / Type Not Found
+        sym_pattern = re.compile(
+            r"(?:(?P<file>[^\s:]+\.dart):(?P<line>\d+):(?P<col>\d+):\s*)?Error:\s*(?:Method not found:\s*['\"](?P<sym1>[^'\"]+)['\"]|The method\s*['\"](?P<sym2>[^'\"]+)['\"]\s*isn't defined|Undefined name\s*['\"](?P<sym3>[^'\"]+)['\"]|Getter not found:\s*['\"](?P<sym4>[^'\"]+)['\"]|Setter not found:\s*['\"](?P<sym5>[^'\"]+)['\"]|['\"](?P<sym6>[^'\"]+)['\"]\s*isn't a type)",
+            re.IGNORECASE,
+        )
+        for m in sym_pattern.finditer(output):
+            symbol = m.group("sym1") or m.group("sym2") or m.group("sym3") or m.group("sym4") or m.group("sym5") or m.group("sym6")
+            if not symbol:
+                continue
+            f_path = m.group("file") or default_test_file
+            l_no = int(m.group("line")) if m.group("line") else 0
+            call_site = _extract_dart_callsite(test_files, f_path, l_no, code_files=code_files)
+            if "Oracle test call site" in call_site:
+                req_change = (
+                    f"Symbol '{symbol}' is invoked or referenced by the caller at {call_site} but is not defined or exported in '{auth_file}'. "
+                    f"Define or export class/method '{symbol}' with the interface expected by the caller."
+                )
+            else:
+                req_change = (
+                    f"Symbol '{symbol}' is referenced at {call_site} but is not defined or exported in '{auth_file}'. "
+                    f"Define or export class/method '{symbol}' to satisfy the interface requirement."
+                )
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B5-DART-SYMBOL-{len(prescriptions)+1:03d}",
+                evidence_ref="B5_DART_COMPILER_UNDEFINED_SYMBOL",
+                observed_failure=f"Dart compiler error: symbol '{symbol}' is undefined or method not found at {f_path}:{l_no}",
+                oracle_call_site=call_site,
+                implementation_symbol=f"symbol '{symbol}' in '{auth_file}'",
+                evidence_basis="DART_COMPILER_DIAGNOSTIC_TRACE",
+                required_change=req_change,
+                repair_boundary_allowed=[
+                    f"Define or export class or method '{symbol}' in '{auth_file}'",
+                    f"Align constructor parameters and attributes of '{symbol}' to match caller invocation",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Symbol '{symbol}' is defined and accessible to the test runner without compiler error.",
+                verification_evidence=f"Dart compiler compiles '{auth_file}' without reporting missing symbol '{symbol}'.",
+            )
+            _record_or_merge_dart_rx(rx.implementation_symbol, rx, call_site, f_path, l_no, max_new=3)
+
+        # Dart Pattern 2: Parameter Signature Mismatch / Undefined Named Parameter
+        param_pattern = re.compile(
+            r"(?:(?P<file>[^\s:]+\.dart):(?P<line>\d+):(?P<col>\d+):\s*)?Error:\s*(?:The named parameter\s*['\"](?P<p1>[^'\"]+)['\"]\s*isn't defined|No named parameter with the name\s*['\"](?P<p2>[^'\"]+)['\"])",
+            re.IGNORECASE,
+        )
+        for m in param_pattern.finditer(output):
+            param = m.group("p1") or m.group("p2")
+            if not param:
+                continue
+            f_path = m.group("file") or default_test_file
+            l_no = int(m.group("line")) if m.group("line") else 0
+            call_site = _extract_dart_callsite(test_files, f_path, l_no, code_files=code_files)
+            if "Oracle test call site" in call_site:
+                req_change = (
+                    f"The constructor or function invoked at {call_site} requires named parameter '{param}', "
+                    f"but the implementation in '{auth_file}' does not accept it. "
+                    f"Update parameter declarations in '{auth_file}' to accept named parameter '{param}'."
+                )
+            else:
+                req_change = (
+                    f"Parameter '{param}' is referenced at {call_site} but is not defined on constructor/method in '{auth_file}'. "
+                    f"Update parameter declarations in '{auth_file}' to accept named parameter '{param}'."
+                )
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B5-DART-PARAM-{len(prescriptions)+1:03d}",
+                evidence_ref="B5_DART_COMPILER_PARAM_MISMATCH",
+                observed_failure=f"Dart compiler error: named parameter '{param}' is not defined at {f_path}:{l_no}",
+                oracle_call_site=call_site,
+                implementation_symbol=f"parameter '{param}' on constructor/method in '{auth_file}'",
+                evidence_basis="DART_COMPILER_PARAM_DIAGNOSTIC",
+                required_change=req_change,
+                repair_boundary_allowed=[
+                    f"Add or update named parameter '{param}' in constructor/method signatures in '{auth_file}'",
+                    f"Ensure field or state maps '{param}' appropriately",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Constructor/method accepts named parameter '{param}' without compiler error.",
+                verification_evidence=f"Dart compiler accepts invocation with parameter '{param}' without error.",
+            )
+            _record_or_merge_dart_rx(rx.implementation_symbol, rx, call_site, f_path, l_no, max_new=3)
+
+        # Dart Pattern 3: Sound Null Safety Error (Non-Solver Phrasing)
+        null_pattern = re.compile(
+            r"(?:(?P<file>[^\s:]+\.dart):(?P<line>\d+):(?P<col>\d+):\s*)?Error:\s*The parameter\s*['\"](?P<param>[^'\"]+)['\"]\s*can't have a value of 'null' because of its type",
+            re.IGNORECASE,
+        )
+        for m in null_pattern.finditer(output):
+            param = m.group("param")
+            f_path = m.group("file") or auth_file
+            l_no = int(m.group("line")) if m.group("line") else 0
+            call_site = _extract_dart_callsite(test_files, f_path, l_no, code_files=code_files)
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B5-DART-NULL-SAFETY-{len(prescriptions)+1:03d}",
+                evidence_ref="B5_DART_SOUND_NULL_SAFETY_VIOLATION",
+                observed_failure=f"Observed null-safety incompatibility: parameter '{param}' receives or permits a null value incompatible with its declared type at {f_path}:{l_no}",
+                oracle_call_site=call_site,
+                implementation_symbol=f"parameter '{param}' in '{auth_file}'",
+                evidence_basis="DART_ANALYZER_NULL_SAFETY_DIAGNOSTIC",
+                required_change=(
+                    f"Observed null-safety incompatibility: parameter '{param}' in '{auth_file}' receives or permits a null value incompatible with its declared type. "
+                    f"Ensure the type contract and parameter handling resolve this incompatibility."
+                ),
+                repair_boundary_allowed=[
+                    f"Modify parameter declaration or handling for '{param}' in '{auth_file}' to resolve null-safety incompatibility",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Parameter '{param}' complies with Dart Sound Null Safety rules without type errors.",
+                verification_evidence="Dart compiler compiles file without null safety diagnostic errors.",
+            )
+            _record_or_merge_dart_rx(rx.implementation_symbol, rx, call_site, f_path, l_no, max_new=3)
+
+        # Dart Pattern 4: Positional Arguments Mismatch
+        pos_dart_pattern = re.compile(
+            r"(?:(?P<file>[^\s:]+\.dart):(?P<line>\d+):(?P<col>\d+):\s*)?Error:\s*Too many positional arguments:\s*(?P<exp>\d+)\s*expected,\s*but\s*(?P<act>\d+)\s*found",
+            re.IGNORECASE,
+        )
+        for m in pos_dart_pattern.finditer(output):
+            f_path = m.group("file") or auth_file
+            l_no = int(m.group("line")) if m.group("line") else 0
+            call_site = _extract_dart_callsite(test_files, f_path, l_no)
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B5-DART-POSITIONAL-{len(prescriptions)+1:03d}",
+                evidence_ref="B5_DART_POSITIONAL_ARG_MISMATCH",
+                observed_failure=f"Dart compiler error: Too many positional arguments (expected {m.group('exp')}, but {m.group('act')} found)",
+                oracle_call_site=call_site,
+                implementation_symbol=f"Constructor/method signature in '{auth_file}'",
+                evidence_basis="DART_COMPILER_POSITIONAL_ARG_DIAGNOSTIC",
+                required_change=(
+                    f"Constructor or method in '{auth_file}' expects {m.group('exp')} positional arguments, "
+                    f"but caller provides {m.group('act')} at {call_site}. "
+                    f"Adjust positional argument definitions in '{auth_file}' to align with caller invocation."
+                ),
+                repair_boundary_allowed=[
+                    f"Modify positional argument declarations in '{auth_file}'",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT modify Frozen Oracle test files",
+                    "Do NOT alter frozen contract status",
+                ],
+                expected_post_repair_state=f"Positional arguments match caller invocation without compiler error.",
+                verification_evidence="Dart compiler compiles without positional argument mismatch.",
+            )
+            _record_or_merge_dart_rx(rx.implementation_symbol, rx, call_site, f_path, l_no, max_new=3)
+
+        # Dart Pattern 5: Flutter Widget Test Assertion Mismatch
+        if not prescriptions:
+            flutter_assert_match = re.search(
+                r"Expected:\s*(?P<expected>[^\n\r]+)[\n\r]+\s*Actual:\s*(?P<actual>[^\n\r]+)",
+                output,
+            )
+            if flutter_assert_match:
+                exp_val = flutter_assert_match.group("expected").strip()
+                act_val = flutter_assert_match.group("actual").strip()
+                rx = ActionableRepairPrescription(
+                    prescription_id="RX-B5-FLUTTER-WIDGET-ASSERTION",
+                    evidence_ref="B5_FLUTTER_TEST_ASSERTION_MISMATCH",
+                    observed_failure=f"Flutter widget test assertion failed: Expected {exp_val}, Actual {act_val}",
+                    oracle_call_site="Flutter widget test expectation in Oracle test suite",
+                    implementation_symbol=f"Widget hierarchy and rendering in '{auth_file}'",
+                    evidence_basis="FLUTTER_TEST_ASSERTION_OUTPUT",
+                    required_change=(
+                        f"The widget test asserted '{exp_val}' but observed '{act_val}'. "
+                        f"Update widget composition, styling, or text in '{auth_file}' to satisfy the expected widget tree."
+                    ),
+                    repair_boundary_allowed=[
+                        f"Modify widget structure, child widgets, or text in '{auth_file}'",
+                    ],
+                    repair_boundary_forbidden=[
+                        "Do NOT modify Frozen Oracle test files",
+                        "Do NOT alter frozen contract status",
+                    ],
+                    expected_post_repair_state=f"Widget test assertion passes ({exp_val}).",
+                    verification_evidence="flutter test executes with all tests passing (exit code 0).",
+                )
+                prescriptions.append(rx)
+
+        if prescriptions:
+            return prescriptions
 
     # 1. Pattern: Positional argument mismatch in Python (cli_t1 / BaseModel.__init__)
     pos_arg_match = re.search(

@@ -445,8 +445,8 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 
 ---
 
-### Commit: 9919736 — 2026-09-12
-- **Commit Hash:** `9919736`
+### Commit: e54a41a — 2026-09-12
+- **Commit Hash:** `e54a41a`
 - **Status:** TERVERIFIKASI PENUH (Gates A–I PASS, 381/381 tests PASS, Zero Regression)
 - **Tipe:** `docs(research)` / `feat(blueprint)`
 - **Pesan Commit:** `docs(research): forensic autopsy of pilot fastapi_t1, ablation study, model capability vindication, and JSON migration`
@@ -460,4 +460,50 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `backend/agents/developer.py`: Eliminasi context shadowing berkas uji Frozen Oracle.
   - `backend/tests/`: Penambahan suite pengujian `test_blueprint_json.py` dan `test_v5_evidence_delivery.py`.
   - `dokumentasi-pengembangan/experiments/`: Penambahan laporan forensik komprehensif `fastapi_t1_v5_forensic_investigation_and_ablation_report.md` dan data ringkasan `fastapi_t1_v5_ablation_summary.json`.
-  - `dokumentasi-pengembangan/`: Sinkronisasi menyeluruh 9 berkas log tata kelola IIDD (`catatan_riset_pengujian_preset.md`, `decision_log.md`, `human_intervention.md`, `validation_log.md`, `error_log.md`, `context_drift_log.md`, `conversation_log.md`, `waktu_estimasi_vs_realisasi.md`, `commit_history.md`).
+  - `dokumentasi-pengembangan/`: Sinkronisasi menyeluruh 9 berkas log tata kelola IIDD.
+
+---
+
+### Commit: bc961d4 — 2026-09-12
+- **Commit Hash:** `bc961d4`
+- **Status:** TERVERIFIKASI PENUH (Gates A–I PASS, 5/5 pilot tests PASS in 1 repair turn, 173.28s)
+- **Tipe:** `feat(evidence)`
+- **Pesan Commit:** `feat(evidence): implement generic runtime diagnostic enrichment and validate Treatment A pilot (100% pass)`
+- **Waktu:** 2026-09-12 05:19 WIB
+- **Cakupan Perubahan:**
+  - `backend/conftest_runtime_enricher.py`: Hook generik runtime harvester pytest menangkap HTTP code & response body.
+  - `backend/agents/developer.py`: Perbaikan `is_repair_mode` pada gerbang B3 pre-execution.
+  - `backend/context_assembler.py`: Integrasi runtime diagnostic synthesis ke dalam CEP.
+  - `backend/tests/test_runtime_evidence_enrichment.py`: Suite pengujian enrichment runtime.
+  - Laporan pilot Treatment A `dokumentasi-pengembangan/experiments/treatment_a_fastapi_t1_pilot_report.md`.
+
+---
+
+### Commit: 0e3361c — 2026-09-12
+- **Commit Hash:** `0e3361c`
+- **Status:** TERVERIFIKASI PENUH (Global Validation IA PASS)
+- **Tipe:** `docs(epistemics)`
+- **Pesan Commit:** `docs(epistemics): calibrate claims and clarify actual treatment bundle in fastapi_t1 pilot report`
+- **Waktu:** 2026-09-12 05:29 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/treatment_a_fastapi_t1_pilot_report.md`: Kalibrasi batas epistemik klaim (treatment bundle R-1 + delivery fix + clean repair context, isolasi murni R-3, status validasi unit deterministik R-2).
+  - Sinkronisasi log IIDD (`decision_log.md`, `validation_log.md`, `conversation_log.md`).
+
+---
+
+### Commit: (Pending) — 2026-09-12
+- **Commit Hash:** (Akan di-generate)
+- **Status:** TERVERIFIKASI PENUH (10/10 Dart diagnostic harvester tests PASS, 114/114 evidence tests PASS, Moratorium Pilot Run 5 Aktif)
+- **Tipe:** `feat(evidence)` / `docs(research)`
+- **Pesan Commit:** `feat(evidence): implement provenance-preserving deduplication, forensic investigation of flutter_t1 run 4, and discovery of hierarchy-of-authority failure`
+- **Waktu:** 2026-09-12 06:41 WIB / 09:36 WIB
+- **Cakupan Perubahan:**
+  - `backend/context_assembler.py`: Provenance-Preserving Deduplication (`[AUTHORITATIVE ORACLE CALL-SITE]` vs `[INTERNAL IMPLEMENTATION REFERENCE]`).
+  - `backend/contextual_evidence.py`: Multi-pass priority-aware compactification & ekspansi rendering 7.500 karakter.
+  - `backend/phase_validators.py`: Filter loading flutter test & guard `passed_count > 0` eliminasi false regression.
+  - `backend/knowledge_catalog.py` & `backend/agents/architect.py`: De-biasing kanonikal Riverpod template.
+  - `backend/tests/test_dart_diagnostic_harvester.py` (NEW — 10 unit tests).
+  - `dokumentasi-pengembangan/experiments/flutter_t1_cross_ecosystem_forensic_investigation_report.md` (NEW — Laporan forensik Run 1 s.d. Run 4).
+  - `dokumentasi-pengembangan/`: Sinkronisasi 10 berkas tata kelola IIDD (`decision_log.md` D-095..D-100, `human_intervention.md` #106..#110, `error_log.md` E-063..E-067, `catatan_riset_pengujian_preset.md`, `validation_log.md`, `context_drift_log.md`, `waktu_estimasi_vs_realisasi.md`, `durasi_per_fitur.md`, `conversation_log.md`, `commit_history.md`).
+
+
