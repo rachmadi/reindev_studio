@@ -350,3 +350,30 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Major (Application Architecture Integration & Iteration 7 Readiness)** — Mengeliminasi sepenuhnya disparitas antara skrip riset di `scratch/` dengan alur eksekusi aplikasi nyata, menjadikan ReinDev Studio sebuah studio rekayasa perangkat lunak otonom yang siap dirilis secara operasional.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 27: RESOLUSI TRUNCATION TOKEN ARCHITECT, WEB UI SERVING, & UI SYNC — 2026-09-12 19:45 s.d. 20:16 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Serving Flutter Web UI pada Root Server FastAPI (`/`) | Positif (Memungkinkan pengujian langsung end-to-end melalui browser tanpa kompilasi lokal tambahan) | Intent Architect & Agen |
+| Penaikan Batas Token Ollama Architect (350 -> 1500) & Developer (1500) | Positif (Mencegah terpotongnya representasi JSON blueprint kanonikal dan error `Unterminated string`) | Intent Architect & Agen |
+| Penyelarasan Event `phase_validation` & Status Kartu Agen UI Flutter | Positif (Menjamin visualisasi kartu agen mencerminkan realitas eksekusi aktual dan zero downstream leakage) | Intent Architect & Agen |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Mount statis `StaticFiles(directory=WEB_DIR, html=True)` pada `backend/server.py`.
+- **B2 (Keputusan Teknis):**
+  - Pemetaan status agen `AgentCardState.idle` dengan teks `Unreached (Zero Leakage)` untuk Developer dan QA saat penghentian dini di Boundary V2.
+
+### Ringkasan Distribusi Sumber Drift:
+- **Intent Architect:** 75.0% (Pelaporan issue "Aplikasi tidak terbuka" dan "FastAPI gagal di agen arsitek")
+- **Agen:** 25.0% (Identifikasi akar masalah token truncation, penaikan batas token, mounting web, dan perbaikan kartu UI)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor (Operational Hardening & UI Truth Alignment)** — Menyelesaikan hambatan operasional antarmuka dan batasan model lokal tanpa mengubah kontrak arsitektural maupun spesifikasi sistem.

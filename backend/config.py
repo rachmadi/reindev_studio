@@ -73,13 +73,13 @@ def get_llm(role: str = "developer", provider: str = None) -> BaseChatModel:
         from langchain_ollama import ChatOllama
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         model = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
-        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
+        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
         
         role_num_predict = {
-            "pm": 300,
-            "architect": 350,
-            "developer": 1000,
-            "tester": 1000,
+            "pm": 800,
+            "architect": 1500,
+            "developer": 1500,
+            "tester": 1200,
             "reviewer": 1000,
         }
         num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", str(role_num_predict.get(role, 600))))

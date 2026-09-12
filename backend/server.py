@@ -1033,3 +1033,13 @@ async def squad_websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
     finally:
         manager.disconnect(websocket)
+
+# ---------------------------------------------------------------------------
+# Frontend Web Mount: Serve Flutter Web UI at `/`
+# ---------------------------------------------------------------------------
+from fastapi.staticfiles import StaticFiles
+
+WEB_DIR = PROJECT_ROOT / "frontend" / "build" / "web"
+if WEB_DIR.exists() and (WEB_DIR / "index.html").exists():
+    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web_ui")
+

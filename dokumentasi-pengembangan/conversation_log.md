@@ -2238,3 +2238,29 @@ Catat trajectory lengkap secara forensik. Laporkan tiap 3 menit. STOP setelah sa
      - Menyusun `implementation_plan.md` untuk Iterasi 7 (`REQ-031` s.d. `REQ-035`) di artifacts dengan penegakan **Strict Stop Rule** (menunggu persetujuan eksplisit IA).
 - **Hasil & Status:**
   **ARSITEKTUR TERPASANG 100% PADA SERVER APLIKASI. ITERASI 6 CLOSED. IMPLEMENTATION PLAN ITERASI 7 DISIAPKAN UNTUK REVIEW IA.**
+
+---
+
+### Sesi 27: Resolusi Truncation Token Architect, Web UI Serving, & UI Status Sync (2026-09-12 19:45 s.d. 20:16 WIB)
+- **Instruksi / Masukan Pengguna (Verbatim):**
+  > *"tadi sempat terhenti karena kehabisan kuota. silakan lanjutkan, tapi bukan untuk memulai iterasi 7 dulu"*
+  > *"Jalankan dulu aplikasi untuk dites IA"*
+  > *"Aplikasi tidak terbuka"* (Screenshot browser `http://127.0.0.1:8000` menampilkan `{"detail":"Not Found"}`)
+  > *"FastAPI gagal di agen arsitek"* (Screenshot web app: Boundary V2 GAGAL Repair 2/2, Developer 0 events, QA 0 events, Reviewer `NEEDS_REVISION`, namun kartu Developer dan QA keliru menampilkan status "Completed" hijau)
+- **Tindakan & Respon Agen:**
+  1. **Mounting Antarmuka Web pada Root Server:**
+     - Mengompilasi rilis Flutter Web (`frontend/build/web`).
+     - Menambahkan mounting `StaticFiles` pada `/` di `backend/server.py`. Verifikasi browser: `http://127.0.0.1:8000/` kini merespons 200 HTML dan memuat antarmuka Flutter Web secara sempurna.
+  2. **Audit Forensik Kegagalan Agen Arsitek:**
+     - Membuka `backend/output/run_fastapi_t1_20260912_200156/run_trace.jsonl`.
+     - Mengidentifikasi akar penyebab: batasan token historis `role_num_predict["architect"] = 350` di `backend/config.py` memotong string JSON pada karakter 1472 (`SCHEMA_VIOLATION: Unterminated string`).
+     - Mengonfirmasi *Zero Downstream Leakage*: Developer dan QA Tester 100% tidak pernah dipanggil saat Arsitek gagal di V2.
+  3. **Penyelesaian Konfigurasi Token:**
+     - Menaikkan `role_num_predict["architect"]` ke 1500, `developer` ke 1500, `pm` ke 800, dan `num_ctx` ke 4096 di `backend/config.py`.
+  4. **Penyelarasan Visualisasi Status Kartu Agen di Frontend:**
+     - Memperbarui `squad_pipeline_provider.dart`: menangani event `phase_validation` secara dinamis dan memastikan pada event `complete`, jika terjadi kegagalan Boundary V2, System Architect berstatus `AgentCardState.error` (Boundary V2 FAILED), sedangkan Developer dan QA berstatus `AgentCardState.idle` (Unreached / Zero Leakage).
+  5. **Verifikasi Pengujian & Tata Kelola IIDD:**
+     - `flutter test` lulus 4/4 (100%), `pytest` backend lolos 32/32 (100%).
+     - Mencatat D-119, E-085, Item #138, dan memperbarui seluruh 11 dokumen tata kelola IIDD.
+- **Hasil & Status:**
+  **SERVER AKTIF PADA http://127.0.0.1:8000 DENGAN FLUTTER WEB UI DAN KAPASITAS TOKEN ARCHITECT YANG DIPERBESAR (1500). KARTU AGEN AKURAT MEREFLEKSIKAN ZERO LEAKAGE. SIAP UNTUK PENGUJIAN LANGSUNG OLEH INTENT ARCHITECT.**

@@ -1066,9 +1066,20 @@ esolve_preset_config() dengan verifikasi checksum SHA-256 pre-flight, skema inis
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Penutupan Iterasi 6 & E-084):
-- **Diselesaikan Mandiri oleh Agen / Engine:** 43 kasus (termasuk E-068, E-069, E-071 s/d E-076, E-078, E-080, E-081, E-082, E-083, E-084)
+### Kasus E-085: Truncation Token Limit pada System Architect (config.py: num_predict=350) & Inisial State False Completed di Frontend UI
+- **Waktu:** 2026-09-12 20:05 WIB (Sesi Uji Coba Interaktif IA pada Aplikasi Web)
+- **Tingkat Keparahan:** Medium / Configuration & UI Alignment
+- **Gejala:** Saat Intent Architect menguji preset `FastAPI CRUD` via antarmuka web, System Architect mengalami kegagalan pada Boundary V2 (Contract Gate P0-2.1) dengan pesan `SCHEMA_VIOLATION: Gagal mendekode JSON blueprint: Unterminated string starting at: line 12 column 24`. Zero Downstream Leakage berhasil menghentikan pipeline tanpa memanggil Developer/QA, namun di UI kartu Developer dan QA keliru menampilkan status "Completed" berwarna hijau.
+- **Akar Masalah:** (1) Parameter `role_num_predict` untuk `"architect"` di `backend/config.py` dibatasi 350 token, sehingga pembuatan JSON `ArchitecturalBlueprint` kanonikal yang memuat `code_scaffold` terpotong tepat pada token ke-350 (`char 1472`), menyebabkan string tidak tertutup; (2) Di `squad_pipeline_provider.dart`, penangan event `complete` mengeksekusi loop yang secara keliru menandai seluruh agen selain Code Reviewer sebagai `Completed` meskipun eksekusi terhenti dini di boundary awal.
+- **Resolusi & Batasan Sistem:** (1) `backend/config.py` diperbarui: `num_ctx = 4096`, `role_num_predict["architect"] = 1500`, `role_num_predict["developer"] = 1500`; (2) `squad_pipeline_provider.dart` dilengkapi dengan penangan event `phase_validation` untuk memetakan hasil V1–V6 ke kartu agen, dan logika `complete` diperbaiki agar saat terjadi penghentian dini di Boundary V2, System Architect berstatus `FAILED` sedangkan Developer dan QA tetap berstatus `Unreached (Zero Leakage)`.
+- **Sumber Solusi:** Analisis Forensik Trace Uji Coba Interaktif IA.
+- **Status:** Tuntas Teratasi & Terverifikasi (Build Web Diperbarui).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. E-085):
+- **Diselesaikan Mandiri oleh Agen / Engine:** 44 kasus (termasuk E-068, E-069, E-071 s/d E-076, E-078, E-080, E-081, E-082, E-083, E-084, E-085)
 - **Diselesaikan atas Intervensi IA:** 10 kasus (termasuk E-077 / D-112, E-079 / D-113)
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 12 kasus (termasuk E-067)
 - **Kasus Forensik & Rekomendasi Terbuka:** 6 kasus (E-060, E-061, E-062, E-066, E-067, E-070)
-- **Total Galat Terdokumentasi:** 84 kasus (E-001 s/d E-084)
+- **Total Galat Terdokumentasi:** 85 kasus (E-001 s/d E-085)

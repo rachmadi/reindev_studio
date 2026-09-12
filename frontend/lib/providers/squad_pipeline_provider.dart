@@ -598,6 +598,40 @@ class PipelineCoordinator {
         }
         break;
 
+      case 'phase_validation':
+        final phase = event['phase'] as String? ?? '';
+        final boundary = event['boundary'] as String? ?? '';
+        final verdict = event['verdict'] as String? ?? '';
+        final repairCount = (event['repair_count'] as num?)?.toInt() ?? 0;
+        final maxRepairs = (event['max_repairs'] as num?)?.toInt() ?? 2;
+
+        AgentRole? targetRole;
+        if (phase == 'PM') targetRole = AgentRole.productManager;
+        if (phase == 'ARCHITECT') targetRole = AgentRole.systemArchitect;
+        if (phase == 'DEVELOPER') targetRole = AgentRole.developer;
+        if (phase == 'TEST_SUITE' || phase == 'EXECUTOR') targetRole = AgentRole.qaTester;
+        if (phase == 'REVIEWER') targetRole = AgentRole.codeReviewer;
+
+        if (targetRole != null) {
+          if (verdict == 'PASS') {
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: targetRole,
+              cardState: AgentCardState.completed,
+              statusText: '$boundary PASS',
+            );
+          } else {
+            final isTerminal = repairCount >= maxRepairs;
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: targetRole,
+              cardState: isTerminal ? AgentCardState.error : AgentCardState.retrying,
+              statusText: isTerminal
+                  ? '$boundary FAILED'
+                  : '$boundary Repair $repairCount/$maxRepairs',
+            );
+          }
+        }
+        break;
+
       case 'agent_heartbeat':
         final nodeId = event['node'] as String? ?? '';
         final elapsed = event['elapsed_sec'];
@@ -879,16 +913,48 @@ class PipelineCoordinator {
         ref.read(isDeployingProvider.notifier).setDeploying(false);
         ref.read(activeAgentRoleProvider.notifier).setActive(null);
 
-        for (final r in AgentRole.values) {
-          ref.read(agentStatusesProvider.notifier).updateAgent(
-            role: r,
-            cardState: isApprovedForRelease
-                ? AgentCardState.completed
-                : (r == AgentRole.codeReviewer ? AgentCardState.retrying : AgentCardState.completed),
-            statusText: isApprovedForRelease
-                ? 'Completed'
-                : (r == AgentRole.codeReviewer ? 'Needs Revision' : 'Completed'),
-          );
+        final contractStatus = event['contract_status'] as String? ?? '';
+        final currentCards = ref.read(agentStatusesProvider);
+
+        if (isApprovedForRelease) {
+          for (final r in AgentRole.values) {
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: r,
+              cardState: AgentCardState.completed,
+              statusText: 'Completed',
+            );
+          }
+        } else {
+          // Perbarui status kartu agen sesuai eksekusi aktual (mencegah false completed)
+          if (contractStatus != 'FROZEN' &&
+              currentCards[AgentRole.systemArchitect]?.state != AgentCardState.completed) {
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: AgentRole.systemArchitect,
+              cardState: AgentCardState.error,
+              statusText: 'Boundary V2 FAILED',
+            );
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: AgentRole.developer,
+              cardState: AgentCardState.idle,
+              statusText: 'Unreached (Zero Leakage)',
+            );
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: AgentRole.qaTester,
+              cardState: AgentCardState.idle,
+              statusText: 'Unreached (Zero Leakage)',
+            );
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: AgentRole.codeReviewer,
+              cardState: AgentCardState.idle,
+              statusText: 'Halted',
+            );
+          } else {
+            ref.read(agentStatusesProvider.notifier).updateAgent(
+              role: AgentRole.codeReviewer,
+              cardState: AgentCardState.retrying,
+              statusText: 'Needs Revision',
+            );
+          }
         }
 
         final files = (event['files_generated'] as List<dynamic>?)?.cast<String>() ?? [];

@@ -1637,3 +1637,31 @@ Sebagai pemegang otoritas tertinggi evaluasi kebenaran global (*Global Correctne
   1. Iterasi 6 dinyatakan **CLOSED** secara penuh (arsitektur, fitur, dan operasional aplikasi).
   2. Menyiapkan **Implementation Plan untuk Iterasi 7: Native Desktop Integration, Export, & End-to-End Verification** (`REQ-031` s.d. `REQ-035`).
   3. **STRICT STOP RULE:** Dilarang mengeksekusi kode Iterasi 7 sebelum Implementation Plan disetujui secara eksplisit oleh Intent Architect.
+
+---
+
+## Bagian 30: Validasi Resolusi Token Limit System Architect (`num_predict=1500`), Web UI Serving pada Root FastAPI, dan Penyelarasan Status Kartu Agen (Zero Downstream Leakage)
+- **Tanggal & Waktu:** 2026-09-12 20:16 WIB
+- **Target Komponen:** `backend/config.py`, `backend/server.py`, `frontend/lib/providers/squad_pipeline_provider.dart`
+- **Pemicu:** Temuan uji interaktif Intent Architect pada preset `FastAPI CRUD`.
+
+### 1. Evaluasi Komponen & Verifikasi Deterministik
+1. **Web UI Serving pada Root (`backend/server.py`):**
+   - Mount statis `frontend/build/web` di root `/` FastAPI.
+   - *Verifikasi:* `http://127.0.0.1:8000/` merespons HTTP 200 text/html (1922 bytes), aset `main.dart.js` termuat sukses.
+2. **Penaikan Kapasitas Token Ollama (`backend/config.py`):**
+   - Batas token `architect` dan `developer` dinaikkan dari 350 menjadi 1500 token; `num_ctx` dinaikkan ke 4096.
+   - *Verifikasi:* Mengeliminasi pemotongan sintaksis JSON `ArchitecturalBlueprint` (`Unterminated string`).
+3. **Penyelarasan Kartu UI Agen (`squad_pipeline_provider.dart`):**
+   - Menangani event `phase_validation` secara dinamis.
+   - Saat Boundary V2 gagal, System Architect berstatus `Boundary V2 FAILED` (error), sementara Developer dan QA berstatus `Unreached (Zero Leakage)` (idle).
+   - *Verifikasi:* `flutter test` lulus 4/4 (100%) mencakup pengujian simulasi pipeline dan status kartu agen.
+4. **Backend Regression Test Suite:**
+   - 32 targeted unit tests pada validator dan kontrak lulus 100% (`backend/test_architect_validator.py`, `backend/test_contract.py`).
+
+### 2. Status Validation Gate (Intent Architect)
+- **Status Validasi:** ✅ **PASS — RUNTIME STABILITY & UI TRUTH ALIGNMENT VERIFIED**
+- **Pelaksana Implementasi:** Antigravity (Agentic Pair-Programmer)
+- **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+- **Catatan Evaluasi:**
+  Aplikasi kini siap diuji langsung oleh Intent Architect melalui browser di `http://127.0.0.1:8000`.

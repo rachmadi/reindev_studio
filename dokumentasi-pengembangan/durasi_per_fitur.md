@@ -1093,3 +1093,45 @@ Total Waktu Realisasi = 420 s (Dev) + 345 s (Test) + 255 s (Doc) = 1.020 detik (
 - **Status Sesi:** **SELESAI & TERVALIDASI PENUH (APLIKASI RUNNABLE TERVERIFIKASI 100%)**
 - **Status Iterasi 6:** **CLOSED (SELESAI / RESMI DITUTUP)**
 - **Status Menuju Iterasi 7:** **READY FOR IMPLEMENTATION PLAN (MENUNGGU PERSETUJUAN IA)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 27: Resolusi Truncation Token Limit System Architect, Web UI Serving, & Sinkronisasi Status Kartu Agen — 2026-09-12 19:45 s.d. 20:15 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan / Perbaikan Arsitektur & UI (Development Time)
+| No | Aktivitas Pengembangan / Perbaikan | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Mounting antarmuka Flutter Web (`frontend/build/web`) pada root server FastAPI (`backend/server.py`) | 19:45:00 | 19:52:00 | 420 s | 7.00 m (0.12 j) |
+| 2 | Investigasi forensik error Arsitek pada `run_trace.jsonl` (identifikasi truncation batas 350 token Ollama) | 20:02:00 | 20:06:00 | 240 s | 4.00 m (0.07 j) |
+| 3 | Penyesuaian batas token Ollama di `backend/config.py` (Architect: 1500, Developer: 1500, PM: 800, num_ctx: 4096) | 20:06:00 | 20:08:00 | 120 s | 2.00 m (0.03 j) |
+| 4 | Penyelarasan event `phase_validation` dan status kartu agen (Zero Downstream Leakage) di `squad_pipeline_provider.dart` | 20:08:00 | 20:11:00 | 180 s | 3.00 m (0.05 j) |
+| | **Subtotal Waktu Pengembangan & Penyelarasan** | | | **960 s** | **16.00 m (0.27 jam)** |
+
+### Komponen 2: Waktu Pengujian & Verifikasi Suite (Testing Time)
+| No | Aktivitas Pengujian & Verifikasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Kompilasi rilis Flutter Web (`flutter build web --release`, 76.4s) | 20:11:00 | 20:12:30 | 90 s | 1.50 m (0.02 j) |
+| 2 | Verifikasi unit test Flutter (`flutter test`, 4/4 PASS in 5.0s) | 20:12:30 | 20:13:30 | 60 s | 1.00 m (0.02 j) |
+| 3 | Verifikasi unit test backend (`pytest backend/test_architect_validator.py backend/test_contract.py`, 32/32 PASS in 0.58s) | 20:13:30 | 20:14:00 | 30 s | 0.50 m (0.01 j) |
+| 4 | Verifikasi runtime endpoint HTTP (`/` -> 200 HTML, `/api/health` -> 200 healthy) | 20:14:00 | 20:14:30 | 30 s | 0.50 m (0.01 j) |
+| | **Subtotal Waktu Pengujian Eksekusi** | | | **210 s** | **3.50 m (0.06 jam)** |
+
+### Komponen 3: Waktu Dokumentasi, Analisis Forensik & Sinkronisasi IIDD (Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Pencatatan keputusan arsitektur D-119 dan kasus error E-085 | 20:14:30 | 20:15:00 | 30 s | 0.50 m (0.01 j) |
+| 2 | Pencatatan Intervensi #138 pada `human_intervention.md` | 20:15:00 | 20:15:20 | 20 s | 0.33 m (0.01 j) |
+| 3 | Sinkronisasi menyeluruh log IIDD (durasi, estimasi, drift, percakapan, validasi, commit history) | 20:15:20 | 20:16:00 | 40 s | 0.67 m (0.01 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **90 s** | **1.50 m (0.02 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 27:
+Total Waktu Realisasi = 960 s (Dev) + 210 s (Test) + 90 s (Doc) = 1.260 detik (~21 menit 00 detik / 0.35 jam)
+- **Waktu Mulai Sesi:** 2026-09-12 19:45:00 WIB
+- **Waktu Selesai Sesi:** 2026-09-12 20:16:00 WIB
+- **Total Durasi Sesi Aktual:** **31 menit 00 detik (0.52 jam)**
+- **Status Sesi:** **SELESAI & TERVALIDASI PENUH (PERBAIKAN TOKEN DAN UI STATUS TUNTAS)**
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.

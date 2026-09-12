@@ -378,3 +378,27 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 - Total Keseluruhan: **62.70 jam (3.762,1 menit)**
 - Status Iterasi 6: **CLOSED (SELESAI / RESMI DITUTUP)**
 - Status Menuju Iterasi 7: **READY FOR IMPLEMENTATION PLAN**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 27: RESOLUSI TRUNCATION TOKEN LIMIT ARCHITECT, WEB UI SERVING, & UI CARD STATE — 2026-09-12 19:45 s.d. 20:16 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Integrasi | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Mounting Flutter Web UI pada Root Server FastAPI | — | 0.12 | 7.0 m | — | StaticFiles mount pada `/` dan verifikasi HTTP 200 |
+| Audit Forensik Token Truncation & Kenaikan Batas Token Ollama | — | 0.10 | 6.0 m | — | Batas 350 dinaikkan ke 1500 (Architect & Dev), num_ctx 4096 |
+| Penyelarasan Event `phase_validation` & Status Kartu Agen Flutter | — | 0.05 | 3.0 m | — | Pencegahan false completed, status unreached / zero leakage |
+| Kompilasi & Verifikasi Test Suite (Flutter 4/4 PASS, Pytest 32/32 PASS) | — | 0.06 | 3.5 m | — | 100% PASS, build web release tersaji di port 8000 |
+| Sinkronisasi 11 Dokumen Tata Kelola IIDD | — | 0.02 | 1.5 m | — | D-119, E-085, #138, validation log, durasi, commit history |
+| **Total Sesi 27 (2026-09-12)** | **—** | **0.35** | **21.0 m** | **—** | **Kumulatif Proyek: 63.05 jam** |
+
+*Rincian Formula Sesi 27:*
+- Total Waktu Realisasi: 960s (Dev) + 210s (Test) + 90s (Doc/Forensik) = **1.260 detik (~21 menit 00 detik / 0.35 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Terkini:*
+- Total Keseluruhan: **63.05 jam (3.783,1 menit)**
+- Status Iterasi 6: **CLOSED (SELESAI / RESMI DITUTUP)**
+- Status Pengujian Langsung IA: **READY FOR LIVE BROWSER AUDIT AT http://127.0.0.1:8000**
+- Status Menuju Iterasi 7: **READY FOR IMPLEMENTATION PLAN (MENUNGGU PERSETUJUAN IA)**

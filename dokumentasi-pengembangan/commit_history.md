@@ -623,3 +623,17 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/context_drift_log.md`: Sesi 26 (Zero drift, 100% arsitektur presisi).
   - `dokumentasi-pengembangan/human_intervention.md`: Item #137 (Mandat Penyelarasan Jalur Aplikasi & Penutupan Iterasi 6).
   - `dokumentasi-pengembangan/conversation_log.md`: Pencatatan interaksi Sesi 26.
+
+---
+
+### Commit Sesi 27: Resolusi Truncation Token Limit System Architect, Web UI Serving, dan Sinkronisasi Status Kartu Agen (2026-09-12 20:16 WIB)
+- **Commit Hash:** `999c822`
+- **Status:** TERVERIFIKASI PENUH (Flutter 4/4 Tests PASS, Pytest 32/32 PASS, Root Web UI 200 OK, Zero Downstream Leakage Confirmed)
+- **Tipe:** `fix(architect)` / `fix(ui)` / `feat(server)`
+- **Pesan Commit:** `fix(architect): increase token limit to 1500, mount web UI at root, and align agent card states for zero downstream leakage`
+- **Waktu:** 2026-09-12 20:16 WIB
+- **Cakupan Perubahan:**
+  - `backend/config.py`: Menaikkan batas token Ollama (`architect: 1500`, `developer: 1500`, `pm: 800`, `num_ctx: 4096`) untuk mencegah pemotongan JSON blueprint.
+  - `backend/server.py`: Memasang static files mount di root `/` untuk menyajikan build rilis Flutter Web secara langsung di port 8000.
+  - `frontend/lib/providers/squad_pipeline_provider.dart`: Menangani event `phase_validation` dan memperbaiki logika pembaruan kartu agen saat penghentian dini agar Developer/QA tetap `Unreached / Zero Leakage`.
+  - `dokumentasi-pengembangan/`: Sinkronisasi 11 berkas tata kelola IIDD (`decision_log.md` D-119, `error_log.md` E-085, `human_intervention.md` Item #138, `durasi_per_fitur.md`, `waktu_estimasi_vs_realisasi.md`, `context_drift_log.md`, `conversation_log.md`, `validation_log.md`, `commit_history.md`).
