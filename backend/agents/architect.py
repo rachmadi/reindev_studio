@@ -110,6 +110,28 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 }
 === END BLUEPRINT JSON ===
 
+SCHEMA SEMANTIC DISAMBIGUATION (Fix C — Iterasi 7):
+Field `files` dan `interface_contracts` memiliki tanggung jawab BERBEDA dan TIDAK boleh ditukar:
+
+`files`:
+  - Mapping nama FILE sebagai key (contoh: "main.py", "lib/widget.dart")
+  - Value berisi metadata modul DAN `code_scaffold` kode lengkap
+  - BUKAN tempat untuk route endpoint atau interface specification
+
+`interface_contracts`:
+  - Berisi spesifikasi antarmuka/endpoint publik
+  - BUKAN tempat untuk file scaffold atau kode implementasi
+
+Contoh minimal (GENERIK — jangan salin implementasi ini):
+{
+  "files": {
+    "main.py": { "file_path": "main.py", "module_role": "...", "imports": [], "code_scaffold": "..." }
+  },
+  "interface_contracts": [
+    { "identifier": "func_name", "route": "/path", "method": "GET", "target_file": "main.py" }
+  ]
+}
+
 PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
 1. File-Centric Cohesion: Seluruh implementasi kode per berkas wajib dituliskan sebagai modul utuh di dalam string `code_scaffold`.
 2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator (misal `@app.get` atau `@field_validator`), instance `app = FastAPI()` dan import `from pydantic import field_validator` WAJIB dideklarasikan secara lokal di berkas yang bersangkutan.
@@ -386,7 +408,18 @@ def architect_agent(state: SquadState) -> dict:
                 "INSTRUKSI REVISI DETERMINISTIK WAJIB:\n"
                 "1. Analisis bukti kegagalan deterministik di atas dan patuhi batas perubahan (REPAIR BOUNDARIES).\n"
                 "2. Selesaikan seluruh REQUIRED CHANGES dan pastikan tidak ada unresolvable symbols atau duplikasi deklarasi.\n"
-                "3. Definisikan `interface_contracts` secara eksplisit agar kontrak lolos validasi Contract Gate."
+                "3. Definisikan `interface_contracts` secara eksplisit agar kontrak lolos validasi Contract Gate.\n"
+                "\n"
+                "OUTPUT REQUIREMENT (Fix B — Iterasi 7):\n"
+                "Hasil akhir repair WAJIB berupa blueprint JSON kanonikal yang dapat diparse oleh validator.\n"
+                "- Hasilkan blok === BLUEPRINT JSON === ... === END BLUEPRINT JSON === yang lengkap dan valid.\n"
+                "- DILARANG mengeluarkan PRE-SEAL SELF-REVIEW atau narasi sebagai pengganti blueprint.\n"
+                "- DILARANG menghilangkan blok blueprint meskipun sedang melakukan reasoning internal.\n"
+                "- Setelah reasoning internal selesai, tuliskan blueprint JSON kanonikal secara penuh.\n"
+                "- Pastikan seluruh required fields ArchitecturalBlueprint tersedia: "
+                "`authoritative_target_file`, `file_tree`, `files` (mapping filename \u2192 module), `interface_contracts`.\n"
+                "- Field `files` WAJIB menggunakan nama file (contoh: `main.py`) sebagai key, "
+                "bukan route endpoint (contoh: `/products`)."
             )
             tracer = get_tracer(state.get("run_id"))
             if tracer and hasattr(tracer, "log_repair_attempt"):
