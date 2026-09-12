@@ -323,3 +323,30 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 
 ### Severity Drift Keseluruhan:
 **Major (Milestone Completion & Formal IIDD Gate Passed)** — Penutupan resmi Iterasi 6 menandai pencapaian penting dalam proyek: sistem tidak hanya memiliki UI Code Canvas dan Terminal Explorer yang lengkap, namun terbukti mampu mengoperasikan autonomous squad yang menghasilkan aplikasi benar secara deterministik.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI INTEGRASI JALUR APLIKASI (SERVER & WEBSOCKET) & KESIAPAN ITERASI 7 — 2026-09-12 19:42 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Integrasi Otoritatif StateGraph V1–V6 ke `backend/server.py` | Positif (Memastikan aplikasi production mengeksekusi StateGraph yang sama dengan yang divalidasi pada eksperimen) | Intent Architect |
+| Registri Preset Otoritatif & Pre-Flight Checksum Verification | Positif (Menghubungkan 3 preset misi ke Frozen Oracle fisik secara deterministik dengan proteksi SHA-256) | Intent Architect & Agen |
+| Uji Regresi Jalur Aplikasi via WebSocket `/ws/squad` | Positif (Membuktikan 6 kriteria integritas: output model diterima, validator aktif, failure terstruktur, repair bekerja, invarian aman, zero downstream leakage) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Pembuatan test suite integrasi aplikasi `backend/tests/test_server_app_integration.py` (7 tests) guna memverifikasi endpoint REST dan protokol WebSocket secara otomatis.
+- **B2 (Keputusan Teknis):**
+  - Pemetaan 13 node StateGraph ke 5 peran kartu antarmuka pengguna Flutter (`NODE_TO_UI_ROLE`) agar UI berdenyut mulus tanpa memerlukan refactoring frontend.
+
+### Ringkasan Distribusi Sumber Drift:
+- **Intent Architect:** 85.0% (Mandat integrasi arsitektur terakhir ke aplikasi, uji regresi 3 preset, penutupan Iterasi 6, dan persiapan Iterasi 7)
+- **Agen:** 15.0% (Implementasi detail resolver preset, skema SquadState, test suite integrasi, sinkronisasi IIDD)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Major (Application Architecture Integration & Iteration 7 Readiness)** — Mengeliminasi sepenuhnya disparitas antara skrip riset di `scratch/` dengan alur eksekusi aplikasi nyata, menjadikan ReinDev Studio sebuah studio rekayasa perangkat lunak otonom yang siap dirilis secara operasional.

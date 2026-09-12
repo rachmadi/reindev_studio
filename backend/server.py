@@ -1,26 +1,40 @@
+# -*- coding: utf-8 -*-
+"""
+ReinDev Studio — Production Server & Execution Gateway
+Integrasi penuh 6 End-Phase Quality Boundaries (V1–V6), Universal 2-Repair Budget,
+dan Otomasi Preset Frozen Oracle Checksum Verification.
+"""
+
 import os
 import sys
 import time
 import json
 import asyncio
+import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Ensure root path is accessible
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from backend.state import SquadState
 from backend.graph import squad_graph
 from backend.tracer import RunTracer, get_tracer, compute_sha256, compute_dict_hashes
+from backend.contract import ContractStatus
 
 app = FastAPI(
     title="ReinDev Studio Backend API",
-    description="Autonomous Multi-Agent Software Engineering Studio Engine (FastAPI + LangGraph)",
+    description="Autonomous Multi-Agent Software Engineering Studio Engine (FastAPI + LangGraph + 6 End-Phase Quality Boundaries)",
     version="1.0.0"
 )
 
@@ -46,8 +60,105 @@ CONFIG_STATE = {
     "frozen_oracle_path": None,
 }
 
-OUTPUT_DIR = Path(__file__).parent / "output"
+OUTPUT_DIR = BACKEND_DIR / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Registri Preset Misi Otoritatif
+# ---------------------------------------------------------------------------
+PRESET_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "fastapi_t1": {
+        "preset_id": "fastapi_t1",
+        "title": "FastAPI CRUD",
+        "task": "Bangun modul REST API FastAPI untuk manajemen inventaris produk dengan validasi Pydantic dan automated pytest.",
+        "target_language": "python",
+        "oracle_path": PROJECT_ROOT / "dokumentasi-pengembangan/experiments/frozen_oracle/fastapi_t1",
+        "expected_sha": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+        "oracle_file": "test_main.py",
+        "authoritative_file": "main.py",
+        "n_tests": 5,
+        "keywords": ["fastapi", "inventaris", "pydantic"]
+    },
+    "cli_t1": {
+        "preset_id": "cli_t1",
+        "title": "CLI Calculator",
+        "task": "Bangun kalkulator CLI Python dengan operasi matematika matriks dan penanganan error komprehensif.",
+        "target_language": "python",
+        "oracle_path": PROJECT_ROOT / "dokumentasi-pengembangan/experiments/frozen_oracle/cli_t1",
+        "expected_sha": "0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124",
+        "oracle_file": "test_main.py",
+        "authoritative_file": "main.py",
+        "n_tests": 5,
+        "keywords": ["kalkulator cli", "matriks", "matrix", "cli calculator"]
+    },
+    "flutter_t1": {
+        "preset_id": "flutter_t1",
+        "title": "Flutter Widget",
+        "task": "Bangun komponen widget kartu metrik modern responsif Flutter dengan Material Design 3 dan Riverpod state.",
+        "target_language": "dart",
+        "oracle_path": PROJECT_ROOT / "dokumentasi-pengembangan/experiments/frozen_oracle/flutter_t1",
+        "expected_sha": "4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528",
+        "oracle_file": "card_metric_test.dart",
+        "authoritative_file": "lib/card_metric.dart",
+        "n_tests": 2,
+        "keywords": ["kartu metrik", "card_metric", "flutter widget", "riverpod"]
+    }
+}
+
+def resolve_preset_config(data: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Mengidentifikasi preset misi dari task text, preset_id, atau oracle_path.
+    Mengembalikan (preset_id, resolved_oracle_path, resolved_expected_sha).
+    """
+    preset_id = data.get("preset_id") or data.get("task_id")
+    if preset_id and preset_id in PRESET_REGISTRY:
+        p = PRESET_REGISTRY[preset_id]
+        return preset_id, str(p["oracle_path"].resolve()), p["expected_sha"]
+
+    task_text = (data.get("task") or "").strip().lower()
+    raw_oracle = data.get("frozen_oracle_path") or CONFIG_STATE.get("frozen_oracle_path")
+
+    # 1. Pencocokan via path
+    if raw_oracle:
+        for pid, p in PRESET_REGISTRY.items():
+            if pid in str(raw_oracle).lower():
+                return pid, str(p["oracle_path"].resolve()), p["expected_sha"]
+
+    # 2. Pencocokan via teks task persis atau kata kunci
+    for pid, p in PRESET_REGISTRY.items():
+        if p["task"].strip().lower() == task_text:
+            return pid, str(p["oracle_path"].resolve()), p["expected_sha"]
+        if any(kw in task_text for kw in p["keywords"]):
+            return pid, str(p["oracle_path"].resolve()), p["expected_sha"]
+
+    # 3. Kustom path jika ada
+    if raw_oracle and str(raw_oracle).strip():
+        return None, str(Path(raw_oracle).resolve()), data.get("expected_oracle_sha")
+
+    return None, None, None
+
+def verify_oracle_checksum(oracle_dir_str: str, expected_sha: str, oracle_file: Optional[str] = None) -> Tuple[bool, str]:
+    """Verifikasi checksum SHA-256 untuk frozen oracle."""
+    oracle_dir = Path(oracle_dir_str)
+    if not oracle_dir.exists():
+        return False, "ORACLE_DIRECTORY_NOT_FOUND"
+
+    candidates = [oracle_dir / oracle_file] if oracle_file else list(oracle_dir.glob("*.dart")) + list(oracle_dir.glob("*.py"))
+    for f in candidates:
+        if f.exists() and f.is_file():
+            data = f.read_bytes()
+            actual_sha = hashlib.sha256(data).hexdigest().lower()
+            if actual_sha == expected_sha.lower():
+                return True, actual_sha
+
+    for f in oracle_dir.iterdir():
+        if f.is_file():
+            data = f.read_bytes()
+            actual_sha = hashlib.sha256(data).hexdigest().lower()
+            if actual_sha == expected_sha.lower():
+                return True, actual_sha
+
+    return False, "SHA_MISMATCH"
 
 # ---------------------------------------------------------------------------
 # REQ-012: WebSocket Hub & Connection Manager
@@ -82,7 +193,7 @@ manager = ConnectionManager()
 # ---------------------------------------------------------------------------
 # REQ-013: Event Helper Protocol
 # ---------------------------------------------------------------------------
-def make_event(event_type: str, payload: Dict[str, Any] = None) -> Dict[str, Any]:
+def make_event(event_type: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     event = {
         "event": event_type,
         "timestamp": datetime.now().isoformat(),
@@ -92,7 +203,26 @@ def make_event(event_type: str, payload: Dict[str, Any] = None) -> Dict[str, Any
     return event
 
 # ---------------------------------------------------------------------------
-# REQ-011: REST Endpoint Health Check
+# Mapping Node StateGraph ke UI Agent Role
+# ---------------------------------------------------------------------------
+NODE_TO_UI_ROLE = {
+    "pm": "pm",
+    "pm_validator": "pm",
+    "architect": "architect",
+    "architect_validator": "architect",
+    "developer": "developer",
+    "developer_validator": "developer",
+    "tester": "tester",
+    "frozen_oracle": "tester",
+    "test_suite_validator": "tester",
+    "executor": "executor",
+    "executor_validator": "executor",
+    "reviewer": "reviewer",
+    "reviewer_validator": "reviewer",
+}
+
+# ---------------------------------------------------------------------------
+# REST Endpoints
 # ---------------------------------------------------------------------------
 @app.get("/api/health")
 async def health_check():
@@ -103,14 +233,30 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-# ---------------------------------------------------------------------------
-# REQ-014: REST Endpoints Configuration & Projects
-# ---------------------------------------------------------------------------
+@app.get("/api/presets")
+async def list_presets():
+    """Mengembalikan daftar preset misi dengan metadata dan hash oracle terverifikasi."""
+    presets_data = []
+    for pid, p in PRESET_REGISTRY.items():
+        presets_data.append({
+            "preset_id": pid,
+            "title": p["title"],
+            "task": p["task"],
+            "target_language": p["target_language"],
+            "expected_sha": p["expected_sha"],
+            "n_tests": p["n_tests"],
+            "oracle_path": str(p["oracle_path"].resolve())
+        })
+    return {
+        "status": "success",
+        "presets": presets_data
+    }
+
 class ConfigUpdateRequest(BaseModel):
     provider: Optional[str] = None
     ollama_model: Optional[str] = None
     openrouter_model: Optional[str] = None
-    max_iterations: Optional[int] = Field(None, ge=1, le=5)
+    max_iterations: Optional[int] = Field(None, ge=1, le=10)
     target_language: Optional[str] = None
     executor_intervention_enabled: Optional[bool] = None
     executor_mode: Optional[str] = None
@@ -154,13 +300,22 @@ async def update_config(req: ConfigUpdateRequest):
 async def list_projects():
     projects = []
     if OUTPUT_DIR.exists():
-        for p in OUTPUT_DIR.iterdir():
+        for p in sorted(OUTPUT_DIR.iterdir(), key=lambda x: x.stat().st_mtime if x.exists() else 0, reverse=True):
             if p.is_dir():
-                file_count = sum(1 for f in p.rglob("*") if f.is_file())
+                meta_file = p / "project_meta.json"
+                meta_data = {}
+                if meta_file.exists():
+                    try:
+                        meta_data = json.loads(meta_file.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
+                file_count = sum(1 for f in p.rglob("*") if f.is_file() and f.name != "project_meta.json" and f.name != "run_trace.jsonl")
                 projects.append({
                     "name": p.name,
                     "path": str(p.resolve()),
                     "file_count": file_count,
+                    "status": meta_data.get("status", "unknown"),
+                    "task": meta_data.get("task", ""),
                     "modified": datetime.fromtimestamp(p.stat().st_mtime).isoformat()
                 })
     return {
@@ -196,8 +351,9 @@ async def get_project_details(project_name: str):
 async def squad_websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     await manager.send_personal(websocket, make_event("connected", {
-        "message": "Connected to ReinDev Studio Squad Engine WebSocket Hub",
-        "active_config": CONFIG_STATE
+        "message": "Connected to ReinDev Studio Squad Engine WebSocket Hub (V1-V6 Validated)",
+        "active_config": CONFIG_STATE,
+        "available_presets": list(PRESET_REGISTRY.keys())
     }))
     
     try:
@@ -227,8 +383,14 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     model_name = "qwen2.5-coder:7b"
                 else:
                     model_name = raw_model
-                target_lang = data.get("target_language", CONFIG_STATE["target_language"])
-                max_iter = data.get("max_iterations", CONFIG_STATE["max_iterations"])
+
+                raw_lang = data.get("target_language", CONFIG_STATE["target_language"])
+                if "dart" in raw_lang.lower() or "flutter" in raw_lang.lower():
+                    target_lang = "dart"
+                else:
+                    target_lang = "python"
+
+                max_iter = int(data.get("max_iterations", CONFIG_STATE["max_iterations"]))
                 raw_mode = data.get("executor_mode")
                 if raw_mode and raw_mode.upper() in ("SAFE", "ON", "OFF", "CODE_ONLY"):
                     executor_mode = raw_mode.upper()
@@ -237,29 +399,53 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                 else:
                     executor_mode = CONFIG_STATE.get("executor_mode", "SAFE").upper()
                 executor_intervention_enabled = (executor_mode != "OFF")
-                frozen_oracle_path = data.get("frozen_oracle_path", CONFIG_STATE.get("frozen_oracle_path", None))
-                if frozen_oracle_path == "":
-                    frozen_oracle_path = None
-                
+
+                # Resolusi Preset & Frozen Oracle secara deterministik
+                preset_id, resolved_oracle_path, resolved_expected_sha = resolve_preset_config(data)
+
+                # Pre-Flight Verifikasi Integritas Frozen Oracle
+                if resolved_oracle_path and resolved_expected_sha:
+                    oracle_ok, act_sha = verify_oracle_checksum(resolved_oracle_path, resolved_expected_sha)
+                    if not oracle_ok:
+                        await manager.send_personal(websocket, make_event("error", {
+                            "message": f"Pre-Flight Abort: Frozen Oracle SHA mismatch atau file tidak ditemukan! (Expected: {resolved_expected_sha[:16]}..., Result: {act_sha})"
+                        }))
+                        continue
+
                 # Inisialisasi Sesi & Observability Tracer
-                run_id = "project_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+                run_id = f"run_{preset_id or 'custom'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 proj_dir = OUTPUT_DIR / run_id
                 proj_dir.mkdir(parents=True, exist_ok=True)
                 tracer = RunTracer.register(run_id, proj_dir)
 
-                # Inisialisasi State Squad
+                # Inisialisasi State Squad Lengkap Sesuai Schema V1–V6
                 initial_state: SquadState = {
                     "task": task_text,
                     "provider": provider,
                     "model_name": model_name,
+                    "developer_backend": os.getenv("DEVELOPER_BACKEND", provider),
+                    "developer_model": os.getenv("DEVELOPER_MODEL", model_name),
+                    "squad_model": os.getenv("SQUAD_MODEL", model_name),
                     "target_language": target_lang,
                     "specifications": "",
                     "architecture_plan": "",
+                    "contract": None,
+                    "contract_status": None,
+                    "contract_revision_count": 0,
+                    "blueprint_revision_count": 0,
+                    "max_iterations": max_iter,
+                    "max_phase_repair_attempts": int(data.get("max_phase_repair_attempts", 2)),
+                    "max_contract_revisions": 2,
+                    "max_blueprint_revisions": 2,
+                    "repair_attempt_counts": {},
+                    "locked_invariants": {},
+                    "oscillation_history": [],
+                    "proven_semantic_interfaces": [],
+                    "previous_passed_tests": [],
                     "code_files": {},
                     "test_files": {},
                     "test_results": {},
                     "iteration_count": 0,
-                    "max_iterations": max_iter,
                     "review_notes": "",
                     "status": "in_progress",
                     "logs": [],
@@ -267,7 +453,8 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     "output_dir": str(proj_dir.resolve()),
                     "executor_intervention_enabled": executor_intervention_enabled,
                     "executor_mode": executor_mode,
-                    "frozen_oracle_path": frozen_oracle_path
+                    "frozen_oracle_path": resolved_oracle_path,
+                    "expected_oracle_sha": resolved_expected_sha
                 }
                 
                 # Observability Trace: Event 1 (RUN_START)
@@ -278,13 +465,15 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     data={
                         "run_id": run_id,
                         "task": task_text,
+                        "preset_id": preset_id,
                         "target_language": target_lang,
                         "provider": provider,
                         "model": model_name,
                         "max_iterations": max_iter,
                         "executor_intervention_enabled": executor_intervention_enabled,
                         "executor_mode": executor_mode,
-                        "frozen_oracle_path": frozen_oracle_path,
+                        "frozen_oracle_path": resolved_oracle_path,
+                        "expected_oracle_sha": resolved_expected_sha,
                         "output_directory": str(proj_dir.resolve()),
                         "config": {
                             "ollama_host": CONFIG_STATE.get("ollama_host"),
@@ -295,27 +484,34 @@ async def squad_websocket_endpoint(websocket: WebSocket):
 
                 start_time = time.time()
                 await manager.send_personal(websocket, make_event("session_start", {
+                    "run_id": run_id,
                     "task": task_text,
+                    "preset_id": preset_id,
                     "provider": provider,
                     "model_name": model_name,
                     "target_language": target_lang,
                     "max_iterations": max_iter,
                     "executor_intervention_enabled": executor_intervention_enabled,
                     "executor_mode": executor_mode,
-                    "frozen_oracle_path": frozen_oracle_path
+                    "frozen_oracle_path": resolved_oracle_path
                 }))
                 
-                # Eksekusi StateGraph secara asynchronous dan broadcast tiap transisi node
                 loop = asyncio.get_event_loop()
                 
                 role_info = {
                     "pm": ("Product Manager", "thinking", f"Product Manager menganalisis spesifikasi misi ({target_lang.upper()})..."),
+                    "pm_validator": ("PM Validator", "testing", "Memvalidasi kelengkapan spesifikasi dan kriteria penerimaan (Boundary V1)..."),
                     "architect": ("System Architect", "thinking", f"System Architect merancang arsitektur modul dan file tree ({target_lang.upper()})..."),
+                    "architect_validator": ("Architect Validator", "testing", "Memvalidasi dan membekukan Interface Contract (Boundary V2)..."),
                     "developer": ("Developer", "working", f"Developer menyintesis kode sumber produksi bersih ({target_lang.upper()})..."),
-                    "tester": ("QA Tester", "testing", f"QA Tester menyusun automated test suite komprehensif ({target_lang.upper()})..."),
+                    "developer_validator": ("Developer Validator", "testing", "Memvalidasi sintaksis AST dan integritas kode sebelum eksekusi (Boundary V3)..."),
+                    "tester": ("QA Tester", "testing", f"QA Tester menyusun automated test suite ({target_lang.upper()})..."),
                     "frozen_oracle": ("Frozen Oracle", "testing", "Memuat frozen oracle test suite komprehensif..."),
-                    "executor": ("QA Tester", "testing", "Mengeksekusi test runner dalam sandbox isolasi..."),
-                    "reviewer": ("Code Reviewer", "reviewing", f"Code Reviewer mengaudit Sound Null Safety & arsitektur ({target_lang.upper()})..."),
+                    "test_suite_validator": ("Test Suite Validator", "testing", "Memvalidasi integritas test suite (Boundary V4)..."),
+                    "executor": ("Sandbox Executor", "testing", "Mengeksekusi test runner dalam sandbox isolasi..."),
+                    "executor_validator": ("Behavioral Validator", "testing", "Mengevaluasi hasil eksekusi, regresi invarian, dan kestabilan (Boundary V5)..."),
+                    "reviewer": ("Code Reviewer", "reviewing", f"Code Reviewer mengaudit kode dan arsitektur ({target_lang.upper()})..."),
+                    "reviewer_validator": ("Reviewer Validator", "reviewing", "Memvalidasi konsistensi keputusan reviewer terhadap bukti Layer 1 (Boundary V6)..."),
                 }
                 
                 try:
@@ -331,11 +527,13 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     next_node_to_announce = "pm"
                     
                     while True:
-                        # 0. Notifikasi awal sebelum LLM mulai berpikir agar UI langsung aktif berdenyut
+                        # 0. Notifikasi awal sebelum LLM / Validator mulai bekerja
                         if next_node_to_announce and next_node_to_announce in role_info:
                             r_name, r_status, r_desc = role_info[next_node_to_announce]
+                            ui_role = NODE_TO_UI_ROLE.get(next_node_to_announce, next_node_to_announce)
                             await manager.send_personal(websocket, make_event("agent_state", {
-                                "node": next_node_to_announce,
+                                "node": ui_role,
+                                "raw_node": next_node_to_announce,
                                 "status": r_status,
                                 "iteration": accumulated_state.get("iteration_count", 0),
                                 "log": f"[{r_name}]: {r_desc}"
@@ -343,17 +541,19 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                             
                         future = loop.run_in_executor(None, get_next, stream_generator)
                         
-                        # Heartbeat loop tiap 2.5 detik selama LLM menghasilkan respon
+                        # Heartbeat loop tiap 2.5 detik selama inferensi berlangsung
                         while not future.done():
                             try:
                                 await asyncio.wait_for(asyncio.shield(future), timeout=2.5)
                             except asyncio.TimeoutError:
                                 elapsed = round(time.time() - start_time, 1)
+                                ui_role = NODE_TO_UI_ROLE.get(next_node_to_announce, "pm")
                                 cur_role = role_info.get(next_node_to_announce, ("Squad",))[0]
                                 await manager.send_personal(websocket, make_event("agent_heartbeat", {
-                                    "node": next_node_to_announce,
+                                    "node": ui_role,
+                                    "raw_node": next_node_to_announce,
                                     "elapsed_sec": elapsed,
-                                    "message": f"{cur_role} aktif memproses respon inferensi ({elapsed}s)..."
+                                    "message": f"{cur_role} aktif memproses ({elapsed}s)..."
                                 }))
                                 
                         step_result, is_done = future.result()
@@ -362,17 +562,10 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                             
                         for node_name, node_output in step_result.items():
                             accumulated_state.update(node_output)
+                            ui_role = NODE_TO_UI_ROLE.get(node_name, node_name)
                             last_log = node_output.get("logs", [""])[-1] if node_output.get("logs") else ""
                             
-                            # 1. Notifikasi Agent Selesai / Completed
-                            await manager.send_personal(websocket, make_event("agent_state", {
-                                "node": node_name,
-                                "status": "completed",
-                                "iteration": accumulated_state.get("iteration_count", 0),
-                                "log": last_log
-                            }))
-                            
-                            # 2. Spesifik Event berdasarkan Node
+                            # 1. Penanganan Spesifik Setiap Node & Boundary
                             if node_name == "pm" and "specifications" in node_output:
                                 tracer.log_event(
                                     stage="pm",
@@ -390,7 +583,48 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                                     "agent": "pm",
                                     "thought": node_output["specifications"]
                                 }))
-                                next_node_to_announce = "architect"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "pm",
+                                    "status": "completed",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": "[Product Manager]: Spesifikasi misi berhasil disusun."
+                                }))
+                                next_node_to_announce = "pm_validator"
+
+                            elif node_name == "pm_validator":
+                                contract = node_output.get("pm_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                repair_count = accumulated_state.get("repair_attempt_counts", {}).get("pm", 0)
+                                max_repairs = accumulated_state.get("max_phase_repair_attempts", 2)
+                                violations = contract.get("violations", [])
+
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "PM",
+                                    "boundary": "V1",
+                                    "verdict": verdict,
+                                    "repair_count": repair_count,
+                                    "max_repairs": max_repairs,
+                                    "violations": violations
+                                }))
+
+                                if verdict == "PASS":
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "pm",
+                                        "status": "completed",
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": "[PM Validator]: Spesifikasi misi lolos validasi Boundary V1."
+                                    }))
+                                    next_node_to_announce = "architect"
+                                else:
+                                    st = "retrying" if repair_count <= max_repairs else "error"
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "pm",
+                                        "status": st,
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": f"[PM Validator]: Validasi Boundary V1 GAGAL ({len(violations)} pelanggaran). Repair {repair_count}/{max_repairs}."
+                                    }))
+                                    next_node_to_announce = "pm" if repair_count <= max_repairs else None
+
                             elif node_name == "architect" and "architecture_plan" in node_output:
                                 tracer.log_event(
                                     stage="architect",
@@ -409,79 +643,272 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                                     "agent": "architect",
                                     "thought": node_output["architecture_plan"]
                                 }))
-                                next_node_to_announce = "developer"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "architect",
+                                    "status": "completed",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": "[System Architect]: Rencana arsitektur dan blueprint modul berhasil dirancang."
+                                }))
+                                next_node_to_announce = "architect_validator"
+
+                            elif node_name == "architect_validator":
+                                contract = node_output.get("architect_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                c_status = accumulated_state.get("contract_status", "UNKNOWN")
+                                seal = accumulated_state.get("contract_sha256", "")
+                                repair_count = accumulated_state.get("repair_attempt_counts", {}).get("architect", 0)
+                                max_repairs = accumulated_state.get("max_phase_repair_attempts", 2)
+                                violations = contract.get("violations", [])
+
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "ARCHITECT",
+                                    "boundary": "V2",
+                                    "verdict": verdict,
+                                    "contract_status": c_status,
+                                    "contract_sha256": seal,
+                                    "repair_count": repair_count,
+                                    "max_repairs": max_repairs,
+                                    "violations": violations
+                                }))
+
+                                if verdict == "PASS":
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "architect",
+                                        "status": "completed",
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": f"[Architect Validator]: Interface Contract FROZEN (Boundary V2 PASS, SHA: {seal[:16]}...). Zero leakage dipastikan."
+                                    }))
+                                    next_node_to_announce = "developer"
+                                else:
+                                    st = "retrying" if repair_count <= max_repairs else "error"
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "architect",
+                                        "status": st,
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": f"[Architect Validator]: Validasi Boundary V2 GAGAL. Repair {repair_count}/{max_repairs}."
+                                    }))
+                                    next_node_to_announce = "architect" if repair_count <= max_repairs else None
+
                             elif node_name == "developer" and "code_files" in node_output:
                                 cur_iter = accumulated_state.get("iteration_count", 0)
-                                has_tests = bool(accumulated_state.get("test_files"))
+                                code_files = node_output["code_files"]
                                 await manager.send_personal(websocket, make_event("code_update", {
                                     "agent": "developer",
-                                    "files": node_output["code_files"],
+                                    "files": code_files,
                                     "iteration": cur_iter
                                 }))
-                                if cur_iter > 0 and has_tests and not accumulated_state.get("tests_need_update", False):
-                                    next_node_to_announce = "executor"
-                                elif accumulated_state.get("frozen_oracle_path"):
-                                    next_node_to_announce = "frozen_oracle"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "developer",
+                                    "status": "completed",
+                                    "iteration": cur_iter,
+                                    "log": f"[Developer]: Sintesis {len(code_files)} berkas kode sumber selesai."
+                                }))
+                                next_node_to_announce = "developer_validator"
+
+                            elif node_name == "developer_validator":
+                                contract = node_output.get("developer_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                repair_count = accumulated_state.get("repair_attempt_counts", {}).get("developer", 0)
+                                max_repairs = accumulated_state.get("max_phase_repair_attempts", 2)
+                                violations = contract.get("violations", [])
+
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "DEVELOPER",
+                                    "boundary": "V3",
+                                    "verdict": verdict,
+                                    "repair_count": repair_count,
+                                    "max_repairs": max_repairs,
+                                    "violations": violations
+                                }))
+
+                                if verdict == "PASS":
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "developer",
+                                        "status": "completed",
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": "[Developer Validator]: Pra-eksekusi AST lolos validasi Boundary V3."
+                                    }))
+                                    next_node_to_announce = "frozen_oracle" if accumulated_state.get("frozen_oracle_path") else "tester"
                                 else:
-                                    next_node_to_announce = "tester"
+                                    st = "retrying" if repair_count <= max_repairs else "error"
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "developer",
+                                        "status": st,
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": f"[Developer Validator]: Pra-eksekusi GAGAL Boundary V3 ({len(violations)} isu). Repair {repair_count}/{max_repairs}."
+                                    }))
+                                    next_node_to_announce = "developer" if repair_count <= max_repairs else None
+
                             elif node_name == "frozen_oracle" and "test_files" in node_output:
+                                test_files = node_output["test_files"]
                                 await manager.send_personal(websocket, make_event("code_update", {
                                     "agent": "frozen_oracle",
-                                    "files": node_output["test_files"]
+                                    "files": test_files
                                 }))
-                                next_node_to_announce = "executor"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "tester",
+                                    "status": "completed",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": f"[Frozen Oracle]: Berhasil memuat {len(test_files)} berkas test suite immutable."
+                                }))
+                                next_node_to_announce = "test_suite_validator"
+
                             elif node_name == "tester" and "test_files" in node_output:
+                                test_files = node_output["test_files"]
                                 await manager.send_personal(websocket, make_event("code_update", {
                                     "agent": "tester",
-                                    "files": node_output["test_files"]
+                                    "files": test_files
                                 }))
-                                next_node_to_announce = "executor"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "tester",
+                                    "status": "completed",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": f"[QA Tester]: Berhasil menyusun {len(test_files)} berkas automated test suite."
+                                }))
+                                next_node_to_announce = "test_suite_validator"
+
+                            elif node_name == "test_suite_validator":
+                                contract = node_output.get("test_suite_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                violations = contract.get("violations", [])
+                                use_frozen = bool(accumulated_state.get("frozen_oracle_path"))
+
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "TEST_SUITE",
+                                    "boundary": "V4",
+                                    "verdict": verdict,
+                                    "use_frozen": use_frozen,
+                                    "violations": violations
+                                }))
+
+                                if verdict == "PASS":
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "tester",
+                                        "status": "completed",
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": "[Test Suite Validator]: Integritas test suite lolos validasi Boundary V4."
+                                    }))
+                                    next_node_to_announce = "executor"
+                                else:
+                                    await manager.send_personal(websocket, make_event("agent_state", {
+                                        "node": "tester",
+                                        "status": "error",
+                                        "iteration": accumulated_state.get("iteration_count", 0),
+                                        "log": "[Test Suite Validator]: Integritas test suite GAGAL Boundary V4. Zero downstream leakage dipicu."
+                                    }))
+                                    next_node_to_announce = None
+
                             elif node_name == "executor" and "test_results" in node_output:
-                                cur_iter = node_output.get("iteration_count", 0)
+                                cur_iter = accumulated_state.get("iteration_count", 0)
                                 test_res = node_output["test_results"]
-                                is_passed = test_res.get("passed", False)
-                                
                                 await manager.send_personal(websocket, make_event("test_log", {
                                     "results": test_res,
                                     "iteration": cur_iter,
                                     "max_iterations": max_iter
                                 }))
-                                
-                                if not is_passed and cur_iter < max_iter:
-                                    next_node_to_announce = "developer"
-                                    loop_status = "retrying"
-                                    loop_msg = f"Self-Healing Loop {cur_iter}/{max_iter}: Pengujian gagal. Melempar tugas kembali ke Developer untuk perbaikan kode..."
-                                elif not is_passed and cur_iter >= max_iter:
-                                    next_node_to_announce = "reviewer"
-                                    loop_status = "max_reached"
-                                    loop_msg = f"Batas Maksimum Self-Healing Tercapai ({cur_iter}/{max_iter} Loop). QA Tester mengalihkan tugas ke Code Reviewer untuk audit kegagalan dan penyajian bukti."
-                                else:
-                                    next_node_to_announce = "reviewer"
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "executor",
+                                    "status": "completed",
+                                    "iteration": cur_iter,
+                                    "log": f"[Sandbox Executor]: Eksekusi isolasi selesai (passed={test_res.get('passed', False)})."
+                                }))
+                                next_node_to_announce = "executor_validator"
+
+                            elif node_name == "executor_validator":
+                                contract = node_output.get("executor_iteration_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                test_res = accumulated_state.get("test_results", {})
+                                is_passed = bool(test_res.get("passed", False))
+                                cur_iter = accumulated_state.get("iteration_count", 0)
+                                repair_count = accumulated_state.get("repair_attempt_counts", {}).get("executor", 0)
+                                max_repairs = accumulated_state.get("max_phase_repair_attempts", 2)
+                                locked_invs = accumulated_state.get("locked_invariants", {})
+                                regressions = contract.get("regressions", [])
+
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "EXECUTOR",
+                                    "boundary": "V5",
+                                    "verdict": verdict,
+                                    "repair_count": repair_count,
+                                    "max_repairs": max_repairs,
+                                    "regressions": regressions,
+                                    "locked_invariants_count": len(locked_invs)
+                                }))
+
+                                if verdict == "PASS" and is_passed:
                                     loop_status = "passed"
                                     loop_msg = f"Pengujian Sandbox Lolos Bersih (Loop {cur_iter}/{max_iter}). Melanjutkan ke Code Reviewer untuk sertifikasi rilis."
-                                    
+                                    next_node = "reviewer"
+                                elif repair_count <= max_repairs:
+                                    loop_status = "retrying"
+                                    c_owner = (accumulated_state.get("causal_owner_phase") or "developer").lower()
+                                    loop_msg = f"Self-Healing Loop {cur_iter}/{max_iter} (Repair {repair_count}/{max_repairs}): Pengujian belum lolos ({len(regressions)} regresi, {len(locked_invs)} invarian terkunci). Mengarahkan perbaikan ke {c_owner.capitalize()}..."
+                                    next_node = c_owner
+                                else:
+                                    loop_status = "max_reached"
+                                    loop_msg = f"Batas Maksimum Self-Healing Tercapai (Repair {repair_count}/{max_repairs}). ZERO LEAKAGE: Eksekusi dihentikan aman."
+                                    next_node = None
+
                                 await manager.send_personal(websocket, make_event("loop_status", {
                                     "current_loop": cur_iter,
                                     "max_loops": max_iter,
                                     "status": loop_status,
                                     "message": loop_msg
                                 }))
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "executor",
+                                    "status": "completed" if loop_status == "passed" else ("retrying" if loop_status == "retrying" else "error"),
+                                    "iteration": cur_iter,
+                                    "log": loop_msg
+                                }))
+                                next_node_to_announce = next_node
+
                             elif node_name == "reviewer" and "review_notes" in node_output:
                                 rev_notes = node_output["review_notes"]
-                                is_rev_approved = "[APPROVED]" in rev_notes and "[NEEDS_REVISION]" not in rev_notes
-                                rev_status = node_output.get("status", "approved" if is_rev_approved else "needs_revision")
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "reviewer",
+                                    "status": "completed",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": "[Code Reviewer]: Audit Sound Null Safety dan integritas arsitektur selesai."
+                                }))
+                                next_node_to_announce = "reviewer_validator"
+
+                            elif node_name == "reviewer_validator":
+                                contract = node_output.get("reviewer_validator_contract", {})
+                                verdict = contract.get("verdict", "FAIL")
+                                rev_verdict = accumulated_state.get("review_verdict", "FAIL")
+                                is_approved = (rev_verdict == "APPROVED" and verdict == "PASS")
+                                status_str = "approved" if is_approved else "needs_revision"
+
                                 await manager.send_personal(websocket, make_event("review_report", {
-                                    "report": rev_notes,
-                                    "status": rev_status,
-                                    "is_approved": is_rev_approved,
+                                    "report": accumulated_state.get("review_notes", ""),
+                                    "status": status_str,
+                                    "is_approved": is_approved,
                                     "iteration": accumulated_state.get("iteration_count", 0),
                                     "max_iterations": max_iter
                                 }))
-                                next_node_to_announce = None
+                                await manager.send_personal(websocket, make_event("phase_validation", {
+                                    "phase": "REVIEWER",
+                                    "boundary": "V6",
+                                    "verdict": verdict,
+                                    "evaluated_review_verdict": rev_verdict,
+                                    "is_approved": is_approved
+                                }))
+                                await manager.send_personal(websocket, make_event("agent_state", {
+                                    "node": "reviewer",
+                                    "status": "completed" if is_approved else "retrying",
+                                    "iteration": accumulated_state.get("iteration_count", 0),
+                                    "log": f"[Reviewer Validator]: Boundary V6 verdict = {verdict}, review decision = {rev_verdict}."
+                                }))
+                                
+                                if not is_approved and contract.get("repair_owner") == "DEVELOPER" and accumulated_state.get("repair_attempt_counts", {}).get("developer", 0) < accumulated_state.get("max_phase_repair_attempts", 2):
+                                    next_node_to_announce = "developer"
+                                else:
+                                    next_node_to_announce = None
                                 
                     duration = round(time.time() - start_time, 2)
                     
-                    # Simpan hasil output proyek ke folder backend/output/
+                    # Simpan hasil output proyek ke direktori backend/output/
                     proj_slug = run_id
                     proj_dir.mkdir(parents=True, exist_ok=True)
                     
@@ -494,31 +921,53 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                         fpath.parent.mkdir(parents=True, exist_ok=True)
                         fpath.write_text(content, encoding="utf-8")
                         
-                    # Hitung status final misi secara objektif dan non-kontradiktif
+                    # Evaluasi status final misi secara objektif dan non-kontradiktif (Doktrin #6)
                     test_res = accumulated_state.get("test_results", {})
                     is_test_passed = bool(test_res.get("passed", False))
                     final_rev_notes = accumulated_state.get("review_notes", "")
-                    is_final_approved = ("[APPROVED]" in final_rev_notes or "APPROVED" in final_rev_notes) and "[NEEDS_REVISION]" not in final_rev_notes
+                    contract_status = accumulated_state.get("contract_status")
+                    review_verdict = accumulated_state.get("review_verdict", "FAIL")
+                    rev_contract = accumulated_state.get("reviewer_validator_contract", {})
+                    is_reviewer_validated = (rev_contract.get("verdict") == "PASS")
+                    status_field = accumulated_state.get("status", "")
+
+                    is_final_approved = (
+                        is_test_passed
+                        and contract_status == "FROZEN"
+                        and review_verdict == "APPROVED"
+                        and is_reviewer_validated
+                    )
                     
-                    if is_test_passed and is_final_approved:
+                    if is_final_approved:
                         final_status = "completed"
-                    elif not is_final_approved:
+                    elif "terminal_failure" in status_field:
+                        final_status = status_field
+                    elif not is_test_passed:
+                        final_status = "tests_failed"
+                    elif review_verdict != "APPROVED":
                         final_status = "needs_revision"
                     else:
-                        final_status = "tests_failed"
+                        final_status = "failed"
                         
-                    # Simpan metadata proyek
+                    # Simpan metadata proyek komprehensif
                     meta = {
                         "run_id": run_id,
                         "task": task_text,
+                        "preset_id": preset_id,
+                        "target_language": target_lang,
                         "duration_sec": duration,
                         "iterations": accumulated_state.get("iteration_count", 0),
                         "status": final_status,
                         "tests_passed": is_test_passed,
                         "is_approved": is_final_approved,
+                        "contract_status": contract_status,
+                        "review_verdict": review_verdict,
+                        "locked_invariants": accumulated_state.get("locked_invariants", {}),
+                        "repair_attempt_counts": accumulated_state.get("repair_attempt_counts", {}),
                         "executor_intervention_enabled": executor_intervention_enabled,
                         "executor_mode": executor_mode,
-                        "frozen_oracle_path": frozen_oracle_path,
+                        "frozen_oracle_path": resolved_oracle_path,
+                        "expected_oracle_sha": resolved_expected_sha,
                         "timestamp": datetime.now().isoformat()
                     }
                     (proj_dir / "project_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -535,9 +984,14 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                             "max_iterations": max_iter,
                             "tests_passed": is_test_passed,
                             "is_approved": is_final_approved,
+                            "contract_status": contract_status,
+                            "review_verdict": review_verdict,
+                            "locked_invariants": accumulated_state.get("locked_invariants", {}),
+                            "repair_attempt_counts": accumulated_state.get("repair_attempt_counts", {}),
                             "executor_intervention_enabled": executor_intervention_enabled,
                             "executor_mode": executor_mode,
-                            "frozen_oracle_path": frozen_oracle_path,
+                            "frozen_oracle_path": resolved_oracle_path,
+                            "expected_oracle_sha": resolved_expected_sha,
                             "total_duration_sec": duration,
                             "final_files": list(all_files.keys()),
                             "final_files_hashes": compute_dict_hashes(all_files)
@@ -557,7 +1011,11 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                         "test_results": accumulated_state.get("test_results", {}),
                         "review_notes": final_rev_notes,
                         "tests_passed": is_test_passed,
-                        "is_approved": is_final_approved
+                        "is_approved": is_final_approved,
+                        "contract_status": contract_status,
+                        "review_verdict": review_verdict,
+                        "locked_invariants": accumulated_state.get("locked_invariants", {}),
+                        "repair_attempt_counts": accumulated_state.get("repair_attempt_counts", {})
                     }))
                     
                 except Exception as e:

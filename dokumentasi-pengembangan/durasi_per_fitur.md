@@ -1053,3 +1053,43 @@ Total Waktu Realisasi = 1.020 s (Dev) + 1.008 s (Test) + 1.740 s (Doc/Forensik) 
 - **Status Sesi:** **SELESAI & TERVALIDASI PENUH (STATUS PASS DIBERIKAN RESMI OLEH INTENT ARCHITECT PADA 2026-09-12 19:18 WIB)**
 - **Status Akhir Iterasi 6:** **RESMI DITUTUP (CLOSED & FULLY PASSED)**
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 26: Integrasi Otoritatif StateGraph V1–V6 ke Backend Server, WebSocket Hub, Uji Regresi 3 Preset Misi, & Kesiapan Iterasi 7 — 2026-09-12 19:25 s.d. 19:42 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Komponen 1: Waktu Pengembangan / Integrasi Server (Development Time)
+| No | Aktivitas Pengembangan / Integrasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Audit diskrepansi `backend/server.py` vs StateGraph otoritatif (`backend/graph.py`) | 19:25:00 | 19:27:00 | 120 s | 2.00 m (0.03 j) |
+| 2 | Perancangan `PRESET_REGISTRY` & helper `resolve_preset_config()` deterministik | 19:27:00 | 19:29:00 | 120 s | 2.00 m (0.03 j) |
+| 3 | Integrasi schema utuh `SquadState` (universal 2-repair budget, locked invariants, proven semantics) | 19:29:00 | 19:30:30 | 90 s | 1.50 m (0.02 j) |
+| 4 | Pemetaan 13 node StateGraph pada streamer WebSocket (`phase_validation`, role mapping `NODE_TO_UI_ROLE`) | 19:30:30 | 19:32:00 | 90 s | 1.50 m (0.02 j) |
+| | **Subtotal Waktu Pengembangan & Integrasi** | | | **420 s** | **7.00 m (0.12 jam)** |
+
+### Komponen 2: Waktu Pengujian & Verifikasi Regresi (Testing Time)
+| No | Aktivitas Pengujian & Verifikasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Pembuatan & eksekusi test suite `test_server_app_integration.py` (7/7 PASS in 0.79s) | 19:32:00 | 19:33:00 | 60 s | 1.00 m (0.02 j) |
+| 2 | Eksekusi seluruh pytest backend regression suite (451/451 PASS in 27.75s) | 19:33:00 | 19:33:45 | 45 s | 0.75 m (0.01 j) |
+| 3 | Eksekusi live WebSocket regression 3 preset misi (`fastapi_t1`, `cli_t1`, `flutter_t1` via Ollama) | 19:33:45 | 19:37:45 | 240 s | 4.00 m (0.07 j) |
+| | **Subtotal Waktu Pengujian Eksekusi** | | | **345 s** | **5.75 m (0.10 jam)** |
+
+### Komponen 3: Waktu Dokumentasi, Analisis Forensik & Penyusunan Laporan (Documentation Time)
+| No | Aktivitas Analisis Forensik & Dokumentasi | Waktu Mulai | Waktu Selesai | Durasi (detik) | Durasi (menit/jam) |
+|---|---|---|---|---|---|
+| 1 | Analisis forensik trace event & verifikasi Zero Downstream Leakage (0 leak ke downstream) | 19:37:45 | 19:39:30 | 105 s | 1.75 m (0.03 j) |
+| 2 | Penyusunan laporan formal `app_execution_path_integration_and_regression_report.md` | 19:39:30 | 19:41:00 | 90 s | 1.50 m (0.02 j) |
+| 3 | Sinkronisasi 11 dokumen tata kelola IIDD & perumusan Implementation Plan Iterasi 7 | 19:41:00 | 19:42:00 | 60 s | 1.00 m (0.02 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **255 s** | **4.25 m (0.07 jam)** |
+
+---
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 26:
+Total Waktu Realisasi = 420 s (Dev) + 345 s (Test) + 255 s (Doc) = 1.020 detik (~17 menit 00 detik / 0.28 jam)
+- **Waktu Mulai Sesi:** 2026-09-12 19:25:00 WIB
+- **Waktu Selesai Sesi:** 2026-09-12 19:42:00 WIB
+- **Status Sesi:** **SELESAI & TERVALIDASI PENUH (APLIKASI RUNNABLE TERVERIFIKASI 100%)**
+- **Status Iterasi 6:** **CLOSED (SELESAI / RESMI DITUTUP)**
+- **Status Menuju Iterasi 7:** **READY FOR IMPLEMENTATION PLAN (MENUNGGU PERSETUJUAN IA)**

@@ -1053,9 +1053,22 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Penutupan Iterasi 6 & E-083):
-- **Diselesaikan Mandiri oleh Agen / Engine:** 42 kasus (termasuk E-068, E-069, E-071 s/d E-076, E-078, E-080, E-081, E-082, E-083)
+### Kasus E-084: Disparitas Initial State & Missing Validator Nodes Streamer di Server WebSocket App Execution Path
+- **Waktu:** 2026-09-12 19:25 WIB (Sesi 26 Penyelarasan Jalur Aplikasi Iterasi 6 Closure)
+- **Tingkat Keparahan:** High / Architectural Alignment
+- **Gejala:** Saat memverifikasi kesiapan rilis aplikasi (ackend/server.py via WebSocket /ws/squad), ditemukan bahwa server belum menginisialisasi skema lengkap SquadState (hilangnya max_phase_repair_attempts=2, 
+epair_attempt_counts, locked_invariants, proven_semantic_interfaces), dan loop streaming WebSocket hanya mengenali 4 node LLM primer serta mengabaikan 6 node End-Phase Validator V1–V6 (pm_validator, rchitect_validator, dll.), sehingga event phase_validation tidak tersiar ke UI dan jalur pemilihan preset belum terikat ke direktori fisik Frozen Oracle dengan verifikasi SHA-256.
+- **Akar Masalah:** Kemajuan pesat arsitektur StateGraph 13-node, multi-turn invariant engine, dan 6 Quality Boundaries dieksekusi via runner dan test harnesses terpisah, menyebabkan titik masuk server produksi tertinggal dari kontrak graph otoritatif.
+- **Resolusi & Batasan Sistem:** ackend/server.py diperbarui secara menyeluruh: ditambahkan PRESET_REGISTRY dan 
+esolve_preset_config() dengan verifikasi checksum SHA-256 pre-flight, skema inisialisasi lengkap SquadState, pemetaan lengkap 13 node StateGraph ke UI Flutter via NODE_TO_UI_ROLE, penyiaran event phase_validation ke WebSocket, dan evaluasi rilis Doktrin #6 berbasis status FROZEN Contract. Disusun test suite integrasi ackend/tests/test_server_app_integration.py (7/7 PASS), meloloskan seluruh 451 backend tests (100%), dan diverifikasi live via 3 preset misi (100% Zero Downstream Leakage).
+- **Sumber Solusi:** Penyelarasan Otoritatif Sesi 26 Mandat IA.
+- **Status:** Tuntas Teratasi & Tervalidasi (100% PASS).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Penutupan Iterasi 6 & E-084):
+- **Diselesaikan Mandiri oleh Agen / Engine:** 43 kasus (termasuk E-068, E-069, E-071 s/d E-076, E-078, E-080, E-081, E-082, E-083, E-084)
 - **Diselesaikan atas Intervensi IA:** 10 kasus (termasuk E-077 / D-112, E-079 / D-113)
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 12 kasus (termasuk E-067)
 - **Kasus Forensik & Rekomendasi Terbuka:** 6 kasus (E-060, E-061, E-062, E-066, E-067, E-070)
-- **Total Galat Terdokumentasi:** 83 kasus (E-001 s/d E-083)
+- **Total Galat Terdokumentasi:** 84 kasus (E-001 s/d E-084)

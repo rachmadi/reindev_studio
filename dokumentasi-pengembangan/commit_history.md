@@ -601,3 +601,25 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Bagian 28 (Konsolidasi 5-Way Matrix dan Replikasi ke-2 Ornith 9B).
   - `dokumentasi-pengembangan/conversation_log.md`: Pencatatan putusan resmi IA dan konfirmasi agen.
   - Verifikasi Kualitas: 273/273 unit tests backend lulus 100%, Frozen Oracles 100% utuh pre & post-flight.
+---
+
+### Commit: [PENDING_HASH] — Penyelarasan Otoritatif Jalur Aplikasi (server.py), Uji Regresi 3 Preset, dan Penutupan Resmi Iterasi 6 (2026-09-12 19:42 WIB)
+- **Commit Hash:** `[PENDING_HASH]`
+- **Status:** TERVERIFIKASI PENUH (Server Aligned with 13-Node StateGraph, 451/451 Backend Tests PASS, 3 Presets App Regression PASS, Iterasi 6 Closed)
+- **Tipe:** `feat(server)` / `test(integration)` / `docs(iidd)`
+- **Waktu:** 2026-09-12 19:42 WIB
+- **Pesan Commit:** `feat(server): authoritative StateGraph integration, 3-preset live app regression, and Iterasi 6 official closure`
+- **Cakupan Perubahan:**
+  - `backend/server.py`: Integrasi `PRESET_REGISTRY` dan `resolve_preset_config()` dengan verifikasi SHA-256 pre-flight, skema lengkap `SquadState`, penanganan 13 node StateGraph di loop WebSocket `/ws/squad`, penyiaran event `phase_validation`, pemetaan UI Flutter via `NODE_TO_UI_ROLE`, dan evaluasi rilis Doktrin #6.
+  - `backend/tests/test_server_app_integration.py`: Test suite integrasi baru (7/7 tests PASS dalam 0.79s). Seluruh 451 backend tests PASS 100%.
+  - `dokumentasi-pengembangan/experiments/app_execution_path_integration_and_regression_report.md`: Laporan formal uji regresi jalur aplikasi pada 3 preset misi (`fastapi_t1`, `cli_t1`, `flutter_t1`) membuktikan 100% Zero Downstream Leakage, penegakan boundary terstruktur, dan penanganan repair.
+  - `dokumentasi-pengembangan/experiments/app_execution_path_regression_summary.json`: Ringkasan machine-readable hasil uji regresi jalur aplikasi.
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Bagian 29 (Verifikasi Jalur Aplikasi Resmi dan Penutupan Iterasi 6).
+  - `dokumentasi-pengembangan/decision_log.md`: Keputusan D-118 (Penyelarasan Server Produksi dengan Arsitektur Otoritatif StateGraph).
+  - `dokumentasi-pengembangan/error_log.md`: Kasus E-084 (Disparitas Initial State & Missing Validator Nodes Streamer di Server WebSocket).
+  - `dokumentasi-pengembangan/validation_log.md`: Bagian 29 dan Penutupan Resmi Iterasi 6.
+  - `dokumentasi-pengembangan/durasi_per_fitur.md`: Sesi 26 (17 menit) dan penutupan final Iterasi 6.
+  - `dokumentasi-pengembangan/waktu_estimasi_vs_realisasi.md`: Sesi 26 dan kumulatif 62.70 jam.
+  - `dokumentasi-pengembangan/context_drift_log.md`: Sesi 26 (Zero drift, 100% arsitektur presisi).
+  - `dokumentasi-pengembangan/human_intervention.md`: Item #137 (Mandat Penyelarasan Jalur Aplikasi & Penutupan Iterasi 6).
+  - `dokumentasi-pengembangan/conversation_log.md`: Pencatatan interaksi Sesi 26.

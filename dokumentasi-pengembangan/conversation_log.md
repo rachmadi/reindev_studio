@@ -2208,3 +2208,33 @@ Catat trajectory lengkap secara forensik. Laporkan tiap 3 menit. STOP setelah sa
   3. Memastikan seluruh 273 unit tests backend tetap 100% PASS dan integritas repositori lokal berada dalam kondisi siap audit.
 - **Hasil & Status:**
   **ITERASI 6: RESMI SELESAI & DITUTUP (STATUS: PASS DIBERIKAN RESMI OLEH INTENT ARCHITECT).**
+---
+
+### Sesi 26: Penyelarasan Jalur Aplikasi (server.py), Uji Regresi 3 Preset, Penutupan Resmi Iterasi 6 & Kesiapan Iterasi 7 (2026-09-12 19:25 s.d. 19:42 WIB)
+- **Instruksi / Putusan Resmi IA (Verbatim):**
+  > *"Git commit dan push ke github"*
+  > *"Lakukan langkah berikut, lalu siapkan Implementation Plan untuk iterasi 7. Jangan eksekusi dulu iterasi 7 sampai mendapatkan persetujuan IA.*
+  > *REINDEV STUDIO — ITERASI 6 CLOSURE & ITERASI 7 READINESS...*
+  > *TUGAS UTAMA SEKARANG: Pastikan ARSITEKTUR REINDEV VERSI TERAKHIR benar-benar TERPASANG, TERINTEGRASI, dan DAPAT DIJALANKAN DARI APLIKASI (backend/server.py + websocket + frontend Flutter), bukan hanya melalui runner script di scratch...*
+  > *Setelah itu: Nyatakan Iterasi 6 SELESAI/CLOSED secara resmi. Siapkan IMPLEMENTATION PLAN UNTUK ITERASI 7: NATIVE DESKTOP INTEGRATION, EXPORT, & END-TO-END VERIFICATION. DILARANG MENGEKSEKUSI ITERASI 7 SEBELUM IMPLEMENTATION PLAN DISETUJUI IA!"*
+- **Tindakan & Respon Agen:**
+  1. **Penyelarasan Otoritatif `backend/server.py`:**
+     - Mengintegrasikan `PRESET_REGISTRY` dan `resolve_preset_config()` yang secara otomatis memetakan preset misi (`fastapi_t1`, `cli_t1`, `flutter_t1`) ke direktori fisik Frozen Oracle disertai verifikasi SHA-256 pre-flight (`verify_oracle_checksum()`).
+     - Menginisialisasi skema lengkap `SquadState` (termasuk `max_phase_repair_attempts=2`, `repair_attempt_counts`, `locked_invariants`, `proven_semantic_interfaces`).
+     - Memperluas loop WebSocket streaming untuk menangani seluruh 13 node StateGraph (termasuk 6 node validator V1–V6), menyiarkan event baru `phase_validation`, dan memetakan ke peran UI via `NODE_TO_UI_ROLE`.
+     - Mengadopsi evaluasi rilis Doktrin #6 berbasis status Contract FROZEN.
+  2. **Automated Integration Test Suite:**
+     - Membuat `backend/tests/test_server_app_integration.py` (7/7 tests PASS dalam 0.79s).
+     - Menjalankan seluruh test suite backend: **451/451 tests PASS** (100% PASS dalam 27.75s).
+  3. **Live WebSocket Execution Path Regression (3 Preset Misi):**
+     - Menjalankan regresi live pada `fastapi_t1`, `cli_t1`, dan `flutter_t1` melalui runner `scratch/run_app_websocket_regression.py`.
+     - Hasil empiris membuktikan: V1 PM lolos, V2 Architect mendeteksi pelanggaran skema, repair attempt 1/2 dan 2/2 aktif, dan terjadi terminal halt aman dengan **100% Zero Downstream Leakage** (0 node bocor ke tahap Developer/QA/Executor/Reviewer).
+  4. **Penyusunan Laporan Formal & Pemutakhiran Tata Kelola IIDD:**
+     - Menerbitkan `dokumentasi-pengembangan/experiments/app_execution_path_integration_and_regression_report.md`.
+     - Menambahkan Bagian 29 di `catatan_riset_pengujian_preset.md`.
+     - Memutakhirkan `decision_log.md` (D-118), `error_log.md` (E-084), `validation_log.md` (Bagian 29 & penutupan resmi Iterasi 6), `durasi_per_fitur.md` (Sesi 26), `waktu_estimasi_vs_realisasi.md` (Sesi 26), `context_drift_log.md` (Sesi 26), dan `human_intervention.md` (Item 137).
+  5. **Penutupan Resmi Iterasi 6 & Penyusunan Implementation Plan Iterasi 7:**
+     - Menutup Iterasi 6 secara arsitektural dan fitur.
+     - Menyusun `implementation_plan.md` untuk Iterasi 7 (`REQ-031` s.d. `REQ-035`) di artifacts dengan penegakan **Strict Stop Rule** (menunggu persetujuan eksplisit IA).
+- **Hasil & Status:**
+  **ARSITEKTUR TERPASANG 100% PADA SERVER APLIKASI. ITERASI 6 CLOSED. IMPLEMENTATION PLAN ITERASI 7 DISIAPKAN UNTUK REVIEW IA.**

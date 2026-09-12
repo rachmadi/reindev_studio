@@ -1,0 +1,269 @@
+{
+  "fastapi_t1": {
+    "preset_id": "fastapi_t1",
+    "duration_sec": 85.34,
+    "total_events": 59,
+    "boundaries_invoked": [
+      "architect_validator",
+      "pm_validator"
+    ],
+    "phase_validations": [
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:34:07.222131",
+        "phase": "PM",
+        "boundary": "V1",
+        "verdict": "PASS",
+        "repair_count": 0,
+        "max_repairs": 2,
+        "violations": []
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:34:29.586875",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 1,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Gagal mendekode JSON blueprint: Expecting ',' delimiter: line 47 column 54 (char 1241)",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:34:51.234163",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:35:11.708296",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      }
+    ],
+    "test_passed": false,
+    "is_approved": false,
+    "contract_status": "REJECTED",
+    "final_status": "terminal_failure_architect_boundary",
+    "error": null
+  },
+  "cli_t1": {
+    "preset_id": "cli_t1",
+    "duration_sec": 75.82,
+    "total_events": 55,
+    "boundaries_invoked": [
+      "architect_validator",
+      "pm_validator"
+    ],
+    "phase_validations": [
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:35:24.108943",
+        "phase": "PM",
+        "boundary": "V1",
+        "verdict": "PASS",
+        "repair_count": 0,
+        "max_repairs": 2,
+        "violations": []
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:35:44.886148",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 1,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Gagal mendekode JSON blueprint: Unterminated string starting at: line 11 column 24 (char 376)",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:36:06.090623",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:36:27.537291",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      }
+    ],
+    "test_passed": false,
+    "is_approved": false,
+    "contract_status": "REJECTED",
+    "final_status": "terminal_failure_architect_boundary",
+    "error": null
+  },
+  "flutter_t1": {
+    "preset_id": "flutter_t1",
+    "duration_sec": 71.99,
+    "total_events": 54,
+    "boundaries_invoked": [
+      "architect_validator",
+      "pm_validator"
+    ],
+    "phase_validations": [
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:36:38.364585",
+        "phase": "PM",
+        "boundary": "V1",
+        "verdict": "PASS",
+        "repair_count": 0,
+        "max_repairs": 2,
+        "violations": []
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:36:59.365692",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 1,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Gagal mendekode JSON blueprint: Unterminated string starting at: line 12 column 24 (char 531)",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:37:19.672639",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      },
+      {
+        "event": "phase_validation",
+        "timestamp": "2026-09-12T19:37:39.530332",
+        "phase": "ARCHITECT",
+        "boundary": "V2",
+        "verdict": "FAIL",
+        "contract_status": "REJECTED",
+        "contract_sha256": "",
+        "repair_count": 2,
+        "max_repairs": 2,
+        "violations": [
+          {
+            "criterion": "blueprint_json_schema",
+            "severity": "CRITICAL",
+            "message": "SCHEMA_VIOLATION: Cetak biru arsitektur tidak memuat blok JSON kanonikal ('=== BLUEPRINT JSON ===' atau skema ArchitecturalBlueprint). Representasi arsitektur kanonikal wajib berformat ArchitecturalBlueprint JSON yang valid.",
+            "location": "architecture_plan",
+            "expected": "Blueprint wajib berformat ArchitecturalBlueprint JSON yang valid dengan code_scaffold lengkap untuk setiap file",
+            "observed_symbol": null
+          }
+        ]
+      }
+    ],
+    "test_passed": false,
+    "is_approved": false,
+    "contract_status": "REJECTED",
+    "final_status": "terminal_failure_architect_boundary",
+    "error": null
+  }
+}

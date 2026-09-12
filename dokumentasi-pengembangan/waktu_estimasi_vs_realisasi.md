@@ -355,3 +355,26 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 - Total Keseluruhan (Fitur + Riset + Eksperimen): **62.42 jam (3.745,1 menit)**
 - Total Riset, Eksperimen & Forensik: **59.16 jam**
 - Status: **SELESAI & DIVERIFIKASI (D-116 Terbukti - Generalisasi Lintas Domain Python AST & Dart Structural Scanner Bekerja Konsisten)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 26: INTEGRASI OTORITATIF STATEGRAPH V1–V6 KE SERVER & REGRESI WEBSOCKET — 2026-09-12 19:25 s.d. 19:42 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Integrasi | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| Audit Diskrepansi & Registri Preset Otoritatif | — | 0.07 | 4.0 m | — | Resolusi deterministik preset_id, oracle path, dan SHA-256 |
+| Integrasi Skema SquadState & Pemetaan 13 Node V1-V6 | — | 0.05 | 3.0 m | — | Universal 2-repair budget, locked invariants, role mapping |
+| Pembuatan & Eksekusi Test Suite `test_server_app_integration.py` | — | 0.02 | 1.0 m | — | 7/7 unit/integration test PASS in 0.79s |
+| Eksekusi Live WebSocket Regression 3 Preset Misi | — | 0.08 | 4.8 m | — | fastapi_t1, cli_t1, flutter_t1 (100% Zero Downstream Leakage) |
+| Penyusunan Laporan Formal & Sinkronisasi Tata Kelola IIDD | — | 0.07 | 4.2 m | — | app_execution_path_report, validation log, decision log |
+| **Total Sesi Integrasi & Regresi Jalur Aplikasi (Sesi 26)** | **—** | **0.28** | **17.0 m** | **—** | **Kumulatif Proyek: 62.70 jam** |
+
+*Rincian Formula Sesi 26:*
+- Total Waktu Realisasi: 420s (Dev) + 345s (Test) + 255s (Doc/Forensik) = **1.020 detik (~17 menit 00 detik / 0.28 jam)**
+
+*Ringkasan Grand Total Kumulatif Proyek Terkini:*
+- Total Keseluruhan: **62.70 jam (3.762,1 menit)**
+- Status Iterasi 6: **CLOSED (SELESAI / RESMI DITUTUP)**
+- Status Menuju Iterasi 7: **READY FOR IMPLEMENTATION PLAN**
