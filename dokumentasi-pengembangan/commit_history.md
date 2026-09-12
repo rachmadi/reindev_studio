@@ -491,8 +491,8 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 
 ---
 
-### Commit: (Pending) — 2026-09-12
-- **Commit Hash:** (Akan di-generate)
+### Commit: 7a11ec5 — 2026-09-12
+- **Commit Hash:** `7a11ec5`
 - **Status:** TERVERIFIKASI PENUH (10/10 Dart diagnostic harvester tests PASS, 114/114 evidence tests PASS, Moratorium Pilot Run 5 Aktif)
 - **Tipe:** `feat(evidence)` / `docs(research)`
 - **Pesan Commit:** `feat(evidence): implement provenance-preserving deduplication, forensic investigation of flutter_t1 run 4, and discovery of hierarchy-of-authority failure`
