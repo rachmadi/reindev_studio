@@ -524,24 +524,26 @@ def _build_repair_directive_lines(
     locked_invariants = [inv for inv in pkg.preserved_invariants if getattr(inv, "status", "") != "REGRESSED"]
 
     if regressed_invariants:
-        lines.append(f"\n[5A. CRITICAL REGRESSIONS DETECTED — MUST BE RESTORED ({len(regressed_invariants)} broken)]")
+        lines.append(f"\n[5A. CRITICAL REGRESSIONS DETECTED — FORMERLY PROVEN, NOW BROKEN ({len(regressed_invariants)} broken)]")
         for inv in regressed_invariants:
             lines.append(f"- [REGRESSION] [{inv.invariant_id}] [{inv.category}] {inv.description}")
             if inv.target:
                 lines.append(f"  Target: {inv.target}")
             if inv.regression_evidence:
                 lines.append(f"  Failure Evidence: {inv.regression_evidence}")
+            lines.append(f"  Required Action: WAJIB PULIHKAN KONDISI INI! Jangan hapus atau ganti nama!")
 
-    lines.append(f"\n[5. PRESERVED INVARIANTS ({len(locked_invariants)} locked — BEHAVIORAL_MUTATION: FORBIDDEN)]")
+    lines.append(f"\n[5. PRESERVED INVARIANTS & LOCKED INVARIANTS ({len(locked_invariants)} locked — ONCE PROVEN, LOCK IT)]")
     for inv in locked_invariants:
         reg_info = f" [PROVEN AGAIN — WITH PRIOR REGRESSION (count: {inv.regression_count})]" if getattr(inv, "ever_regressed", False) else ""
         lines.append(f"- [LOCKED]{reg_info} [{inv.invariant_id}] [{inv.category}] {inv.description}")
         if inv.target:
             lines.append(f"  Behavioral Target: {inv.target}")
         ev_str = str(inv.evidence_value)
-        if len(ev_str) > 60:
-            ev_str = ev_str[:60] + "..."
+        if len(ev_str) > 80:
+            ev_str = ev_str[:80] + "..."
         lines.append(f"  Evidence: {ev_str}")
+        lines.append(f"  Status: PROVEN (Mutation: CONDITION MUST REMAIN TRUE)")
 
     # 6. Engineering Doctrine (doctrine - mandatory for developer/executor)
     if getattr(pkg, "causal_owner", "") == "DEVELOPER" or getattr(pkg, "phase", "") in ("DEVELOPER", "EXECUTOR"):

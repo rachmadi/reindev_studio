@@ -111,8 +111,10 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 === END BLUEPRINT JSON ===
 
 PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
-1. File-Centric Cohesion: Seluruh implementasi kode per berkas wajib dituliskan sebagai modul utuh di dalam string `code_scaffold`.
-2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator (misal `@app.get` atau `@field_validator`), instance `app = FastAPI()` dan import `from pydantic import field_validator` WAJIB dideklarasikan secara lokal di berkas yang bersangkutan.
+1. File-Centric Signatures & Scaffolding: Setiap berkas dituliskan sebagai kerangka interface di dalam string `code_scaffold`.
+   - BATAS SCAFFOLD WAJIB: `code_scaffold` HANYA berupa interface signatures & stubs (misal: deklarasi fungsi/metode dengan `pass`).
+   - TARGET UKURAN: <=800 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
+2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator, instance dan class dekorator WAJIB dideklarasikan atau diimpor secara lokal di berkas yang bersangkutan.
 3. Specification Authority: Pertahankan antarmuka yang telah ditentukan spesifikasi secara eksak.
 4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
 
@@ -362,36 +364,53 @@ def architect_agent(state: SquadState) -> dict:
         if is_dart else
         "ATURAN STRUKTUR PROYEK PYTHON (WAJIB):\n"
         "- Gunakan struktur modul Python sederhana dan kohesif: MAKSIMAL 1-2 file kode implementasi untuk Developer (misal: `main.py` atau `models.py` + `main.py`) dan 1 file test untuk QA Tester (`test_*.py`).\n"
-        "- Untuk REST API FastAPI: gabungkan model Pydantic, in-memory store, dan routes dalam `main.py` (atau `models.py` dan `main.py`) untuk menghindari fragmentasi folder dan kesalahan impor silang.\n"
+        "- Gabungkan data models, in-memory store/state, dan antarmuka utama dalam modul utama (contoh: `main.py` atau `models.py` + `main.py`) untuk menghindari fragmentasi folder dan kesalahan impor silang.\n"
         "- DILARANG merancang hierarki folder yang terlalu dalam (hindari app/api/, app/schemas/, app/models/). Jaga struktur tetap datar di root.\n"
     )
     
     feedback_section = ""
     latest_cep = state.get("latest_evidence_package")
+    tracer = get_tracer(state.get("run_id"))
+
     if latest_cep and latest_cep.get("causal_owner") == "ARCHITECT":
         try:
-            from ..contextual_evidence import ContextualEvidencePackage, render_repair_directive
+            from ..context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
         except (ImportError, ValueError):
             try:
-                from contextual_evidence import ContextualEvidencePackage, render_repair_directive
+                from context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
             except ImportError:
-                ContextualEvidencePackage = None
-                render_repair_directive = None
-        if ContextualEvidencePackage and render_repair_directive:
-            pkg = ContextualEvidencePackage.from_dict(latest_cep)
-            rendered = render_repair_directive(pkg)
-            feedback_section = (
-                f"\n\n[PERHATIAN: BLUEPRINT / KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG DETERMINISTIK - REVISI DIPERLUKAN]\n"
-                f"{rendered}\n\n"
-                "INSTRUKSI REVISI DETERMINISTIK WAJIB:\n"
-                "1. Analisis bukti kegagalan deterministik di atas dan patuhi batas perubahan (REPAIR BOUNDARIES).\n"
-                "2. Selesaikan seluruh REQUIRED CHANGES dan pastikan tidak ada unresolvable symbols atau duplikasi deklarasi.\n"
-                "3. Definisikan `interface_contracts` secara eksplisit agar kontrak lolos validasi Contract Gate."
-            )
-            tracer = get_tracer(state.get("run_id"))
-            if tracer and hasattr(tracer, "log_repair_attempt"):
-                rev_idx = state.get("contract_revision_count", 0)
-                tracer.log_repair_attempt(turn=rev_idx, package_id=pkg.package_id, iteration=rev_idx)
+                build_architect_decision_context = None
+                ContextTelemetry = None
+                emit_context_telemetry = None
+
+        if build_architect_decision_context:
+            pkg = None
+            try:
+                from ..contextual_evidence import ContextualEvidencePackage
+            except (ImportError, ValueError):
+                try:
+                    from contextual_evidence import ContextualEvidencePackage
+                except ImportError:
+                    ContextualEvidencePackage = None
+            if ContextualEvidencePackage:
+                pkg = ContextualEvidencePackage.from_dict(latest_cep)
+
+            decision_ctx, telem_data = build_architect_decision_context(state, pkg=pkg)
+            feedback_section = f"\n\n{decision_ctx}\n"
+
+            if tracer and ContextTelemetry and emit_context_telemetry:
+                telem = ContextTelemetry(
+                    agent="architect",
+                    model=str(state.get("model_name", "")),
+                    context_version="hardening_v1",
+                    run_id=str(state.get("run_id", "")),
+                    iteration=state.get("contract_revision_count", 0),
+                    **telem_data
+                )
+                emit_context_telemetry(tracer, "architect", telem)
+                if hasattr(tracer, "log_repair_attempt") and pkg:
+                    rev_idx = state.get("contract_revision_count", 0)
+                    tracer.log_repair_attempt(turn=rev_idx, package_id=pkg.package_id, iteration=rev_idx)
 
     if not feedback_section:
         contract_feedback = state.get("contract_feedback")
@@ -403,6 +422,19 @@ def architect_agent(state: SquadState) -> dict:
                 "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
                 "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
             )
+
+    # V0 App Requirements Grounding (Epistemic Grounding)
+    v0_section = ""
+    v0_model = state.get("v0_requirement_model")
+    if v0_model and isinstance(v0_model, dict):
+        core_reqs = v0_model.get("requirements", [])
+        if core_reqs:
+            v0_lines = [
+                f"- [{r.get('category', 'REQ')}] {r.get('description', str(r))}"
+                if isinstance(r, dict) else f"- {r}"
+                for r in core_reqs[:8]
+            ]
+            v0_section = "\nKebutuhan Aplikasi V0 (Epistemic Grounding):\n" + "\n".join(v0_lines) + "\n"
 
     # Environment Grounding untuk Architect
     try:
@@ -417,7 +449,7 @@ def architect_agent(state: SquadState) -> dict:
 {env_section}
 Deskripsi Tugas Pengguna:
 {user_task}
-
+{v0_section}
 Spesifikasi Product Manager:
 {specs}{feedback_section}
 

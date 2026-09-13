@@ -237,67 +237,43 @@ def developer_agent(state: SquadState) -> dict:
 
     if latest_cep and latest_cep.get("causal_owner") == "DEVELOPER":
         try:
-            from ..contextual_evidence import ContextualEvidencePackage, render_repair_directive
+            from ..context_hardening import build_developer_repair_context, ContextTelemetry, emit_context_telemetry
         except (ImportError, ValueError):
             try:
-                from contextual_evidence import ContextualEvidencePackage, render_repair_directive
+                from context_hardening import build_developer_repair_context, ContextTelemetry, emit_context_telemetry
             except ImportError:
-                ContextualEvidencePackage = None
-                render_repair_directive = None
-        if ContextualEvidencePackage and render_repair_directive:
-            pkg = ContextualEvidencePackage.from_dict(latest_cep)
-            rendered_directive = render_repair_directive(pkg)
+                build_developer_repair_context = None
+                ContextTelemetry = None
+                emit_context_telemetry = None
 
-            # Sediakan konteks kode yang sudah ditulis sebelumnya - prioritaskan authoritative target file
-            prev_code_blocks = []
-            code_files = state.get("code_files", {})
-            if authoritative_target_file in code_files:
-                prev_code_blocks.append(f"=== FILE: {authoritative_target_file} ===\n{code_files[authoritative_target_file]}\n=== END FILE ===")
-            else:
-                for fname, content in code_files.items():
-                    prev_code_blocks.append(f"=== FILE: {fname} ===\n{content}\n=== END FILE ===")
-                    break
-            prev_code_str = "\n".join(prev_code_blocks) if prev_code_blocks else "(Belum ada kode)"
-            qa_test_blocks = []
-            for fname, content in state.get("test_files", {}).items():
-                if len(content) > 1500:
-                    test_summary = content[:1500] + "\n// ... (sisa test suite dipotong untuk efisiensi konteks)"
-                else:
-                    test_summary = content
-                qa_test_blocks.append(f"=== TEST FILE: {fname} ===\n{test_summary}\n=== END TEST FILE ===")
-            qa_test_str = "\n".join(qa_test_blocks) if qa_test_blocks else "(Belum ada test)"
+        if build_developer_repair_context:
+            pkg = None
+            try:
+                from ..contextual_evidence import ContextualEvidencePackage
+            except (ImportError, ValueError):
+                try:
+                    from contextual_evidence import ContextualEvidencePackage
+                except ImportError:
+                    ContextualEvidencePackage = None
+            if ContextualEvidencePackage:
+                pkg = ContextualEvidencePackage.from_dict(latest_cep)
 
-            if os.environ.get("REINDEV_TREATMENT_B_R3", "0") == "1":
-                r3_directive = (
-                    "3. [CONTRACT BOUNDARY PRINCIPLE]:\n"
-                    "   Status Frozen berlaku ketat pada elemen kontrak eksternal yang disegel:\n"
-                    "   - Target File Authoritative, nama kelas/interface publik, route endpoint, HTTP verbs, dan schema kontrak yang disegel.\n"
-                    "   Detail implementasi internal yang tidak disegel secara eksplisit (seperti representasi field internal, nilai default parameter/field, adapter, atau pemetaan internal) DAPAT disesuaikan bila diperlukan oleh bukti deterministik, asalkan seluruh invarian eksternal yang disegel tetap terjaga 100%.\n"
-                    f"4. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
-                )
-            else:
-                r3_directive = (
-                    f"3. Tuliskan kembali berkas yang diperbaiki dengan Target File Authoritative: '{authoritative_target_file}'. DILARANG menggunakan nama file lain!\n"
-                )
+            repair_ctx, telem_data = build_developer_repair_context(state, pkg=pkg)
+            feedback_section = f"\n\n[PERHATIAN KRUSIAL - SIKLUS PERBAIKAN DETERMINISTIK (LOOP {iteration}/{dev_max_iter})]:\n{repair_ctx}\n"
 
-            feedback_section = f"""
-
-[PERHATIAN KRUSIAL - SIKLUS PERBAIKAN DETERMINISTIK (LOOP {iteration}/{dev_max_iter})]:
-{rendered_directive}
-
-BERKAS KODE TERAKHIR ANDA:
-{prev_code_str}
-
-BERKAS TEST RUNNER (FROZEN ORACLE CALL SITE & EXPECTATIONS):
-{qa_test_str}
-
-INSTRUKSI PERBAIKAN DETERMINISTIK:
-1. Analisis bukti deterministik dan patuhi REQUIRED CHANGES di atas secara disiplin.
-2. JANGAN langgar PRESERVED INVARIANTS dan REPAIR BOUNDARIES yang telah ditentukan.
-{r3_directive}"""
             tracer = get_tracer(state.get("run_id"))
-            if tracer and hasattr(tracer, "log_repair_attempt"):
-                tracer.log_repair_attempt(turn=iteration, package_id=pkg.package_id, iteration=iteration)
+            if tracer and ContextTelemetry and emit_context_telemetry:
+                telem = ContextTelemetry(
+                    agent="developer",
+                    model=str(state.get("model_name", "")),
+                    context_version="hardening_v1",
+                    run_id=str(state.get("run_id", "")),
+                    iteration=iteration,
+                    **telem_data
+                )
+                emit_context_telemetry(tracer, "developer", telem)
+                if hasattr(tracer, "log_repair_attempt") and pkg:
+                    tracer.log_repair_attempt(turn=iteration, package_id=pkg.package_id, iteration=iteration)
 
     is_repair_mode = (iteration > 0 or state.get("status") == "developer_preflight_rejected" or bool(state.get("developer_feedback")) or bool(latest_cep and latest_cep.get("causal_owner") == "DEVELOPER"))
 
@@ -438,35 +414,15 @@ INSTRUKSI PERBAIKAN:
             "- DILARANG menggunakan `StateProvider`, `ChangeNotifierProvider`, atau `StateNotifier` (deprecated/hilang pada Riverpod terbaru)."
         )
     else:
-        is_fastapi = any(k in user_task.lower() for k in ["fastapi", "rest", "api", "crud", "endpoint", "inventaris"])
-        is_calc = any(k in user_task.lower() for k in ["kalkulator", "calculator", "matriks", "matrix", "cli"])
-
         py_rules = [
             "ATURAN PYTHON (WAJIB):",
             "- Tulis kode Python PEP 8 modular dengan type hint murni.",
             "- DILARANG menulis file test atau file non-kode seperti README.md atau requirements.txt (fokus hanya pada file kode .py).",
             "- Pastikan seluruh class/model yang digunakan diimpor secara eksplisit.",
-            "- Simpan file implementasi dengan ekstensi .py di root direktori (contoh: === FILE: main.py ===)."
+            "- Simpan file implementasi dengan ekstensi .py di root direktori (contoh: === FILE: main.py ===).",
+            "- Seluruh antarmuka yang didefinisikan dalam Kontrak Resmi (interface_contracts dan data_models) WAJIB diimplementasikan secara utuh.",
+            "- Sesuaikan operasi mutasi internal dengan struktur data yang Anda pilih agar konsisten dengan call-site dan ekspektasi test.",
         ]
-        if is_fastapi:
-            py_rules.extend([
-                "- WAJIB tulis SELURUH implementasi FastAPI (model Pydantic, endpoint, dan in-memory store) dalam SATU FILE bernama main.py. DILARANG membuat file models.py, schemas.py, database.py, atau file Python terpisah lainnya.",
-                "- Untuk FastAPI & Pydantic v2:",
-                "  * Implementasikan endpoint CRUD lengkap: POST '/products/' (status_code=201), GET '/products/' (list all), GET '/products/{id}' (raise HTTPException(404, 'Product not found') jika tidak ada), dan DELETE '/products/{id}' (status_code=204, raise HTTPException(404) jika tidak ada).",
-                "  * Pada DELETE endpoint (/products/{id}, status_code=204):",
-                "    initial_len = len(products)",
-                "    products[:] = [p for p in products if getattr(p, 'id', None) != id]",
-                "    if len(products) == initial_len:",
-                "        raise HTTPException(status_code=404, detail='Product not found')",
-                "    return None"
-            ])
-        if is_calc or not is_fastapi:
-            py_rules.extend([
-                "- Untuk modul kalkulator / parsing matriks:",
-                "  * WAJIB menambahkan `import sys` di baris pertama file.",
-                "  * Dalam parse_matrix, validasi bahwa matriks berdimensi 2x2 atau 3x3 dan seragam (jika dimensi bukan 2x2 atau 3x3, atau baris tidak seragam, raise ValueError('Invalid dimensions')).",
-                "  * Buat signature fungsi main: `def main(args=None):` (jika args is None, gunakan sys.argv[1:]; dukung format 3 argumen `[m1, op, m2]` maupun format 4 argumen). Selalu panggil `sys.exit(0)` saat operasi selesai atau tertangani."
-            ])
         lang_rule = "\n".join(py_rules)
     
     # Environment Grounding: periksa fakta lingkungan aktual sebelum Developer mulai coding

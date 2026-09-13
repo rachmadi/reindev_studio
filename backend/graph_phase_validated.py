@@ -12,6 +12,8 @@ from .state import SquadState
 from .graph import (
     build_squad_graph,
     squad_graph,
+    v0_validator_node,
+    route_after_v0_validator,
     pm_validator_node,
     route_after_pm_validator,
     architect_validator_node,

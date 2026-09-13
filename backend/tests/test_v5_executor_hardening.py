@@ -308,3 +308,110 @@ def test_dim11_absolute_zero_leakage_on_any_failure():
     }
     assert route_after_executor_validator(fail_state) != "reviewer"
     assert route_after_executor_validator(fail_state) == END
+
+
+# ==============================================================================
+# Integration Test: Cross-Turn Data-Flow
+# Membuktikan jalur:
+#   executor_node (Turn N) → previous_diagnostic_evidence
+#   → executor_validator_node (Turn N+1) → validate_executor_phase
+#   → discover_newly_proven_invariants → locked_invariants
+# ==============================================================================
+
+def test_cross_turn_dataflow_diagnostic_evidence_to_locked_invariants():
+    """
+    Integration test: Verifikasi bahwa previous_diagnostic_evidence yang disimpan
+    v5_node di Turn N benar-benar menghasilkan locked_invariants di Turn N+1.
+
+    Ini membuktikan jalur data-flow lengkap:
+        Turn N: test_results["diagnostic_evidence"] tersedia (compiler error)
+            → v5_node menyimpan previous_diagnostic_evidence ke return dict
+        Turn N+1: previous_diagnostic_evidence tersedia di state
+            → validate_executor_phase mengirimnya ke discover_newly_proven_invariants
+            → simbol yang sebelumnya gagal kini PROVEN karena ada di AST + compiler bersih
+            → locked_invariants non-empty
+    """
+    DART_CODE_WITH_METRIC_DATA = (
+        "class MetricData { final String title; MetricData({required this.title}); }"
+    )
+
+    # ------- Turn N: Eksekusi GAGAL, MetricData belum ada / tidak dikenali --------
+    turn_n_state: SquadState = {
+        "test_results": {
+            "passed": False,
+            "exit_code": 1,
+            "passed_count": 0,
+            "failed_count": 1,
+            "total": 1,
+            "output": "Error: Method not found: 'MetricData'.\n",
+            "passed_test_names": [],
+            "diagnostic_evidence": {
+                "failing_tests": [
+                    {
+                        "message": "Method not found: 'MetricData'",
+                        "source_symbol": "MetricData",
+                        "test_name": "test_card_widget",
+                        "failure_type": "METHOD_NOT_FOUND"
+                    }
+                ]
+            }
+        },
+        "repair_attempt_counts": {"executor": 0},
+        "target_language": "dart",
+        "code_files": {"lib/card_metric.dart": "// belum ada MetricData"},
+        "logs": []
+    }
+    res_n = v5_node(turn_n_state)
+
+    # Verifikasi bahwa v5_node menyimpan evidence untuk turn berikutnya
+    assert "previous_diagnostic_evidence" in res_n, (
+        "v5_node harus menyimpan previous_diagnostic_evidence di return dict"
+    )
+    prev_diag = res_n["previous_diagnostic_evidence"]
+    failing_tests = prev_diag.get("failing_tests", [])
+    assert len(failing_tests) >= 1, (
+        "previous_diagnostic_evidence harus berisi failing_tests dari turn N"
+    )
+    assert any(ft.get("source_symbol") == "MetricData" for ft in failing_tests), (
+        "MetricData harus ada sebagai source_symbol di previous_diagnostic_evidence"
+    )
+
+    # ------- Turn N+1: Developer menambahkan MetricData, eksekusi SUKSES --------
+    # Gabungkan state Turn N dengan return Turn N (simulasi LangGraph state merge)
+    turn_n1_state: SquadState = {
+        **turn_n_state,
+        **res_n,  # previous_diagnostic_evidence ada di sini
+        "test_results": {
+            "passed": True,
+            "exit_code": 0,
+            "passed_count": 1,
+            "failed_count": 0,
+            "total": 1,
+            "output": "1 passed in 0.15s",
+            "passed_test_names": ["test_card_widget"],
+            "diagnostic_evidence": {}
+        },
+        # MetricData sekarang ADA di kode
+        "code_files": {"lib/card_metric.dart": DART_CODE_WITH_METRIC_DATA},
+        "repair_attempt_counts": {"executor": 1},
+    }
+    res_n1 = v5_node(turn_n1_state)
+
+    locked = res_n1.get("locked_invariants", {})
+
+    # MetricData HARUS terkunci karena:
+    # - Kandidat dari previous_diagnostic_evidence["failing_tests"] (Source B)
+    # - Gate 1: ada di AST kode Turn N+1 ✓
+    # - Gate 2: compiler_output Turn N+1 bersih dari "Method not found: 'MetricData'" ✓
+    assert len(locked) >= 1, (
+        f"Setelah Turn N+1 sukses, harus ada ≥1 locked invariant. "
+        f"Ditemukan: {list(locked.keys())}"
+    )
+    metric_locked = [k for k in locked if "MetricData" in k]
+    assert metric_locked, (
+        f"INV-SYM-MetricData harus terkunci. locked_invariants: {list(locked.keys())}"
+    )
+    inv = locked[metric_locked[0]]
+    assert inv.get("status") == "PROVEN", f"Status harus PROVEN, bukan {inv.get('status')}"
+    assert inv.get("state") == "LOCKED", f"State harus LOCKED, bukan {inv.get('state')}"
+

@@ -32,8 +32,16 @@ try:
         render_repair_directive,
     )
     from .context_assembler import (
-        assemble_b1_evidence, assemble_b2_evidence, assemble_b3_evidence,
-        assemble_b4_evidence, assemble_b5_evidence, assemble_b6_evidence,
+        assemble_v0_evidence, assemble_b1_evidence, assemble_b2_evidence,
+        assemble_b3_evidence, assemble_b4_evidence, assemble_b5_evidence,
+        assemble_b6_evidence,
+    )
+    from .locked_invariants import (
+        LockedInvariant, revalidate_locked_invariants, discover_newly_proven_invariants,
+    )
+    from .v0_schema import (
+        parse_v0_output, V0RequirementOutput, EpistemicStatus,
+        ConstructibilityStatus, RequirementCategory
     )
 except (ImportError, ValueError):
     from state import SquadState
@@ -57,15 +65,28 @@ except (ImportError, ValueError):
             render_repair_directive,
         )
         from context_assembler import (
-            assemble_b1_evidence, assemble_b2_evidence, assemble_b3_evidence,
-            assemble_b4_evidence, assemble_b5_evidence, assemble_b6_evidence,
+            assemble_v0_evidence, assemble_b1_evidence, assemble_b2_evidence,
+            assemble_b3_evidence, assemble_b4_evidence, assemble_b5_evidence,
+            assemble_b6_evidence,
+        )
+        from locked_invariants import (
+            LockedInvariant, revalidate_locked_invariants, discover_newly_proven_invariants,
+        )
+        from v0_schema import (
+            parse_v0_output, V0RequirementOutput, EpistemicStatus,
+            ConstructibilityStatus, RequirementCategory
         )
     except ImportError:
         ContextualEvidencePackage = None
         CEPViolationItem = None
         render_repair_directive = lambda pkg, **kw: ""
-        assemble_b1_evidence = assemble_b2_evidence = assemble_b3_evidence = None
+        assemble_v0_evidence = assemble_b1_evidence = assemble_b2_evidence = assemble_b3_evidence = None
         assemble_b4_evidence = assemble_b5_evidence = assemble_b6_evidence = None
+        LockedInvariant = None
+        revalidate_locked_invariants = lambda *a, **kw: ({}, [], [])
+        discover_newly_proven_invariants = lambda *a, **kw: []
+        parse_v0_output = V0RequirementOutput = EpistemicStatus = None
+        ConstructibilityStatus = RequirementCategory = None
 
 
 
@@ -209,42 +230,15 @@ def audit_python_module_symbol_resolvability(tree: ast.AST, fname: str = "main.p
     return unresolved
 
 
+try:
+    from .canonical_symbol_scanner import scan_code_symbols as _canonical_scan_code_symbols
+except ImportError:
+    from canonical_symbol_scanner import scan_code_symbols as _canonical_scan_code_symbols
+
+
 def scan_code_symbols(code_files: Dict[str, str], target_lang: str = "python") -> Dict[str, List[str]]:
-    """Mengekstrak simbol kelas, fungsi, dan import dari code_files secara deterministik."""
-    symbols: Dict[str, List[str]] = {
-        "classes": [],
-        "functions": [],
-        "imports": []
-    }
-    is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
-
-    for fname, content in code_files.items():
-        if not is_dart and fname.endswith(".py"):
-            try:
-                tree = ast.parse(content, filename=fname)
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.ClassDef):
-                        symbols["classes"].append(node.name)
-                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        symbols["functions"].append(node.name)
-                    elif isinstance(node, ast.Import):
-                        for alias in node.names:
-                            symbols["imports"].append(alias.name)
-                    elif isinstance(node, ast.ImportFrom):
-                        mod = node.module or ""
-                        for alias in node.names:
-                            symbols["imports"].append(f"{mod}.{alias.name}")
-            except SyntaxError:
-                pass
-        elif is_dart:
-            class_matches = re.findall(r"\bclass\s+([A-Za-z0-9_]+)", content)
-            symbols["classes"].extend(class_matches)
-            func_matches = re.findall(r"\b([A-Za-z0-9_]+)\s*\([^)]*\)\s*(?:async\s*)?\{", content)
-            symbols["functions"].extend(func_matches)
-            import_matches = re.findall(r"import\s+['\"]([^'\"]+)['\"]", content)
-            symbols["imports"].extend(import_matches)
-
-    return symbols
+    """Mengekstrak simbol kelas, fungsi, dan import dari code_files secara deterministik via canonical scanner."""
+    return _canonical_scan_code_symbols(code_files, target_lang)
 
 
 def validate_dart_syntax_structural(code: str) -> Tuple[bool, List[str]]:
@@ -304,6 +298,296 @@ def validate_dart_syntax_structural(code: str) -> Tuple[bool, List[str]]:
             errors.append(f"Unclosed delimiter '{unclosed}' opened at line {line_idx}")
 
     return (len(errors) == 0, errors)
+
+
+# ==============================================================================
+# B0: V0 Requirement Interpreter & Constructibility Gate Validator (Phase-End)
+# ==============================================================================
+
+def validate_v0_phase(state: SquadState) -> ValidatorContract:
+    """
+    B0: Validasi batas fase V0 -> PM (Phase-End).
+    Menjamin:
+    1. Schema Validity: V0 requirement model valid sesuai Pydantic v2 V0RequirementOutput.
+    2. Epistemic Provenance: Setiap butir berstatus FACT memiliki dasar/anchor langsung
+       pada teks tugas pengguna mentah (Zero Hallucinated Facts).
+    3. Basis Requirement: Setiap INTERPRETATION dan ASSUMPTION memiliki dasar logis non-kosong.
+    4. Constructibility Consistency: Status WORKABLE tidak boleh memiliki blocking_gaps,
+       status BLOCKED wajib mencantumkan blocking_gaps, dan tidak boleh WORKABLE jika task
+       mengandung kontradiksi terbuka.
+    5. ID Uniqueness: Seluruh ID butir dalam epistemic_ledger bersifat unik.
+    """
+    v0_dict = state.get("v0_requirement_model")
+    raw_task = (state.get("task") or "").strip()
+
+    evidence: List[Dict[str, Any]] = []
+    violations: List[Dict[str, Any]] = []
+    required_repairs: List[Dict[str, Any]] = []
+    criteria = [
+        "v0_model_present",
+        "schema_validation",
+        "epistemic_provenance",
+        "constructibility_consistency",
+        "ledger_id_uniqueness",
+    ]
+
+    # 1. v0_model_present
+    if not v0_dict or not isinstance(v0_dict, dict):
+        violations.append({
+            "criterion": "v0_model_present",
+            "violation_type": "MANDATORY_FIELD_MISSING",
+            "severity": "CRITICAL",
+            "message": "v0_requirement_model tidak ditemukan atau bukan dictionary di SquadState",
+            "location": "state:v0_requirement_model",
+            "expected": "v0_requirement_model dictionary terisi lengkap.",
+        })
+        evidence.append({
+            "item": "v0_model_presence",
+            "evidence_class": "DETERMINISTIC",
+            "observed": None,
+            "expected": "Dict",
+            "status": "INVALID",
+            "details": "Model V0 belum dihasilkan oleh agen V0."
+        })
+    else:
+        # 2. Schema Validation
+        parsed_model: Optional[V0RequirementOutput] = None
+        if parse_v0_output is not None:
+            try:
+                parsed_model = parse_v0_output(v0_dict)
+                evidence.append({
+                    "item": "v0_schema_conformance",
+                    "evidence_class": "DETERMINISTIC",
+                    "observed": "Valid V0RequirementOutput",
+                    "expected": "V0RequirementOutput valid",
+                    "status": "VALID",
+                    "details": f"Archetype: {parsed_model.metadata.detected_archetype.value}, Items: {len(parsed_model.epistemic_ledger)}"
+                })
+            except Exception as exc:
+                violations.append({
+                    "criterion": "schema_validation",
+                    "violation_type": "SCHEMA_INVALID",
+                    "severity": "CRITICAL",
+                    "message": f"v0_requirement_model gagal divalidasi skema Pydantic: {str(exc)[:250]}",
+                    "location": "v0_requirement_model",
+                    "expected": "Model conforming to V0RequirementOutput schema",
+                })
+                evidence.append({
+                    "item": "v0_schema_conformance",
+                    "evidence_class": "DETERMINISTIC",
+                    "observed": "Schema invalid",
+                    "expected": "V0RequirementOutput valid",
+                    "status": "INVALID",
+                    "details": str(exc)[:250]
+                })
+
+        if parsed_model is not None:
+            # 3. Epistemic Provenance Check
+            task_lower = raw_task.lower()
+            task_tokens = set(re.findall(r"\b[a-z0-9_-]+\b", task_lower))
+            common_stopwords = {
+                "dan", "yang", "untuk", "dengan", "pada", "ini", "itu", "atau",
+                "dari", "dalam", "akan", "the", "and", "for", "with", "this",
+                "that", "from", "into", "system", "sistem", "user", "pengguna",
+                "membuat", "buat", "create", "make", "build", "a", "an", "of"
+            }
+
+            for item in parsed_model.epistemic_ledger:
+                st_val = item.epistemic_status.value if hasattr(item.epistemic_status, "value") else str(item.epistemic_status)
+                basis_clean = (item.basis or "").strip()
+
+                if st_val == "FACT":
+                    if not raw_task:
+                        violations.append({
+                            "criterion": "epistemic_provenance",
+                            "violation_type": "HALLUCINATED_FACT_VIOLATION",
+                            "severity": "CRITICAL",
+                            "message": f"Item {item.id} mengklaim status FACT tetapi task pengguna kosong.",
+                            "location": f"epistemic_ledger:{item.id}",
+                            "expected": "Item tidak boleh berstatus FACT jika task kosong.",
+                        })
+                    else:
+                        # 1. Verifikasi bahwa basis memiliki jangkar tekstual pada task
+                        has_substring_anchor = basis_clean.lower() in task_lower if len(basis_clean) >= 3 else False
+                        basis_words = set(re.findall(r"\b[a-z0-9_-]{3,}\b", basis_clean.lower())) - common_stopwords
+                        has_basis_overlap = bool(basis_words & task_tokens) if basis_words else False
+
+                        if not has_substring_anchor and not has_basis_overlap:
+                            violations.append({
+                                "criterion": "epistemic_provenance",
+                                "violation_type": "HALLUCINATED_FACT_VIOLATION",
+                                "severity": "CRITICAL",
+                                "message": f"Item {item.id} mengklaim FACT tetapi basis tidak memiliki jangkar pada tugas pengguna: '{basis_clean}'",
+                                "location": f"epistemic_ledger:{item.id}",
+                                "expected": "Setiap FACT wajib mengutip basis langsung dari teks tugas pengguna.",
+                            })
+
+                        # 2. Verifikasi bahwa statement tidak menyelundupkan konsep/field domain yang tidak ada di task
+                        generic_vocab = {
+                            "dan", "yang", "untuk", "dengan", "pada", "ini", "itu", "atau", "dari", "dalam",
+                            "akan", "sistem", "user", "pengguna", "membuat", "buat", "aplikasi", "modul",
+                            "fitur", "fungsi", "layanan", "data", "entitas", "model", "kolom", "field",
+                            "tabel", "tipe", "memiliki", "bertipe", "berisi", "menggunakan", "dapat",
+                            "harus", "wajib", "adalah", "sebagai", "secara", "kebutuhan", "spesifikasi",
+                            "mengembalikan", "return", "status", "kode", "code", "menerima", "endpoint",
+                            "meminta", "permintaan", "instruksi", "perintah", "tugas", "deskripsi",
+                            "the", "and", "for", "with", "this", "that", "from", "into", "system", "user",
+                            "create", "make", "build", "application", "module", "feature", "function", "service",
+                            "data", "entity", "model", "column", "field", "table", "type", "has", "contains",
+                            "using", "must", "should", "is", "as", "by", "requirement", "specification",
+                            "request", "requested", "stated", "requires", "target", "language", "platform"
+                        }
+                        stmt_content = set(re.findall(r"\b[a-z0-9_-]{3,}\b", item.statement.lower())) - generic_vocab
+                        ungrounded_stmt_tokens = stmt_content - task_tokens
+
+                        # Deteksi spesifik klaim field/kolom
+                        field_matches = re.findall(r"\b(?:kolom|field|atribut|attribute|parameter)\s+([a-z0-9_-]+)", item.statement.lower())
+                        for f_name in field_matches:
+                            if f_name not in task_tokens:
+                                violations.append({
+                                    "criterion": "epistemic_provenance",
+                                    "violation_type": "HALLUCINATED_FACT_VIOLATION",
+                                    "severity": "CRITICAL",
+                                    "message": f"Item {item.id} mengklaim field/kolom '{f_name}' sebagai FACT, namun tidak disebutkan oleh pengguna.",
+                                    "location": f"epistemic_ledger:{item.id}",
+                                    "expected": "Field yang tidak disebutkan pengguna tidak boleh diklaim sebagai FACT.",
+                                })
+
+                        if ungrounded_stmt_tokens and not violations:
+                            # Jika ada token konten spesifik di luar vocab generik dan tidak ada di task
+                            cat_val = item.category.value if hasattr(item.category, "value") else str(item.category)
+                            if cat_val in ("DATA", "FUNCTIONAL"):
+                                violations.append({
+                                    "criterion": "epistemic_provenance",
+                                    "violation_type": "HALLUCINATED_FACT_VIOLATION",
+                                    "severity": "CRITICAL",
+                                    "message": f"Item {item.id} mengklaim FACT dengan konsep yang tidak ada di task pengguna: {ungrounded_stmt_tokens}",
+                                    "location": f"epistemic_ledger:{item.id}",
+                                    "expected": "Setiap butir FACT tidak boleh memuat konsep spesifik di luar teks tugas pengguna.",
+                                })
+
+                elif st_val in ("INTERPRETATION", "ASSUMPTION"):
+                    if len(basis_clean) < 5:
+                        violations.append({
+                            "criterion": "epistemic_provenance",
+                            "violation_type": "EMPTY_OR_INSUFFICIENT_BASIS",
+                            "severity": "CRITICAL",
+                            "message": f"Item {item.id} berstatus {st_val} tetapi memiliki basis yang tidak memadai (< 5 karakter): '{item.basis}'",
+                            "location": f"epistemic_ledger:{item.id}",
+                            "expected": "Setiap INTERPRETATION dan ASSUMPTION wajib menyertakan basis penjelasan logis.",
+                        })
+
+            # 4. Constructibility Consistency
+            c_status = parsed_model.constructibility.status.value if hasattr(parsed_model.constructibility.status, "value") else str(parsed_model.constructibility.status)
+            gaps = parsed_model.constructibility.blocking_gaps
+
+            if c_status == "WORKABLE":
+                if len(gaps) > 0:
+                    violations.append({
+                        "criterion": "constructibility_consistency",
+                        "violation_type": "CONSTRUCTIBILITY_INCONSISTENCY",
+                        "severity": "CRITICAL",
+                        "message": f"Status konstruktibilitas WORKABLE tidak boleh memiliki blocking_gaps (ditemukan {len(gaps)} gaps).",
+                        "location": "constructibility:blocking_gaps",
+                        "expected": "blocking_gaps harus kosong untuk status WORKABLE.",
+                    })
+                # Deteksi paradoks kontradiksi dalam task
+                if "read-only" in task_lower and any(w in task_lower for w in ["crud", "delete", "post", "create", "update", "write"]):
+                    violations.append({
+                        "criterion": "constructibility_consistency",
+                        "violation_type": "UNRESOLVED_CONTRADICTION",
+                        "severity": "CRITICAL",
+                        "message": "Task pengguna memuat kontradiksi langsung (read-only vs modifikasi/CRUD); status konstruktibilitas tidak boleh WORKABLE.",
+                        "location": "constructibility:status",
+                        "expected": "Status harus BLOCKED atau PARTIALLY_WORKABLE untuk requirement kontradiktif.",
+                    })
+
+            elif c_status == "BLOCKED":
+                if len(gaps) == 0:
+                    violations.append({
+                        "criterion": "constructibility_consistency",
+                        "violation_type": "CONSTRUCTIBILITY_INCONSISTENCY",
+                        "severity": "CRITICAL",
+                        "message": "Status konstruktibilitas BLOCKED wajib mencantumkan minimal satu blocking_gap.",
+                        "location": "constructibility:blocking_gaps",
+                        "expected": "blocking_gaps tidak boleh kosong untuk status BLOCKED.",
+                    })
+
+            # 5. Ledger ID Uniqueness
+            ledger_ids = [it.id for it in parsed_model.epistemic_ledger]
+            duplicates = [lid for lid in set(ledger_ids) if ledger_ids.count(lid) > 1]
+            if duplicates:
+                violations.append({
+                    "criterion": "ledger_id_uniqueness",
+                    "violation_type": "DUPLICATE_ID",
+                    "severity": "CRITICAL",
+                    "message": f"Ditemukan ID duplikat pada epistemic_ledger: {duplicates}",
+                    "location": "epistemic_ledger:ids",
+                    "expected": "Seluruh ID dalam epistemic_ledger harus unik.",
+                })
+
+    verdict = "FAIL" if any(v["severity"] == "CRITICAL" for v in violations) else "PASS"
+
+    if verdict == "FAIL":
+        for v in violations:
+            v_type = v.get("violation_type", "")
+            if v_type == "HALLUCINATED_FACT_VIOLATION":
+                required_repairs.append({
+                    "target_phase": "V0",
+                    "action": "RECLASSIFY_OR_REMOVE_FACT",
+                    "details": f"Ubah status item ke INTERPRETATION/ASSUMPTION atau hapus klaim fakta palsu: {v['message']}"
+                })
+            elif v_type == "SCHEMA_INVALID":
+                required_repairs.append({
+                    "target_phase": "V0",
+                    "action": "FIX_CANONICAL_SCHEMA",
+                    "details": f"Perbaiki struktur JSON V0 agar valid per V0RequirementOutput: {v['message']}"
+                })
+            elif v_type in ("CONSTRUCTIBILITY_INCONSISTENCY", "UNRESOLVED_CONTRADICTION"):
+                required_repairs.append({
+                    "target_phase": "V0",
+                    "action": "ALIGN_CONSTRUCTIBILITY",
+                    "details": f"Selaraskan status konstruktibilitas dengan blocking_gaps dan sifat task: {v['message']}"
+                })
+            elif v_type == "EMPTY_OR_INSUFFICIENT_BASIS":
+                required_repairs.append({
+                    "target_phase": "V0",
+                    "action": "SUPPLY_LOGICAL_BASIS",
+                    "details": f"Sediakan basis logis memadai (min 5 char) untuk interpretasi/asumsi: {v['message']}"
+                })
+            elif v_type == "DUPLICATE_ID":
+                required_repairs.append({
+                    "target_phase": "V0",
+                    "action": "DEDUPLICATE_LEDGER_IDS",
+                    "details": f"Pastikan setiap butir memiliki ID unik: {v['message']}"
+                })
+
+    # Assemble CEP on FAIL
+    cep_dict: Optional[Dict[str, Any]] = None
+    if verdict == "FAIL" and assemble_v0_evidence is not None:
+        cep_violations = _make_cep_violations(violations)
+        run_id = state.get("run_id", "")
+        counts = state.get("repair_attempt_counts") or {}
+        iteration = counts.get("v0", 0) if isinstance(counts, dict) else 0
+        cep = assemble_v0_evidence(state, cep_violations, evidence, run_id=run_id, iteration=iteration)
+        cep_dict = cep.to_dict()
+
+    return {
+        "phase": "V0",
+        "validator_type": "PHASE_END",
+        "verdict": verdict,
+        "criteria_checked": criteria,
+        "evidence": evidence,
+        "violations": violations,
+        "regressions": [],
+        "required_repairs": required_repairs,
+        "repair_owner": "V0" if verdict == "FAIL" else "NONE",
+        "remaining_budget": 0,
+        "evaluated_review_verdict": None,
+        "confidence": 1.0,
+        "source_of_truth": "V0_CANONICAL_SCHEMA",
+        "contextual_evidence_package": cep_dict,
+    }
 
 
 # ==============================================================================
@@ -1274,23 +1558,104 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
                     "message": f"Regresi terdeteksi: tes '{prev_t}' sebelumnya lulus tetapi kini gagal"
                 })
 
+    # 4. Locked Invariant Evaluation & Explicit State Preservation (ONCE PROVEN, LOCK IT)
+    existing_locked = dict(state.get("locked_invariants") or {})
+    code_files = state.get("code_files") or {}
+    target_lang = (state.get("target_language") or "python").lower()
+    auth_file = "lib/card_metric.dart" if ("dart" in target_lang or "flutter" in target_lang) else "main.py"
+    if isinstance(state.get("contract"), dict):
+        tf = state.get("contract", {}).get("task_intent", {}).get("authoritative_target_file")
+        if tf:
+            auth_file = tf
+
+    updated_locked_invariants, newly_regressed_invariants, maintained_locked = revalidate_locked_invariants(
+        locked_invariants=existing_locked,
+        code_files=code_files,
+        test_results=test_results,
+        target_lang=target_lang,
+        turn=iteration
+    )
+
+    for reg_inv in newly_regressed_invariants:
+        reg_msg = f"CRITICAL REGRESSION: Invariant '{reg_inv.invariant_id}' ({reg_inv.description}) was PROVEN but is now BROKEN by recent repair"
+        regressions.append({
+            "test_or_invariant": reg_inv.target_symbol,
+            "invariant_id": reg_inv.invariant_id,
+            "previous_status": "PROVEN",
+            "current_status": "FAIL",
+            "message": reg_msg,
+            "failure_evidence": reg_inv.regression_history[-1].get("failure_evidence") if reg_inv.regression_history else ""
+        })
+        violations.append({
+            "criterion": "zero_regression_invariant",
+            "severity": "CRITICAL",
+            "message": reg_msg,
+            "location": f"{reg_inv.target_file}:{reg_inv.target_symbol}",
+            "expected": reg_inv.condition,
+            "observed_symbol": reg_inv.target_symbol,
+        })
+
+    # Discover newly proven conditions from deterministic evidence
+    prev_contract = state.get("executor_iteration_validator_contract") or {}
+    prev_violations = prev_contract.get("violations", []) if isinstance(prev_contract, dict) else []
+    compiler_err_str = output_text
+
+    # Evidence sources tambahan — digunakan sebagai kandidat saja, bukan bukti PROVEN
+    # diagnostic_evidence: galat turn SAAT INI (untuk param detection)
+    curr_diag_ev = test_results.get("diagnostic_evidence") or {}
+    # previous_diagnostic_evidence: galat turn SEBELUMNYA (tersimpan dari executor_validator_node)
+    prev_diag_ev = state.get("previous_diagnostic_evidence") or {}
+    # previous_executor_stderr: stderr mentah turn SEBELUMNYA
+    prev_exec_stderr = state.get("previous_executor_stderr") or ""
+
+    newly_proven = discover_newly_proven_invariants(
+        code_files=code_files,
+        test_results=test_results,
+        compiler_output=compiler_err_str,
+        target_lang=target_lang,
+        authoritative_file=auth_file,
+        previous_violations=prev_violations,
+        current_violations=violations,
+        turn=iteration,
+        diagnostic_evidence=curr_diag_ev,
+        previous_diagnostic_evidence=prev_diag_ev,
+        previous_stderr=prev_exec_stderr,
+    )
+
+    for np in newly_proven:
+        if np.invariant_id not in updated_locked_invariants or updated_locked_invariants[np.invariant_id].status != "REGRESSION":
+            updated_locked_invariants[np.invariant_id] = np
+
+    # Telemetry: Oscillation History
+    oscillation_history = list(state.get("oscillation_history") or [])
+    for inv in updated_locked_invariants.values():
+        if getattr(inv, "oscillation_detected", False):
+            oscillation_history.append({
+                "invariant_id": inv.invariant_id,
+                "target_symbol": inv.target_symbol,
+                "turn": iteration,
+                "regression_count": inv.regression_count,
+                "status": inv.status
+            })
+
     if regressions:
         evidence.append({
             "item": "regression_detection",
             "evidence_class": "DETERMINISTIC",
-            "observed": f"{len(regressions)} regressed tests",
+            "observed": f"{len(regressions)} regressed tests/invariants",
             "expected": "0 regressions",
             "status": "INVALID"
         })
         for reg in regressions:
-            violations.append({
-                "criterion": "zero_regression_invariant",
-                "severity": "CRITICAL",
-                "message": reg["message"],
-                "location": reg["test_or_invariant"],
-                "expected": f"Pengujian '{reg['test_or_invariant']}' tetap berstatus PASS",
-                "observed_symbol": reg["test_or_invariant"],
-            })
+            if not any(v.get("message") == reg["message"] for v in violations):
+                violations.append({
+                    "criterion": "zero_regression_invariant",
+                    "severity": "CRITICAL",
+                    "message": reg["message"],
+                    "location": reg["test_or_invariant"],
+                    "expected": f"Invarian/Pengujian '{reg['test_or_invariant']}' tetap berstatus PROVEN/PASS",
+                    "observed_symbol": reg["test_or_invariant"],
+                })
     else:
         evidence.append({
             "item": "regression_detection",
@@ -1306,8 +1671,14 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         required_repairs.append({
             "target_phase": "DEVELOPER",
             "action": "SELF_HEALING_REPAIR",
-            "details": f"Perbaiki {failed_count} kegagalan uji sandbox dengan mempertahankan fungsionalitas yang telah lulus."
+            "details": f"Perbaiki {failed_count} kegagalan uji sandbox dengan mempertahankan seluruh kondisi invariant yang telah terkunci."
         })
+
+    # Injeksi state locked invariants terupdate ke dalam state sebelum assemble_b5_evidence
+    locked_dict_for_state = {k: inv.to_dict() for k, inv in updated_locked_invariants.items()}
+    augmented_state = dict(state)
+    augmented_state["locked_invariants"] = locked_dict_for_state
+    augmented_state["oscillation_history"] = oscillation_history
 
     # Iterasi 7: Assemble ContextualEvidencePackage on FAIL
     cep_dict_b5: Optional[Dict[str, Any]] = None
@@ -1315,7 +1686,7 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         cep_violations = _make_cep_violations(violations)
         run_id = state.get("run_id", "")
         iteration_num = state.get("iteration_count", 0)
-        cep = assemble_b5_evidence(state, cep_violations, regressions, evidence, run_id=run_id, iteration=iteration_num)
+        cep = assemble_b5_evidence(augmented_state, cep_violations, regressions, evidence, run_id=run_id, iteration=iteration_num)
         cep_dict_b5 = cep.to_dict()
 
     return {
@@ -1334,6 +1705,8 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
         "source_of_truth": f"SANDBOX_RUNNER:exit_code_{exit_code}",
         "contextual_evidence_package": cep_dict_b5,
         "current_passed_tests": current_passed_tests,
+        "locked_invariants": locked_dict_for_state,
+        "oscillation_history": oscillation_history,
     }
 
 
@@ -1433,7 +1806,172 @@ def classify_contract_mutation_demand(notes: str) -> Dict[str, Any]:
     return {"classification": "NONE", "matched_pattern": None, "matched_text": None, "is_mutation_demand": False}
 
 
-def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes: str = "") -> ValidatorContract:
+def classify_reviewer_output(raw_output) -> Dict[str, Any]:
+    """
+    V6 Output & Evidence Validity Gate: Klasifikasi deterministik output LLM Reviewer.
+
+    Prinsip desain: Evidence presence, not text length, determines validity.
+
+    Kelas output:
+      EMPTY          — raw is None, "", atau whitespace-only. Tidak ada konten apapun.
+      MALFORMED      — Ada konten tetapi tidak mengandung verdict tag [APPROVED] atau [NEEDS_REVISION].
+                       Output tidak dapat diinterpretasi sebagai keputusan Reviewer yang valid.
+      NON_ACTIONABLE — Ada [NEEDS_REVISION] tag (format valid), tetapi tidak ada structural evidence
+                       markers — tidak ada finding yang traceable ke sumber aktual pipeline.
+                       Text panjang tanpa evidence markers tetap NON_ACTIONABLE.
+      VALID          — Ada verdict tag DAN evidence requirement terpenuhi sesuai tipe verdict.
+
+    Terminal status yang dikembalikan:
+      EMPTY / MALFORMED      → terminal_status = "V6_OUTPUT_INVALID"
+      NON_ACTIONABLE         → terminal_status = "V6_EVIDENCE_INVALID"
+      VALID                  → terminal_status = None (pipeline berlanjut normal)
+
+    Structural evidence markers (untuk NEEDS_REVISION → VALID):
+      Setidaknya SATU dari berikut harus ditemukan:
+      - file_reference:      ekstensi file kode (.py, .dart, .go, .ts, .js, .java, .kt, .rs, .tsx, .jsx)
+      - line_reference:      referensi baris ("baris", "line", "line N", ":N")
+      - code_reference:      referensi simbol kode ("def ", "class ", "method ", "fungsi ", "function ", "() ")
+      - test_reference:      referensi test/assertion ("test_", "_test.", "assert", "TestCase", "flutter test")
+      - error_quote:         kutipan pesan error ("error:", "Error:", "galat:", "kegagalan:", "exception:", "Exception:")
+      - itemized_finding:    list berurutan ≥2 item (bullet "-" atau "*" atau nomor "1.") masing-masing ≥10 chars
+
+    Return dict:
+      classification:              "EMPTY" | "MALFORMED" | "NON_ACTIONABLE" | "VALID"
+      terminal_status:             "V6_OUTPUT_INVALID" | "V6_EVIDENCE_INVALID" | None
+      is_valid:                    bool
+      reason:                      str (penjelasan keputusan klasifikasi)
+      raw_output_length:           int
+      has_approved_tag:            bool
+      has_needs_revision_tag:      bool
+      evidence_markers_found:      List[str] (nama marker yang match, kosong jika tidak ada)
+      evidence_markers_count:      int
+    """
+    import re as _re
+
+    raw_len = len(raw_output) if raw_output is not None else 0
+    content = raw_output if raw_output is not None else ""
+    content_stripped = content.strip()
+
+    has_approved = "[APPROVED]" in content or "APPROVED" in content
+    has_needs_revision = "[NEEDS_REVISION]" in content or "NEEDS_REVISION" in content
+
+    # ── EMPTY ───────────────────────────────────────────────────────────────
+    if not content_stripped:
+        return {
+            "classification": "EMPTY",
+            "terminal_status": "V6_OUTPUT_INVALID",
+            "is_valid": False,
+            "reason": "Output Reviewer kosong (None/empty/whitespace-only). Tidak ada konten yang dapat diklasifikasikan.",
+            "raw_output_length": raw_len,
+            "has_approved_tag": False,
+            "has_needs_revision_tag": False,
+            "evidence_markers_found": [],
+            "evidence_markers_count": 0,
+        }
+
+    # ── MALFORMED ────────────────────────────────────────────────────────────
+    if not has_approved and not has_needs_revision:
+        return {
+            "classification": "MALFORMED",
+            "terminal_status": "V6_OUTPUT_INVALID",
+            "is_valid": False,
+            "reason": (
+                "Output Reviewer tidak mengandung verdict tag [APPROVED] atau [NEEDS_REVISION]. "
+                "Output tidak dapat diinterpretasi sebagai keputusan Reviewer yang valid."
+            ),
+            "raw_output_length": raw_len,
+            "has_approved_tag": False,
+            "has_needs_revision_tag": False,
+            "evidence_markers_found": [],
+            "evidence_markers_count": 0,
+        }
+
+    # ── APPROVED: tidak perlu evidence markers negatif ────────────────────────
+    # Reviewer menyatakan artefak sudah benar → hanya butuh tag, tanpa [NEEDS_REVISION]
+    if has_approved and not has_needs_revision:
+        return {
+            "classification": "VALID",
+            "terminal_status": None,
+            "is_valid": True,
+            "reason": "Output Reviewer valid: mengandung [APPROVED] tag tanpa kontradiksi [NEEDS_REVISION].",
+            "raw_output_length": raw_len,
+            "has_approved_tag": True,
+            "has_needs_revision_tag": False,
+            "evidence_markers_found": ["approved_tag"],
+            "evidence_markers_count": 1,
+        }
+
+    # ── NEEDS_REVISION: wajib ada structural evidence markers ────────────────
+    # (mencakup has_needs_revision=True, termasuk kasus conflict approved+needs_revision)
+    evidence_markers_found: List[str] = []
+
+    # Marker 1: file_reference — ekstensi file kode
+    if _re.search(r"\b\w[\w.-]*\.(py|dart|go|ts|js|java|kt|rs|tsx|jsx|cpp|c|h)\b", content):
+        evidence_markers_found.append("file_reference")
+
+    # Marker 2: line_reference — referensi baris/line
+    if _re.search(r"(?i)\b(baris|line)\s*\d+|\b\w+\.(?:py|dart|go|ts|js|java|kt|rs|tsx|jsx):\d+", content):
+        evidence_markers_found.append("line_reference")
+
+    # Marker 3: code_reference — simbol kode eksplisit
+    if _re.search(r"\b(def |class |method |fungsi |function |\w+\(\))", content):
+        evidence_markers_found.append("code_reference")
+
+    # Marker 4: test_reference — referensi pengujian/assertion
+    if _re.search(r"(test_\w+|_test\.|assert\w*|TestCase|\bflutter test\b)", content):
+        evidence_markers_found.append("test_reference")
+
+    # Marker 5: error_quote — kutipan pesan error aktual
+    if _re.search(r"(?i)(error:|galat:|kegagalan:|exception:|traceback|stderr|exit code)", content):
+        evidence_markers_found.append("error_quote")
+
+    # Marker 6: itemized_finding — daftar berurutan ≥2 item substantif
+    bullet_items = _re.findall(r"(?m)^[ \t]*[-*]\s+(.{10,})", content)
+    numbered_items = _re.findall(r"(?m)^[ \t]*\d+[.)]\s+(.{10,})", content)
+    if len(bullet_items) >= 2 or len(numbered_items) >= 2:
+        evidence_markers_found.append("itemized_finding")
+
+    if evidence_markers_found:
+        return {
+            "classification": "VALID",
+            "terminal_status": None,
+            "is_valid": True,
+            "reason": (
+                f"Output Reviewer valid: mengandung [NEEDS_REVISION] dengan structural evidence markers: "
+                f"{evidence_markers_found}."
+            ),
+            "raw_output_length": raw_len,
+            "has_approved_tag": has_approved,
+            "has_needs_revision_tag": True,
+            "evidence_markers_found": evidence_markers_found,
+            "evidence_markers_count": len(evidence_markers_found),
+        }
+
+    # NEEDS_REVISION tanpa satu pun evidence marker → NON_ACTIONABLE
+    return {
+        "classification": "NON_ACTIONABLE",
+        "terminal_status": "V6_EVIDENCE_INVALID",
+        "is_valid": False,
+        "reason": (
+            "Output Reviewer mengandung [NEEDS_REVISION] tetapi tidak memiliki structural evidence markers. "
+            "Tidak ada finding yang traceable ke sumber aktual pipeline (file, baris, simbol kode, error, atau daftar temuan). "
+            "Teks panjang tanpa evidence markers tidak dianggap actionable."
+        ),
+        "raw_output_length": raw_len,
+        "has_approved_tag": has_approved,
+        "has_needs_revision_tag": True,
+        "evidence_markers_found": [],
+        "evidence_markers_count": 0,
+    }
+
+
+def validate_reviewer_phase(
+    state: SquadState,
+    review_verdict: str,
+    review_notes: str = "",
+    reviewer_output_classification: Optional[str] = None,
+    reviewer_terminal_status: Optional[str] = None,
+) -> ValidatorContract:
     """
     B6: Validasi batas fase Reviewer -> END / Developer (Phase-End).
     Invarian:
@@ -1442,6 +1980,9 @@ def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes
     3. NEEDS_REVISION hanya valid jika ada kegagalan teknis kode yang terbukti DAN sisa budget Developer > 0.
        Kontrak FROZEN adalah mutlak immutable (DILARANG unfreeze contract).
     4. FAIL valid jika budget habis atau kondisi terminal terpenuhi.
+    5. [V6 Hardening] reviewer_output_classification INVALID (EMPTY/MALFORMED/NON_ACTIONABLE) →
+       validator_verdict = FAIL, criterion reviewer_output_validity, repair_owner = NONE.
+       Tidak ada Developer routing dari output Reviewer yang tidak valid.
     """
     test_results = state.get("test_results") or {}
     is_test_passed = bool(test_results.get("passed", False))
@@ -1454,11 +1995,63 @@ def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes
     violations: List[Dict[str, Any]] = []
     required_repairs: List[Dict[str, Any]] = []
     criteria = [
+        "reviewer_output_validity",
         "review_approval_integrity",
         "frozen_contract_immutability",
         "deterministic_evidence_alignment",
         "authorized_budget_availability"
     ]
+
+    # ── V6 REVIEWER OUTPUT VALIDITY GATE ─────────────────────────────────────
+    # Periksa reviewer_output_classification SEBELUM semantic verdict diproses.
+    # EMPTY/MALFORMED/NON_ACTIONABLE → FAIL langsung, tidak ada Developer routing.
+    INVALID_CLASSIFICATIONS = ("EMPTY", "MALFORMED", "NON_ACTIONABLE")
+    if reviewer_output_classification in INVALID_CLASSIFICATIONS:
+        artifact_state = "GREEN" if is_test_passed else "RED"
+        terminal_status = reviewer_terminal_status or "V6_OUTPUT_INVALID"
+        evidence.append({
+            "item": "reviewer_output_validity_check",
+            "evidence_class": "DETERMINISTIC",
+            "observed": {
+                "classification": reviewer_output_classification,
+                "terminal_status": terminal_status,
+                "artifact_state": artifact_state,
+            },
+            "expected": "VALID reviewer output with evidence markers",
+            "status": "INVALID",
+        })
+        violations.append({
+            "criterion": "reviewer_output_validity",
+            "severity": "CRITICAL",
+            "message": (
+                f"Reviewer output tidak valid: {reviewer_output_classification}. "
+                f"Terminal status: {terminal_status}. "
+                f"Artifact state: {artifact_state}. "
+                f"Output Reviewer yang EMPTY/MALFORMED/NON_ACTIONABLE tidak dapat dikonversi menjadi "
+                f"NEEDS_REVISION dan tidak boleh memicu Developer repair."
+            ),
+            "location": "raw_review_notes",
+            "classification": reviewer_output_classification,
+            "terminal_status": terminal_status,
+            "artifact_state": artifact_state,
+        })
+        clean_verdict = review_verdict.strip().upper() if review_verdict else "REVIEWER_OUTPUT_INVALID"
+        return {
+            "phase": "REVIEWER",
+            "validator_type": "PHASE_END",
+            "verdict": "FAIL",
+            "criteria_checked": criteria,
+            "evidence": evidence,
+            "violations": violations,
+            "regressions": [],
+            "required_repairs": [],
+            "repair_owner": "NONE",
+            "remaining_budget": remaining_dev_budget,
+            "evaluated_review_verdict": "REVIEWER_OUTPUT_INVALID",
+            "confidence": 1.0,
+            "source_of_truth": "V6_REVIEWER_OUTPUT_VALIDITY_GATE",
+            "contextual_evidence_package": None,
+        }
 
     clean_verdict = review_verdict.strip().upper() if review_verdict else "FAIL"
     evidence.append({

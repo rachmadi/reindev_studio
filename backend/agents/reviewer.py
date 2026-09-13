@@ -8,6 +8,7 @@ try:
     from ..config import get_llm
     from ..tracer import get_tracer, compute_dict_hashes
     from ..contract import verify_contract_checkpoint
+    from ..phase_validators import scan_code_symbols, classify_reviewer_output
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -17,6 +18,11 @@ except (ImportError, ValueError):
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
     from contract import verify_contract_checkpoint
+    try:
+        from phase_validators import scan_code_symbols, classify_reviewer_output
+    except ImportError:
+        scan_code_symbols = None
+        classify_reviewer_output = None
 
 REVIEWER_SYSTEM_PROMPT = """Anda adalah Principal Code Reviewer & Tech Lead dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah melakukan audit menyeluruh terhadap kode program yang telah ditulis oleh Developer dan diuji oleh QA Tester.
@@ -38,29 +44,20 @@ Aspek yang WAJIB Anda audit:
 Gunakan Bahasa Indonesia yang profesional, analitis, dan objektif.
 """
 
+try:
+    from ..canonical_symbol_scanner import scan_code_symbols as _canonical_scan_code_symbols
+except ImportError:
+    from canonical_symbol_scanner import scan_code_symbols as _canonical_scan_code_symbols
+
+
 def scan_ast_symbols(code_files: dict, target_lang: str) -> Dict[str, List[str]]:
-    """Memindai simbol kelas dan fungsi dari code_files."""
-    symbols: Dict[str, List[str]] = {"classes": [], "functions": []}
-    is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
-    
-    for fname, content in code_files.items():
-        if not is_dart and fname.endswith(".py"):
-            try:
-                tree = ast.parse(content, filename=fname)
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.ClassDef):
-                        symbols["classes"].append(node.name)
-                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        symbols["functions"].append(node.name)
-            except SyntaxError:
-                pass
-        elif is_dart:
-            class_matches = re.findall(r"\bclass\s+([A-Za-z0-9_]+)", content)
-            symbols["classes"].extend(class_matches)
-            func_matches = re.findall(r"\b([A-Za-z0-9_]+)\s*\([^)]*\)\s*(?:async\s*)?\{", content)
-            symbols["functions"].extend(func_matches)
-            
-    return symbols
+    """Memindai simbol kelas dan fungsi dari code_files via canonical scanner."""
+    raw_syms = _canonical_scan_code_symbols(code_files, target_lang)
+    return {
+        "classes": raw_syms.get("classes", []),
+        "functions": raw_syms.get("functions", [])
+    }
+
 
 def evaluate_deterministic_evidence_gate(state: SquadState) -> Tuple[bool, Dict[str, Any]]:
     """
@@ -311,22 +308,49 @@ Hasil Pengujian Sandbox QA:
     
     response = llm.invoke(messages)
     raw_review_notes = response.content if hasattr(response, "content") else str(response)
-    
-    # Enforce Deterministic Verdict Override
-    if not is_gate_passed:
+
+    # ── V6 OUTPUT VALIDITY GATE ───────────────────────────────────────────────
+    # Klasifikasi output SEBELUM menentukan verdict. Ini mencegah fallback
+    # EMPTY → needs_revision yang menjadi akar masalah Flutter oscillation.
+    _classify_fn = classify_reviewer_output if classify_reviewer_output is not None else lambda x: {
+        "classification": "VALID", "terminal_status": None, "is_valid": True,
+        "reason": "classify_reviewer_output unavailable (fallback)", "raw_output_length": len(x or ""),
+        "has_approved_tag": bool(x and "[APPROVED]" in x), "has_needs_revision_tag": bool(x and "[NEEDS_REVISION]" in x),
+        "evidence_markers_found": [], "evidence_markers_count": 0,
+    }
+    output_classification = _classify_fn(raw_review_notes)
+    classification = output_classification["classification"]
+    terminal_status = output_classification["terminal_status"]
+
+    # ── ENFORCE DETERMINISTIC VERDICT OVERRIDE ───────────────────────────────
+    if not output_classification["is_valid"]:
+        # Output INVALID (EMPTY / MALFORMED / NON_ACTIONABLE)
+        # DILARANG mengkonversi ke needs_revision. Gunakan terminal_status eksplisit.
+        is_approved = False
+        review_status = terminal_status  # "V6_OUTPUT_INVALID" atau "V6_EVIDENCE_INVALID"
+        # Tidak ada string-replace pada raw_review_notes — output tetap apa adanya untuk forensic
+    elif not is_gate_passed:
+        # Gate Layer 1 gagal, LLM hanya mengkonfirmasi: force NEEDS_REVISION
         is_approved = False
         review_status = "needs_revision"
         if "[APPROVED]" in raw_review_notes:
             raw_review_notes = raw_review_notes.replace("[APPROVED]", "[NEEDS_REVISION]")
     else:
-        is_approved = ("[APPROVED]" in raw_review_notes or "APPROVED" in raw_review_notes) and "[NEEDS_REVISION]" not in raw_review_notes
+        # Output VALID dan gate lulus → percayai verdict LLM
+        is_approved = (
+            ("[APPROVED]" in raw_review_notes or "APPROVED" in raw_review_notes)
+            and "[NEEDS_REVISION]" not in raw_review_notes
+        )
         review_status = "completed" if is_approved else "needs_revision"
-        
+
     final_review_notes = f"{l1_report}\n=== BOUNDED LLM REVIEW (LAYER 2) ===\n{raw_review_notes}"
-    
-    new_log = f"[Code Reviewer]: Audit kode selesai dilaksanakan ({len(final_review_notes)} karakter, status: {review_status.upper()})."
+
+    new_log = (
+        f"[Code Reviewer]: Audit selesai ({len(final_review_notes)} chars, "
+        f"classification: {classification}, status: {review_status.upper()})."
+    )
     current_logs = state.get("logs", [])
-    
+
     # Observability Trace Logging
     tracer = get_tracer(state.get("run_id"))
     if tracer:
@@ -345,12 +369,19 @@ Hasil Pengujian Sandbox QA:
                 "final_review_notes": final_review_notes,
                 "is_approved": is_approved,
                 "review_status": review_status,
-                "iteration": iteration
+                "iteration": iteration,
+                # V6 Output Gate telemetry
+                "output_classification": classification,
+                "terminal_status": terminal_status,
+                "evidence_markers_found": output_classification.get("evidence_markers_found", []),
+                "evidence_markers_count": output_classification.get("evidence_markers_count", 0),
+                "raw_output_length": len(raw_review_notes or ""),
             }
         )
 
     return {
         "review_notes": final_review_notes,
         "status": review_status,
+        "reviewer_output_classification": output_classification,   # V6 Output Gate result
         "logs": current_logs + [new_log]
     }

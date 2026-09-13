@@ -294,16 +294,16 @@ def run_preflight_gates() -> bool:
 # 3-Run Pilot Execution
 # ==============================================================================
 
-def execute_single_pilot_run(task: dict, run_index: int) -> dict:
+def execute_single_pilot_run(task: dict, run_index: int, rep_index: int = 1, total_runs: int = 3) -> dict:
     """Menjalankan 1 run eksperimen terkontrol dengan graph phase-validated."""
     task_id = task["task_id"]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_id = f"pv_pilot_{task_id}_rep1_{timestamp}"
+    run_id = f"pv_pilot_{task_id}_rep{rep_index}_{timestamp}"
     run_dir = OUTPUT_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n" + "=" * 70)
-    print(f"[PILOT RUN {run_index}/3]: {task_id.upper()} ({task['target_language']})")
+    print(f"[PILOT RUN {run_index}/{total_runs}]: {task_id.upper()} (Rep {rep_index}) ({task['target_language']})")
     print(f"Run ID: {run_id}")
     print(f"Target File Authoritative: {task['authoritative_file']}")
     print(f"Expected Oracle Checksum: {task['expected_sha'][:16]}...")
@@ -415,6 +415,7 @@ def execute_single_pilot_run(task: dict, run_index: int) -> dict:
     run_summary = {
         "run_id": run_id,
         "task_id": task_id,
+        "rep_index": rep_index,
         "target_language": task["target_language"],
         "model": ALL_AGENTS_MODEL,
         "final_verdict": final_verdict,
@@ -443,19 +444,30 @@ def execute_single_pilot_run(task: dict, run_index: int) -> dict:
         data=run_summary
     )
 
-    print(f"\n[PILOT RUN {run_index} SUMMARY]: Verdict={final_verdict} | Loops={loops_consumed} | Tests={passed_count}/{total_tests} | OTRR={otrr_info.get('otrr_percent', 0.0)}% | Duration={duration:.1f}s")
+    print(f"\n[PILOT RUN {run_index}/{total_runs} SUMMARY]: Task={task_id} (Rep {rep_index}) | Verdict={final_verdict} | Loops={loops_consumed} | Tests={passed_count}/{total_tests} | OTRR={otrr_info.get('otrr_percent', 0.0)}% | Duration={duration:.1f}s")
     return run_summary
 
 
-def run_full_pilot(start_from: int = 1, single_task_id: Optional[str] = None, model_name: Optional[str] = None, summary_file_path: Optional[str] = None, num_predict: Optional[int] = None):
+def run_full_pilot(
+    start_from: int = 1,
+    single_task_id: Optional[str] = None,
+    model_name: Optional[str] = None,
+    summary_file_path: Optional[str] = None,
+    num_predict: Optional[int] = None,
+    repetitions: int = 1
+):
     """Menjalankan pilot experiment dan menghasilkan/memperbarui ringkasan evaluasi."""
     if model_name or num_predict:
         configure_squad_model(model_name, num_predict)
+
+    total_tasks = len(TASKS) if not single_task_id else 1
+    total_planned = total_tasks * repetitions
 
     print("\n" + "=" * 70)
     print("PHASE-END VALIDATION PILOT EXPERIMENT")
     print(f"Active Model: {ALL_AGENTS_MODEL}")
     print(f"Active Num Predict: {os.environ.get('OLLAMA_NUM_PREDICT', '3000')}")
+    print(f"Repetitions per task: {repetitions} (Total Planned Runs: {total_planned})")
     print(f"Resuming from Run Index: {start_from}" if start_from > 1 else "Starting from Run 1")
     print("=" * 70)
 
@@ -476,17 +488,22 @@ def run_full_pilot(start_from: int = 1, single_task_id: Optional[str] = None, mo
             results = []
 
     tasks_to_run = []
-    for idx, t in enumerate(TASKS, start=1):
-        if single_task_id and t["task_id"] != single_task_id:
-            continue
-        if idx < start_from:
-            continue
-        tasks_to_run.append((idx, t))
+    run_counter = 1
+    for rep in range(1, repetitions + 1):
+        for task in TASKS:
+            if single_task_id and task["task_id"] != single_task_id:
+                continue
+            if run_counter >= start_from:
+                tasks_to_run.append((run_counter, task, rep))
+            run_counter += 1
 
-    for idx, task in tasks_to_run:
-        summary = execute_single_pilot_run(task, idx)
-        # Update or append
-        existing_idx = next((i for i, r in enumerate(results) if r["task_id"] == task["task_id"]), None)
+    for idx, task, rep in tasks_to_run:
+        summary = execute_single_pilot_run(task, idx, rep_index=rep, total_runs=total_planned)
+        # Update or append matching (task_id, rep_index)
+        existing_idx = next(
+            (i for i, r in enumerate(results) if r.get("task_id") == task["task_id"] and r.get("rep_index", 1) == rep),
+            None
+        )
         if existing_idx is not None:
             results[existing_idx] = summary
         else:
@@ -500,9 +517,9 @@ def run_full_pilot(start_from: int = 1, single_task_id: Optional[str] = None, mo
         summary_data = {
             "experiment": "phase_end_validation_pilot",
             "date": datetime.now().isoformat(),
-            "total_runs_planned": len(TASKS),
+            "total_runs_planned": total_planned,
             "runs_completed": len(results),
-            "status": "COMPLETED" if len(results) >= len(TASKS) else f"PAUSED_AT_RUN_{idx}",
+            "status": "COMPLETED" if len(results) >= total_planned else f"PAUSED_AT_RUN_{idx}",
             "pass_count": sum(1 for r in results if r.get("final_verdict") == "PASS"),
             "convergent_within_3_loops_count": sum(1 for r in results if r.get("converged_within_3_loops", False)),
             "aggregate_otrr": aggregate_otrr,
@@ -512,9 +529,9 @@ def run_full_pilot(start_from: int = 1, single_task_id: Optional[str] = None, mo
         summary_file.write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
         print(f"\nCheckpoint written to: {summary_file}")
 
-    if len(results) >= len(TASKS):
+    if len(results) >= total_planned:
         print("\n" + "=" * 70)
-        print("STOP RULE REACHED: ALL 3 PILOT RUNS COMPLETED. STOPPING SYSTEM.")
+        print(f"STOP RULE REACHED: ALL {total_planned} PILOT RUNS COMPLETED. STOPPING SYSTEM.")
         print("=" * 70)
 
 
@@ -526,6 +543,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default=None, help="Unified squad model override (e.g. qwen3:8b)")
     parser.add_argument("--num-predict", type=int, default=None, help="Ollama num_predict token limit override (default: 3000)")
     parser.add_argument("--summary-file", type=str, default=None, help="Custom summary output path")
+    parser.add_argument("--reps", "--repetitions", dest="repetitions", type=int, default=1, help="Number of repetitions per task (default: 1, e.g. 3 for 3x3)")
     args = parser.parse_args()
 
     if args.model or args.num_predict:
@@ -544,5 +562,6 @@ if __name__ == "__main__":
             single_task_id=args.task_id,
             model_name=args.model,
             summary_file_path=args.summary_file,
-            num_predict=args.num_predict
+            num_predict=args.num_predict,
+            repetitions=args.repetitions
         )

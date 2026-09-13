@@ -202,6 +202,113 @@ def _standard_forbidden_changes(target_lang: str) -> List[str]:
 
 
 # ===========================================================================
+# 1B. V0: Requirement Interpreter Context Assembler
+# ===========================================================================
+
+def assemble_v0_evidence(
+    state: SquadState,
+    violations: List[ViolationItem],
+    evidence: List[Dict[str, Any]],
+    run_id: str = "",
+    iteration: int = 0,
+) -> ContextualEvidencePackage:
+    """Merakit ContextualEvidencePackage untuk kegagalan V0 (Requirement Interpretation Gate)."""
+    has_fail = any(v.severity == "CRITICAL" for v in violations)
+    verdict = "FAIL" if has_fail else "PASS"
+
+    root_causes = []
+    if has_fail:
+        crit_strs = [getattr(v, "criterion", "") or "" for v in violations]
+        obs_strs = [getattr(v, "observed_state", "") or "" for v in violations]
+        combined = " ".join(crit_strs + obs_strs).lower()
+
+        if "hallucinated" in combined or "provenance" in combined or "fakta palsu" in combined:
+            root_causes.append(
+                "V0 claimed FACT status for items not grounded in the original user task text."
+            )
+        if "schema" in combined or "missing" in combined:
+            root_causes.append(
+                "V0 output does not conform to the canonical V0RequirementOutput Pydantic schema."
+            )
+        if "blocking_gaps" in combined or "constructibility" in combined or "kontradiksi" in combined:
+            root_causes.append(
+                "V0 constructibility assessment is inconsistent with blocking_gaps or task intent."
+            )
+        if not root_causes:
+            root_causes.append(
+                "V0 requirement model failed deterministic validation constraints."
+            )
+
+    required_changes = []
+    for i, v in enumerate(violations, 1):
+        obs = getattr(v, "observed_state", "") or ""
+        exp = getattr(v, "expected_state", "") or ""
+        req_text = f"{obs} → {exp}" if exp else obs
+
+        required_changes.append(RequiredChange(
+            change_id=f"REQ-{i:03d}",
+            target="v0_requirement_model",
+            violation_ref=v.violation_id,
+            deterministic_requirement=req_text,
+        ))
+
+    allowed_changes = [
+        "Reclassify ungrounded FACT items to INTERPRETATION or ASSUMPTION with clear textual basis",
+        "Correct Pydantic schema structure and required fields",
+        "Align constructibility status with blocking_gaps (empty for WORKABLE, non-empty for BLOCKED)",
+    ]
+
+    forbidden_changes = [
+        "Do not invent domain entity attributes not mentioned by user",
+        "Do not consult or sneak schemas from Frozen Oracle test files",
+        "Do not output plain text outside the canonical JSON markers",
+    ]
+
+    expected_post_repair_state = [
+        "V0RequirementOutput valid per Pydantic v2 schema",
+        "All FACT items grounded in user task text",
+        "Constructibility status consistent with blocking_gaps",
+    ]
+
+    failure_summary = (
+        "; ".join(root_causes[:2]) if root_causes else "V0 requirement interpretation validated."
+    )
+
+    return ContextualEvidencePackage(
+        package_id=ContextualEvidencePackage.make_id(run_id or "unknown", "V0_REQUIREMENT_GATE", iteration),
+        timestamp=ContextualEvidencePackage.make_timestamp(),
+        validator="V0_REQUIREMENT_GATE",
+        phase="V0",
+        validator_type="PHASE_END",
+        verdict=verdict,
+        causal_owner="V0" if has_fail else "NONE",
+        failure_summary=failure_summary,
+        root_causes=root_causes,
+        violations=violations,
+        violation_dependencies=[],
+        authoritative_context={
+            "user_task": (state.get("task", "") or "")[:200],
+            "target_language": state.get("target_language", "python") or "python",
+        },
+        active_constraints={"valid_schema": True, "epistemic_grounding": True},
+        preserved_invariants=[],
+        repair_boundary=RepairBoundary(
+            allowed_changes=allowed_changes,
+            forbidden_changes=forbidden_changes,
+        ),
+        forbidden_changes=forbidden_changes,
+        required_changes=required_changes,
+        expected_post_repair_state=expected_post_repair_state,
+        verification_criteria=[
+            "validate_v0_phase returns verdict == 'PASS'",
+        ],
+        source_of_truth="V0_CANONICAL_SCHEMA",
+        evidence=evidence,
+        remaining_budget=0,
+    )
+
+
+# ===========================================================================
 # 2. B1: PM Context Assembler
 # ===========================================================================
 
@@ -596,6 +703,33 @@ def assemble_b3_evidence(
         preserved.append(contract_inv)
     passing_invs = _collect_passing_test_invariants(state)
     preserved.extend(passing_invs)
+
+    # Include explicit LockedInvariants from state (ONCE PROVEN, LOCK IT)
+    locked_dict = state.get("locked_invariants") or {}
+    existing_ids = {inv.invariant_id for inv in preserved}
+    for l_id, l_data in locked_dict.items():
+        if l_id in existing_ids:
+            continue
+        l_status = l_data.get("status", "PROVEN")
+        l_state = "LOCKED" if l_status == "PROVEN" else "VIOLATED"
+        status_str = "REGRESSED" if l_status == "REGRESSION" else "PROVEN"
+        p_inv = PreservedInvariant(
+            invariant_id=l_data.get("invariant_id", l_id),
+            category=l_data.get("category", "LOCKED_INVARIANT"),
+            description=l_data.get("description", ""),
+            evidence_value=l_data.get("evidence", ""),
+            status=status_str,
+            target=l_data.get("target_symbol", ""),
+            state=l_state,
+            mutation="FORBIDDEN",
+            provenance_evidence=l_data.get("provenance"),
+            regression_evidence=l_data.get("regression_history", [{}])[-1] if l_data.get("regression_history") else None,
+            ever_regressed=(l_data.get("regression_count", 0) > 0),
+            regression_count=l_data.get("regression_count", 0),
+            regression_history=l_data.get("regression_history", []),
+        )
+        preserved.append(p_inv)
+        existing_ids.add(l_id)
 
     # Required changes
     required_changes = []
@@ -1974,6 +2108,33 @@ def assemble_b5_evidence(
     if contract_inv:
         preserved.append(contract_inv)
     preserved.extend(_collect_passing_test_invariants(state))
+
+    # Include explicit LockedInvariants from state (ONCE PROVEN, LOCK IT)
+    locked_dict = state.get("locked_invariants") or {}
+    existing_ids = {inv.invariant_id for inv in preserved}
+    for l_id, l_data in locked_dict.items():
+        if l_id in existing_ids:
+            continue
+        l_status = l_data.get("status", "PROVEN")
+        l_state = "LOCKED" if l_status == "PROVEN" else "VIOLATED"
+        status_str = "REGRESSED" if l_status == "REGRESSION" else "PROVEN"
+        p_inv = PreservedInvariant(
+            invariant_id=l_data.get("invariant_id", l_id),
+            category=l_data.get("category", "LOCKED_INVARIANT"),
+            description=l_data.get("description", ""),
+            evidence_value=l_data.get("evidence", ""),
+            status=status_str,
+            target=l_data.get("target_symbol", ""),
+            state=l_state,
+            mutation="FORBIDDEN",
+            provenance_evidence=l_data.get("provenance"),
+            regression_evidence=l_data.get("regression_history", [{}])[-1] if l_data.get("regression_history") else None,
+            ever_regressed=(l_data.get("regression_count", 0) > 0),
+            regression_count=l_data.get("regression_count", 0),
+            regression_history=l_data.get("regression_history", []),
+        )
+        preserved.append(p_inv)
+        existing_ids.add(l_id)
 
     # Oracle call site from test_files (crucial context for semantic fixation)
     test_files = state.get("test_files") or {}

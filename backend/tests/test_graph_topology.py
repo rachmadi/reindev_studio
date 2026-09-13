@@ -16,6 +16,8 @@ from langgraph.graph import END
 from backend.graph import (
     build_squad_graph,
     squad_graph,
+    v0_validator_node,
+    route_after_v0_validator,
     pm_validator_node,
     route_after_pm_validator,
     architect_validator_node,
@@ -37,12 +39,13 @@ from backend.contract import ContractStatus
 # ==============================================================================
 
 def test_squad_graph_nodes_registration():
-    """Memverifikasi bahwa seluruh 6 produser dan 6 validator terdaftar di StateGraph."""
+    """Memverifikasi bahwa seluruh 7 produser dan 7 validator terdaftar di StateGraph."""
     graph = build_squad_graph()
     nodes = set(graph.nodes.keys())
     
-    expected_producers = {"pm", "architect", "developer", "tester", "frozen_oracle", "executor", "reviewer"}
+    expected_producers = {"v0", "pm", "architect", "developer", "tester", "frozen_oracle", "executor", "reviewer"}
     expected_validators = {
+        "v0_validator",
         "pm_validator",
         "architect_validator",
         "developer_validator",
@@ -56,6 +59,57 @@ def test_squad_graph_nodes_registration():
         
     for v in expected_validators:
         assert v in nodes, f"Validator boundary '{v}' tidak ditemukan pada StateGraph"
+
+
+# ==============================================================================
+# 1B. V0: Requirement Gate Boundary & Two-Repair Routing Tests
+# ==============================================================================
+
+def test_v0_boundary_pass():
+    state = {
+        "v0_validator_contract": {"verdict": "PASS", "violations": []},
+        "repair_attempt_counts": {"v0": 0}
+    }
+    assert route_after_v0_validator(state) == "pm"
+
+
+def test_v0_boundary_repair_attempt_1():
+    state = {
+        "task": "test",
+        "v0_requirement_model": None,
+        "repair_attempt_counts": {"v0": 0}
+    }
+    res = v0_validator_node(state)
+    assert res["v0_validator_contract"]["verdict"] == "FAIL"
+    assert res["repair_attempt_counts"]["v0"] == 1
+    state.update(res)
+    assert route_after_v0_validator(state) == "v0"
+
+
+def test_v0_boundary_repair_attempt_2():
+    state = {
+        "task": "test",
+        "v0_requirement_model": None,
+        "repair_attempt_counts": {"v0": 1}
+    }
+    res = v0_validator_node(state)
+    assert res["v0_validator_contract"]["verdict"] == "FAIL"
+    assert res["repair_attempt_counts"]["v0"] == 2
+    state.update(res)
+    assert route_after_v0_validator(state) == "v0"
+
+
+def test_v0_boundary_terminal_failure_zero_leakage():
+    state = {
+        "task": "test",
+        "v0_requirement_model": None,
+        "repair_attempt_counts": {"v0": 2}
+    }
+    res = v0_validator_node(state)
+    assert res["v0_validator_contract"]["verdict"] == "FAIL"
+    assert res["status"] == "terminal_failure_v0_boundary"
+    state.update(res)
+    assert route_after_v0_validator(state) == END
 
 
 # ==============================================================================

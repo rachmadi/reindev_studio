@@ -506,4 +506,24 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/experiments/flutter_t1_cross_ecosystem_forensic_investigation_report.md` (NEW — Laporan forensik Run 1 s.d. Run 4).
   - `dokumentasi-pengembangan/`: Sinkronisasi 10 berkas tata kelola IIDD (`decision_log.md` D-095..D-100, `human_intervention.md` #106..#110, `error_log.md` E-063..E-067, `catatan_riset_pengujian_preset.md`, `validation_log.md`, `context_drift_log.md`, `waktu_estimasi_vs_realisasi.md`, `durasi_per_fitur.md`, `conversation_log.md`, `commit_history.md`).
 
+---
+
+### Commit: ef66011 — 2026-09-14
+- **Commit Hash:** `ef66011`
+- **Status:** TERVERIFIKASI PENUH (490/490 Pytest Unit Tests PASS, Zero Regression, 3x3 Matrix Pilot Executed)
+- **Tipe:** `feat(hardening)` / `docs(research)`
+- **Pesan Commit:** `feat(hardening): implement end-phase validation v0-v6, run 3x3 matrix pilot on qwen2.5-coder:7b, and publish deep forensic failure audit`
+- **Waktu:** 2026-09-14 06:40 WIB
+- **Cakupan Perubahan:**
+  - `backend/phase_validators.py`, `backend/context_hardening.py`, `backend/locked_invariants.py`, `backend/v0_schema.py`, `backend/canonical_symbol_scanner.py`: Implementasi sistem pertahanan multi-fase V0 s.d. V6, evaluasi gerbang pra-eksekusi, dan context telemetry.
+  - `backend/run_phase_end_validation_pilot.py`: Orkestrasi 9 eksperimen terkontrol (matriks 3x3) dengan 9 Pre-Flight Gates A–I deterministik.
+  - `backend/tests/`: Penambahan suite pengujian komprehensif V0–V6 (490 tests PASS total).
+  - `dokumentasi-pengembangan/experiments/`:
+    - `qwen_coder_7b_3x3_matrix_pilot_evaluation_report.md` (Laporan evaluasi penuh matriks 3x3).
+    - `qwen_coder_7b_forensic_failure_audit_report.md` (Audit forensik lengkap 6 run gagal dengan taksonomi 4 kelas patologi).
+    - `model_comparison_qwen7b_vs_ornith9b_report.md` (Komparasi empiris Qwen-7B vs Ornith-9B).
+    - `deterministic_cep_pilot_summary.json` (Data telemetri matriks 3x3 kanonikal).
+  - `dokumentasi-pengembangan/`: Sinkronisasi log tata kelola IIDD (`decision_log.md` D-102..D-106, `validation_log.md`, `conversation_log.md`, `commit_history.md`).
+
+
 

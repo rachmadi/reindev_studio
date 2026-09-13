@@ -56,11 +56,37 @@ Instruksi Perbaikan Wajib:
 3. Patuhi format luaran 1, 2, 3 secara ketat.
 """
     
+    v0_section = ""
+    v0_model = state.get("v0_requirement_model")
+    if v0_model and isinstance(v0_model, dict):
+        facts = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "FACT"]
+        interpretations = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "INTERPRETATION"]
+        assumptions = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "ASSUMPTION"]
+        unresolved = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") in ("UNRESOLVED", "AMBIGUITY")]
+
+        c_status = v0_model.get("constructibility", {}).get("status", "WORKABLE")
+
+        v0_section = f"""
+MODEL KEBUTUHAN TERSTRUKTUR (Dari V0 Requirement Interpreter):
+- Fakta Terverifikasi (Ground Truth): {'; '.join(facts) if facts else 'Tidak ada fakta tambahan'}
+- Interpretasi Logis: {'; '.join(interpretations) if interpretations else 'Tidak ada'}
+- Asumsi Rekayasa Standar: {'; '.join(assumptions) if assumptions else 'Tidak ada'}
+- Butir Belum Terdefinisi / Terbuka: {'; '.join(unresolved) if unresolved else 'Tidak ada'}
+- Status Konstruktibilitas: {c_status}
+
+DOKTRIN PENTING UNTUK PM:
+1. Perlakukan Fakta Terverifikasi sebagai batasan mutlak.
+2. JANGAN mempromosikan Interpretasi atau Asumsi menjadi Fakta pengguna.
+3. JANGAN mengarang atribut entitas atau field data baru yang tidak tercantum dalam model di atas.
+4. Pertahankan butir yang belum terdefinisi sebagai batasan terbuka, jangan ditutup dengan spekulasi atribut sepihak.
+"""
+
     prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
 {ecosystem_guidance}
 
 Deskripsi Tugas Pengguna:
 {user_task}
+{v0_section}
 {repair_section}
 Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tanpa basa-basi pembuka atau penutup."""
 

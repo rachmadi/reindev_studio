@@ -38,8 +38,11 @@ class SquadState(TypedDict):
     failed_strategies: Optional[List[Dict[str, Any]]] # Strategi gagal yang pernah dicoba
     known_good_constraints: Optional[List[str]] # Constraint yang sudah terverifikasi benar dan harus dipertahankan
 
-    # Phase-End Validation & Universal Two-Repair Engine (v2.2)
-    repair_attempt_counts: Optional[Dict[str, int]]  # {"pm": 0, "architect": 0, "developer": 0, "tester": 0, "executor": 0, "reviewer": 0}
+    # Phase-End Validation & Universal Two-Repair Engine (v2.3 with V0)
+    v0_requirement_model: Optional[Dict[str, Any]]   # Structured Application Requirement Model dari V0
+    v0_validator_contract: Optional[Dict[str, Any]]  # Kontrak hasil evaluasi V0 Validator
+    v0_feedback: Optional[str]                       # Umpan balik diagnostik jika V0 Validator FAIL
+    repair_attempt_counts: Optional[Dict[str, int]]  # {"v0": 0, "pm": 0, "architect": 0, "developer": 0, "tester": 0, "executor": 0, "reviewer": 0}
     max_phase_repair_attempts: Optional[int]         # Batas maksimal perbaikan per fase (default: 2)
     phase_evidence_packages: Optional[Dict[str, Any]] # Paket bukti CEP per fase
     causal_owner_phase: Optional[str]                # Fase pemilik kausal (misal: "architect", "developer")
@@ -56,3 +59,14 @@ class SquadState(TypedDict):
     invariant_regression_history: Optional[Dict[str, Any]]
     review_verdict: Optional[str]
     expected_oracle_sha: Optional[str]
+    locked_invariants: Optional[Dict[str, Any]]  # Invarian deterministik yang berstatus PROVEN/LOCKED
+    oscillation_history: Optional[List[Dict[str, Any]]]  # Riwayat osilasi regresi-pemulihan
+    # Evidence dari turn sebelumnya untuk discovery kandidat lintas-turn
+    # PENTING: hanya digunakan sebagai sumber kandidat, BUKAN sebagai bukti PROVEN langsung
+    previous_diagnostic_evidence: Optional[Dict[str, Any]]  # diagnostic_evidence turn N-1
+    previous_executor_stderr: Optional[str]  # Stderr kompilasi turn N-1
+
+    # V6 Reviewer Output & Evidence Gate Hardening (v1)
+    reviewer_output_classification: Optional[Dict[str, Any]]  # Hasil classify_reviewer_output(): classification, terminal_status, evidence_markers_found, dll.
+    reviewer_retry_count: Optional[int]    # Jumlah retry Reviewer yang sudah dilakukan karena output INVALID (default 0)
+    reviewer_retry_budget: Optional[int]   # Budget retry Reviewer terkontrol (default 1 → total 2 Reviewer attempts max)

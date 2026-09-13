@@ -89,9 +89,9 @@ def test_executor_mode_code_only_transforms_code_but_preserves_tests():
         executor_mode="CODE_ONLY"
     )
 
-    # 1. Code files ARE transformed (Pydantic model auto-healing)
-    assert results["code_files"]["models.py"] != code_files["models.py"]
-    assert "class Product(BaseModel):" in results["code_files"]["models.py"]
+    # 1. Code files are PRESERVED UNCHANGED (Architecture Hardening v2 Sterile Execution)
+    assert results["code_files"]["models.py"] == code_files["models.py"]
+    assert results["code_files"]["calc.py"] == code_files["calc.py"]
 
     # 2. Test files are 100% STRICTLY IDENTICAL and NOT relaxed/modified
     assert results["test_files"] == test_orig

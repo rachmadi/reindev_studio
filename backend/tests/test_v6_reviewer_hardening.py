@@ -282,3 +282,65 @@ def test_v6_actionable_contract_mutation_demands_fail_gate():
         merged = {**state, **res}
         assert route_after_reviewer_validator(merged) == END
 
+
+def test_reviewer_scan_ast_symbols_dart_provider_and_arrow():
+    """Verifikasi scan_ast_symbols mengenali provider Riverpod dan arrow function Dart."""
+    from backend.agents.reviewer import scan_ast_symbols
+    code = """
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class MetricData {
+  final String title;
+  const MetricData({required this.title});
+}
+
+final metricProvider = Provider<MetricState>((ref) => const MetricState());
+const double kDefaultMargin = 16.0;
+
+class MetricState {
+  const MetricState();
+}
+"""
+    syms = scan_ast_symbols({"lib/card_metric.dart": code}, "dart")
+    all_syms = set(syms["classes"] + syms["functions"])
+    assert "MetricData" in all_syms
+    assert "MetricState" in all_syms
+    assert "metricProvider" in all_syms
+    assert "kDefaultMargin" in all_syms
+
+
+def test_reviewer_developer_budget_exhaustion_terminates():
+    """Verifikasi bahwa akumulasi perbaikan developer via Reviewer strictly dibatasi max_repairs."""
+    state: SquadState = {
+        "test_results": {"passed": True, "exit_code": 0},
+        "contract_status": "FROZEN",
+        "iteration_count": 0,
+        "max_iterations": 10,
+        "review_notes": "[NEEDS_REVISION] Mohon bersihkan komentar debug.",
+        "status": "needs_revision",
+        "repair_attempt_counts": {"developer": 0},
+        "max_phase_repair_attempts": 2,
+        "logs": []
+    }
+
+    # Turn 1
+    res1 = v6_node(state)
+    assert res1["repair_attempt_counts"]["developer"] == 1
+    assert res1["iteration_count"] == 1
+    merged1 = {**state, **res1}
+    assert route_after_reviewer_validator(merged1) == "developer"
+
+    # Turn 2
+    res2 = v6_node(merged1)
+    assert res2["repair_attempt_counts"]["developer"] == 2
+    assert res2["iteration_count"] == 2
+    merged2 = {**merged1, **res2}
+    assert route_after_reviewer_validator(merged2) == "developer"
+
+    # Turn 3 (Exhausted)
+    res3 = v6_node(merged2)
+    assert res3["status"] == "terminal_failure_reviewer_boundary"
+    merged3 = {**merged2, **res3}
+    assert route_after_reviewer_validator(merged3) == END
+

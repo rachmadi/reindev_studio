@@ -18,6 +18,7 @@ from langgraph.graph import StateGraph, START, END
 
 try:
     from .state import SquadState
+    from .agents.v0 import v0_agent
     from .agents.pm import pm_agent
     from .agents.architect import architect_agent
     from .agents.developer import developer_agent
@@ -27,6 +28,7 @@ try:
     from .tracer import get_tracer, compute_dict_hashes
     from .contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
     from .phase_validators import (
+        validate_v0_phase,
         validate_pm_phase,
         validate_architect_phase,
         validate_developer_phase,
@@ -38,6 +40,10 @@ try:
     from .contextual_evidence import ContextualEvidencePackage, render_repair_directive
 except (ImportError, ValueError):
     from state import SquadState
+    try:
+        from agents.v0 import v0_agent
+    except ImportError:
+        def v0_agent(s): return s
     from agents.pm import pm_agent
     from agents.architect import architect_agent
     from agents.developer import developer_agent
@@ -60,6 +66,7 @@ except (ImportError, ValueError):
         class ContractStatus: FROZEN = "FROZEN"; REJECTED = "REJECTED"
     try:
         from phase_validators import (
+            validate_v0_phase,
             validate_pm_phase,
             validate_architect_phase,
             validate_developer_phase,
@@ -100,6 +107,67 @@ def _increment_repair_count(state: SquadState, phase_name: str) -> Dict[str, int
     counts = dict(state.get("repair_attempt_counts") or {})
     counts[phase_name] = counts.get(phase_name, 0) + 1
     return counts
+
+
+# ==============================================================================
+# Node 0: V0 Requirement Interpreter & V0 Boundary
+# ==============================================================================
+
+def v0_validator_node(state: SquadState) -> Dict[str, Any]:
+    """V0: Memvalidasi Structured Application Requirement Model sebelum melangkah ke PM."""
+    contract = validate_v0_phase(state)
+    tracer = get_tracer(state.get("run_id"))
+    count = _get_repair_count(state, "v0")
+    max_repairs = _get_max_repairs(state)
+
+    if tracer:
+        tracer.log_event(
+            stage="phase_end_validation",
+            event_type="v0_validation",
+            iteration=count,
+            data=contract
+        )
+
+    verdict = contract.get("verdict", "FAIL")
+    logs = list(state.get("logs") or [])
+    logs.append(f"[V0 Validator (Repair {count}/{max_repairs})]: Verdict = {verdict} ({len(contract.get('violations', []))} violations)")
+
+    res: Dict[str, Any] = {
+        "v0_validator_contract": contract,
+        "logs": logs
+    }
+
+    if verdict == "FAIL":
+        if count < max_repairs:
+            new_counts = _increment_repair_count(state, "v0")
+            res["repair_attempt_counts"] = new_counts
+            cep_dict = contract.get("contextual_evidence_package")
+            if cep_dict:
+                res["latest_evidence_package"] = cep_dict
+                if ContextualEvidencePackage is not None and render_repair_directive is not None:
+                    pkg = ContextualEvidencePackage.from_dict(cep_dict)
+                    rendered = render_repair_directive(pkg)
+                    res["v0_feedback"] = rendered
+        else:
+            res["status"] = "terminal_failure_v0_boundary"
+
+    return res
+
+
+def route_after_v0_validator(state: SquadState) -> str:
+    """Routing V0: Zero downstream leakage on FAIL."""
+    contract = state.get("v0_validator_contract") or {}
+    verdict = contract.get("verdict")
+    count = _get_repair_count(state, "v0")
+    max_repairs = _get_max_repairs(state)
+
+    if verdict == "PASS":
+        return "pm"
+
+    if count <= max_repairs and state.get("status") != "terminal_failure_v0_boundary":
+        return "v0"
+
+    return END
 
 
 # ==============================================================================
@@ -596,7 +664,14 @@ def executor_validator_node(state: SquadState) -> Dict[str, Any]:
         "executor_iteration_validator_contract": contract,
         "previous_passed_tests": current_passed,
         "invariant_regression_history": history_map,
-        "logs": logs
+        "locked_invariants": contract.get("locked_invariants", {}),
+        "oscillation_history": contract.get("oscillation_history", []),
+        "logs": logs,
+        # Simpan evidence turn SAAT INI sebagai "previous" untuk turn berikutnya.
+        # Digunakan oleh discover_newly_proven_invariants sebagai sumber kandidat saja
+        # (bukan sebagai bukti PROVEN langsung — dual gate tetap menentukan status PROVEN).
+        "previous_diagnostic_evidence": (state.get("test_results") or {}).get("diagnostic_evidence") or {},
+        "previous_executor_stderr": (state.get("test_results") or {}).get("stderr") or "",
     }
 
     if verdict == "FAIL":
@@ -649,15 +724,37 @@ def route_after_executor_validator(state: SquadState) -> str:
 def reviewer_validator_node(state: SquadState) -> Dict[str, Any]:
     """V6: Memvalidasi keabsahan keputusan Reviewer terhadap bukti Layer 1."""
     notes = state.get("review_notes", "")
-    status = state.get("status", "").lower()
-    if "completed" in status or "[approved]" in notes.lower():
-        review_verdict = "APPROVED"
-    elif "needs_revision" in status or "[needs_revision]" in notes.lower():
-        review_verdict = "NEEDS_REVISION"
-    else:
-        review_verdict = "FAIL"
+    output_classification = state.get("reviewer_output_classification")
+    classification = output_classification.get("classification") if output_classification else None
+    terminal_status = output_classification.get("terminal_status") if output_classification else None
 
-    contract = validate_reviewer_phase(state, review_verdict=review_verdict, review_notes=notes)
+    # Jika output_classification belum ada di state tetapi notes kosong/whitespace,
+    # deteksi secara deterministik sebagai EMPTY
+    if not classification and (notes is None or not str(notes).strip()):
+        classification = "EMPTY"
+        terminal_status = "V6_OUTPUT_INVALID"
+
+    # PRIORITAS 1: Jika reviewer_output_classification tersedia dan INVALID,
+    # langsung tetapkan review_verdict tanpa membaca status field lama
+    if classification in ("EMPTY", "MALFORMED", "NON_ACTIONABLE"):
+        review_verdict = "REVIEWER_OUTPUT_INVALID"
+    # PRIORITAS 2: classification VALID atau tidak ada classification -> baca dari output
+    else:
+        status = state.get("status", "").lower()
+        if "completed" in status or "[approved]" in str(notes).lower():
+            review_verdict = "APPROVED"
+        elif "needs_revision" in status or "[needs_revision]" in str(notes).lower():
+            review_verdict = "NEEDS_REVISION"
+        else:
+            review_verdict = "FAIL"
+
+    contract = validate_reviewer_phase(
+        state,
+        review_verdict=review_verdict,
+        review_notes=notes,
+        reviewer_output_classification=classification,
+        reviewer_terminal_status=terminal_status,
+    )
     count = _get_repair_count(state, "reviewer")
     max_repairs = _get_max_repairs(state)
     tracer = get_tracer(state.get("run_id"))
@@ -680,12 +777,50 @@ def reviewer_validator_node(state: SquadState) -> Dict[str, Any]:
         "logs": logs
     }
 
-    if verdict == "FAIL":
+    test_results = state.get("test_results") or {}
+    is_test_passed = bool(test_results.get("passed", False))
+    artifact_state = "GREEN" if is_test_passed else "RED"
+
+    if review_verdict == "REVIEWER_OUTPUT_INVALID":
+        retry_count = state.get("reviewer_retry_count") or 0
+        retry_budget = state.get("reviewer_retry_budget")
+        if retry_budget is None:
+            retry_budget = 1
+
+        if retry_count < retry_budget:
+            new_retry_count = retry_count + 1
+            res["reviewer_retry_count"] = new_retry_count
+            logs.append(
+                f"[V6 GREEN_STATE_PROTECTION]: Reviewer output {classification} -> {terminal_status}. "
+                f"Artifact state: {artifact_state}. "
+                f"Retry {new_retry_count}/{retry_budget}. "
+                f"Developer routing: BLOCKED."
+            )
+        else:
+            res["status"] = "terminal_failure_v6_reviewer_output"
+            logs.append(
+                f"[V6 GREEN_STATE_PROTECTION]: Reviewer output {classification} -> {terminal_status}. "
+                f"Artifact state: {artifact_state}. "
+                f"Retry budget exhausted ({retry_count}/{retry_budget}). "
+                f"Terminal failure triggered. Developer routing: BLOCKED."
+            )
+    elif verdict == "FAIL":
         if count < max_repairs:
             new_counts = _increment_repair_count(state, "reviewer")
             res["repair_attempt_counts"] = new_counts
         else:
             res["status"] = "terminal_failure_reviewer_boundary"
+    elif verdict == "PASS" and review_verdict == "NEEDS_REVISION":
+        repair_owner = (contract.get("repair_owner") or "").lower()
+        if repair_owner == "developer":
+            dev_repairs = _get_repair_count(state, "developer")
+            if dev_repairs < max_repairs:
+                new_counts = _increment_repair_count(state, "developer")
+                res["repair_attempt_counts"] = new_counts
+                iteration = state.get("iteration_count", 0)
+                res["iteration_count"] = iteration + 1
+            else:
+                res["status"] = "terminal_failure_reviewer_boundary"
 
     return res
 
@@ -693,16 +828,31 @@ def reviewer_validator_node(state: SquadState) -> Dict[str, Any]:
 def route_after_reviewer_validator(state: SquadState) -> str:
     """Routing V6: Konvergensi release gatekeeper."""
     contract = state.get("reviewer_validator_contract") or {}
-    if contract.get("verdict") != "PASS":
+    verdict = contract.get("verdict")
+    eval_verdict = contract.get("evaluated_review_verdict")
+
+    if verdict != "PASS":
+        # Cek apakah ini adalah REVIEWER_OUTPUT_INVALID dengan retry tersisa
+        if eval_verdict == "REVIEWER_OUTPUT_INVALID":
+            retry_count = state.get("reviewer_retry_count", 0)
+            retry_budget = state.get("reviewer_retry_budget")
+            if retry_budget is None:
+                retry_budget = 1
+            term = state.get("status", "")
+            if retry_count <= retry_budget and term != "terminal_failure_v6_reviewer_output":
+                return "reviewer"   # Retry terkontrol
         return END
 
-    rev_verdict = contract.get("evaluated_review_verdict")
-    if rev_verdict == "APPROVED":
+    if eval_verdict == "APPROVED":
         return END  # Success convergence
 
-    if rev_verdict == "NEEDS_REVISION":
+    if eval_verdict == "NEEDS_REVISION":
         repair_owner = (contract.get("repair_owner") or "").lower()
-        if repair_owner == "developer" and _get_repair_count(state, "developer") < _get_max_repairs(state):
+        if (
+            repair_owner == "developer"
+            and _get_repair_count(state, "developer") <= _get_max_repairs(state)
+            and state.get("status") != "terminal_failure_reviewer_boundary"
+        ):
             # Causal return ke developer: WAJIB lewat developer -> developer_validator -> test_suite -> executor -> reviewer
             return "developer"
         return END
@@ -827,6 +977,9 @@ def build_squad_graph():
     workflow = StateGraph(SquadState)
 
     # 1. Daftarkan seluruh Node Produser dan End-Phase Validator
+    workflow.add_node("v0", v0_agent)
+    workflow.add_node("v0_validator", v0_validator_node)
+
     workflow.add_node("pm", pm_agent)
     workflow.add_node("pm_validator", pm_validator_node)
 
@@ -848,8 +1001,20 @@ def build_squad_graph():
 
     # 2. Rangkaikan Edges & Conditional Quality Boundaries
 
+    # Boundary V0: START -> V0 -> V0 Validator
+    workflow.add_edge(START, "v0")
+    workflow.add_edge("v0", "v0_validator")
+    workflow.add_conditional_edges(
+        "v0_validator",
+        route_after_v0_validator,
+        {
+            "pm": "pm",
+            "v0": "v0",
+            END: END
+        }
+    )
+
     # Boundary V1: PM -> PM Validator
-    workflow.add_edge(START, "pm")
     workflow.add_edge("pm", "pm_validator")
     workflow.add_conditional_edges(
         "pm_validator",
@@ -918,6 +1083,7 @@ def build_squad_graph():
         "reviewer_validator",
         route_after_reviewer_validator,
         {
+            "reviewer": "reviewer",
             "developer": "developer",
             END: END
         }
