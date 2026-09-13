@@ -438,6 +438,82 @@ def is_non_ui_computational_task(contract_dict: Dict[str, Any], task_text: Optio
     return True
 
 
+def extract_oracle_tested_symbols(frozen_oracle_path: str, target_lang: str = "") -> Set[str]:
+    """
+    Mengekstrak simbol, kelas, antarmuka, atau endpoint yang diuji oleh Frozen Oracle
+    secara deterministik (Read-Only Observer).
+    Digunakan untuk menegakkan wewenang Acceptance Oracle pada context evidence.
+    """
+    import os
+    from pathlib import Path
+
+    if not frozen_oracle_path:
+        return set()
+
+    oracle_dir = Path(frozen_oracle_path)
+    if not oracle_dir.exists() or not oracle_dir.is_dir():
+        return set()
+
+    test_contents: List[Tuple[str, str]] = []
+    for root, _, files in os.walk(oracle_dir):
+        for f in files:
+            if (f.startswith("test_") and f.endswith(".py")) or (f.endswith("_test.dart")) or (f.endswith("_test.py")):
+                try:
+                    fpath = Path(root) / f
+                    test_contents.append((f, fpath.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+
+    tested_symbols: Set[str] = set()
+
+    dart_framework_types = {
+        "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
+        "Container", "Card", "Text", "Center", "Row", "Column", "Padding",
+        "WidgetTester", "Key", "Colors", "Icon", "Icons", "ConsumerWidget",
+        "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Widget",
+        "Expanded", "Flexible", "ListView", "SingleChildScrollView", "AppBar",
+        "FloatingActionButton", "ElevatedButton", "TextButton", "IconButton",
+        "Stack", "Positioned", "Align", "Duration", "Future", "Stream",
+        "ValueNotifier", "ChangeNotifier", "StateNotifier", "Provider",
+        "StateProvider", "FutureProvider", "StreamProvider", "NotifierProvider",
+        "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
+        "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
+    }
+
+    for fname, content in test_contents:
+        # 1. REST API endpoints
+        for ep in re.findall(r"client\.(?:get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content):
+            base_ep = re.sub(r"/\{[^}]+\}", "", ep).rstrip("/")
+            if base_ep:
+                tested_symbols.add(base_ep)
+
+        # 2. Python symbols
+        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
+            tested_symbols.add(sym)
+        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
+            if sym not in ("app", "main"):
+                tested_symbols.add(sym)
+        for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
+            tested_symbols.add(dunder)
+
+        # 3. Dart symbols
+        if fname.endswith(".dart"):
+            dart_symbols = set()
+            for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
+                if sym not in dart_framework_types:
+                    dart_symbols.add(sym)
+            for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
+                if sym not in dart_framework_types:
+                    dart_symbols.add(sym)
+            if not dart_symbols:
+                for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
+                    if sym not in dart_framework_types:
+                        dart_symbols.add(sym)
+            tested_symbols.update(dart_symbols)
+
+    return tested_symbols
+
+
 def check_oracle_interface_consistency(
     interface_contracts: List[InterfaceContract],
     frozen_oracle_path: str
@@ -563,6 +639,66 @@ def check_oracle_interface_consistency(
                     )
 
     return True, None
+
+
+def extract_proven_semantic_interfaces(
+    interface_contracts: List[Any],
+    frozen_oracle_path: str,
+    target_lang: str = ""
+) -> List[str]:
+    """
+    Mengekstrak nama antarmuka yang telah TERBUKTI konsisten secara deterministik
+    terhadap Frozen Acceptance Oracle (PROVEN_SEMANTIC_INVARIANT).
+    HANYA mengembalikan antarmuka jika:
+    1. check_oracle_interface_consistency bernilai True (lulus konsistensi).
+    2. Antarmuka benar-benar bersesuaian dengan simbol/endpoint yang diuji oleh Oracle.
+    Draft atau rejected interface tanpa bukti keselarasan TIDAK AKAN PERNAH dikembalikan.
+    """
+    if not interface_contracts or not frozen_oracle_path:
+        return []
+
+    iface_objs: List[InterfaceContract] = []
+    for idx, iface in enumerate(interface_contracts, 1):
+        if isinstance(iface, InterfaceContract):
+            iface_objs.append(iface)
+        elif isinstance(iface, dict):
+            try:
+                d = dict(iface)
+                if not d.get("interface_id"):
+                    d["interface_id"] = f"IFC-{idx:02d}"
+                if not d.get("interface_type"):
+                    d["interface_type"] = "WIDGET" if "dart" in (target_lang or "").lower() else "FUNCTION"
+                if not d.get("target_file"):
+                    d["target_file"] = "lib/main.dart" if "dart" in (target_lang or "").lower() else "main.py"
+                iface_objs.append(InterfaceContract(**d))
+            except Exception:
+                pass
+
+    if not iface_objs:
+        return []
+
+    consistent, _ = check_oracle_interface_consistency(iface_objs, frozen_oracle_path)
+    if not consistent:
+        return []
+
+    oracle_symbols = extract_oracle_tested_symbols(frozen_oracle_path, target_lang)
+    if not oracle_symbols:
+        return []
+
+    proven: List[str] = []
+    for ifc in iface_objs:
+        ident = ifc.identifier.strip()
+        if ifc.interface_type == "HTTP_ENDPOINT":
+            base_ep = re.sub(r"/\{[^}]+\}", "", ident).rstrip("/")
+            if base_ep in oracle_symbols or any(base_ep == os or os.startswith(base_ep) or base_ep.startswith(os) for os in oracle_symbols):
+                proven.append(ident)
+        else:
+            parts = re.split(r"[.\(]", ident)
+            clean_parts = [p.strip(" )\"'") for p in parts if p.strip(" )\"'")]
+            if any(cp in oracle_symbols for cp in clean_parts):
+                proven.append(ident)
+
+    return sorted(list(set(proven)))
 
 
 # ===========================================================================

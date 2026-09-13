@@ -22,7 +22,7 @@ from backend.graph import (
     _get_repair_count,
     _get_max_repairs
 )
-from backend.phase_validators import validate_reviewer_phase
+from backend.phase_validators import validate_reviewer_phase, classify_contract_mutation_demand
 
 
 # ==============================================================================
@@ -194,3 +194,91 @@ def test_dim9_deterministic_release_gatekeeper():
     assert contract["evaluated_review_verdict"] == "FAIL"
     merged = {**state, **res}
     assert route_after_reviewer_validator(merged) == END
+
+
+# ==============================================================================
+# Hardening: Intent Distinction Tests (Mandated IA Cases)
+# ==============================================================================
+
+def test_v6_contract_mutation_classification_cases():
+    """
+    Memverifikasi 5 kasus spesifik klasifikasi tuntutan mutasi kontrak:
+    1. 'Implementasi ini mengubah kontrak antarmuka secara fundamental.' -> DESCRIPTIVE (False)
+    2. 'Ubah kontrak antarmuka.' -> DEMAND (True)
+    3. 'Revisi kontrak agar endpoint menjadi ...' -> DEMAND (True)
+    4. 'Kontrak harus di-unfreeze.' -> DEMAND (True)
+    5. 'Implementasi tidak boleh mengubah frozen contract.' -> DESCRIPTIVE (False)
+    """
+    cases = [
+        ("Implementasi ini mengubah kontrak antarmuka secara fundamental.", "DESCRIPTIVE", False),
+        ("Ubah kontrak antarmuka.", "DEMAND", True),
+        ("Revisi kontrak agar endpoint menjadi ...", "DEMAND", True),
+        ("Kontrak harus di-unfreeze.", "DEMAND", True),
+        ("Implementasi tidak boleh mengubah frozen contract.", "DESCRIPTIVE", False),
+    ]
+    for text, expected_cls, expected_demand in cases:
+        res = classify_contract_mutation_demand(text)
+        assert res["classification"] == expected_cls, f"Expected {expected_cls} for '{text}', got {res['classification']}"
+        assert res["is_mutation_demand"] == expected_demand, f"Expected is_mutation_demand={expected_demand} for '{text}'"
+
+
+def test_v6_descriptive_contract_observation_does_not_fail_gate():
+    """
+    Kasus 1 & 5: Reviewer menulis kalimat deskriptif atau larangan perubahan kontrak.
+    Gate V6 TIDAK boleh false-positive memvonis FAIL frozen_contract_immutability.
+    Jika ada sisa budget, harus PASS dan route ke developer.
+    """
+    descriptive_notes = [
+        "[NEEDS_REVISION] Implementasi ini mengubah kontrak antarmuka secara fundamental. Mohon perbaiki implementasi widget.",
+        "[NEEDS_REVISION] Implementasi tidak boleh mengubah frozen contract. Perbaiki method yang ada.",
+    ]
+    for notes in descriptive_notes:
+        state: SquadState = {
+            "test_results": {"passed": True, "exit_code": 0},
+            "contract_status": "FROZEN",
+            "iteration_count": 1,
+            "max_iterations": 10,
+            "review_notes": notes,
+            "status": "needs_revision",
+            "repair_attempt_counts": {"developer": 0, "reviewer": 0},
+            "logs": []
+        }
+        res = v6_node(state)
+        contract = res["reviewer_validator_contract"]
+        assert contract["verdict"] == "PASS", f"Failed for notes: {notes}"
+        assert contract["repair_owner"] == "DEVELOPER"
+        assert not any(v["criterion"] == "frozen_contract_immutability" for v in contract["violations"])
+
+        merged = {**state, **res}
+        assert route_after_reviewer_validator(merged) == "developer"
+
+
+def test_v6_actionable_contract_mutation_demands_fail_gate():
+    """
+    Kasus 2, 3 & 4: Reviewer secara imperatif menuntut ubah/revisi kontrak atau unfreeze.
+    Gate V6 WAJIB memvonis FAIL frozen_contract_immutability dan router abort ke END.
+    """
+    demand_notes = [
+        "[NEEDS_REVISION] Ubah kontrak antarmuka.",
+        "[NEEDS_REVISION] Revisi kontrak agar endpoint menjadi ...",
+        "[NEEDS_REVISION] Kontrak harus di-unfreeze.",
+    ]
+    for notes in demand_notes:
+        state: SquadState = {
+            "test_results": {"passed": True, "exit_code": 0},
+            "contract_status": "FROZEN",
+            "iteration_count": 1,
+            "max_iterations": 10,
+            "review_notes": notes,
+            "status": "needs_revision",
+            "repair_attempt_counts": {"reviewer": 0},
+            "logs": []
+        }
+        res = v6_node(state)
+        contract = res["reviewer_validator_contract"]
+        assert contract["verdict"] == "FAIL", f"Expected FAIL for notes: {notes}"
+        assert any(v["criterion"] == "frozen_contract_immutability" for v in contract["violations"])
+
+        merged = {**state, **res}
+        assert route_after_reviewer_validator(merged) == END
+

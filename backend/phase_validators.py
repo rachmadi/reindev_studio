@@ -1341,6 +1341,98 @@ def validate_executor_phase(state: SquadState, previous_passed_tests: Optional[L
 # B6: Reviewer Phase Validator (Phase-End Validation of Reviewer)
 # ==============================================================================
 
+
+# ==============================================================================
+# B6 Helper: Deterministik Contract Mutation Intent Classifier (D-112)
+# ==============================================================================
+
+_V6_DEMAND_PATTERNS = [
+    # 1. Actionable request: Mohon/Tolong/Harap/Silakan/Wajib/Harus/Perlu/Minta/Instruksikan ubah/revisi/ganti/amend/unfreeze kontrak
+    re.compile(r'\b(?:tolong|mohon|harap|silakan|wajib|harus|perlu|minta|instruksi(?:kan)?)\s+(?:(?:meng)?ubah|(?:me)?revisi|amend|ganti|unfreeze)\s+(?:kontrak|contract|model\s+kontrak|endpoint\s+kontrak)\b', re.IGNORECASE),
+    # 2. Passive modal demand: Kontrak harus/perlu/wajib/mohon di-unfreeze/di-ubah/di-revisi/di-amend
+    re.compile(r'\b(?:kontrak|contract)\s+(?:harus|perlu|wajib|mohon|minta)\s+(?:di-?unfreeze|di-?ubah|di-?revisi|di-?amend)\b', re.IGNORECASE),
+    # 3. Direct imperative start: Ubah kontrak..., Revisi kontrak..., Ganti model kontrak...
+    re.compile(r'(?:^|[\]\)\.:;!\?,\-\n]|\b(?:maka|jadi|untuk\s+itu)\b)\s*(?:ubah|revisi|ganti)\s+(?:kontrak|model\s+kontrak|endpoint\s+kontrak)\b', re.IGNORECASE),
+    # 4. Direct unfreeze command: Unfreeze contract..., Amend contract...
+    re.compile(r'\b(?:unfreeze|amend)\s+contract\b', re.IGNORECASE),
+    # 5. Direct phrase: ganti model kontrak, ganti endpoint kontrak
+    re.compile(r'\b(?:ganti|ubah)\s+(?:model|endpoint)\s+kontrak\b', re.IGNORECASE)
+]
+
+_V6_PROHIBITION_PATTERNS = [
+    re.compile(r'\b(?:tidak\s+boleh|dilarang|jangan|bukan|tidak\s+perlu|tidak\s+dapat)\s+(?:(?:meng)?ubah|(?:me)?revisi|amend|unfreeze)\s+(?:frozen\s+)?(?:kontrak|contract)\b', re.IGNORECASE),
+    re.compile(r'\b(?:tanpa|bebas\s+dari)\s+(?:(?:meng)?ubah|(?:me)?revisi)\s+(?:frozen\s+)?(?:kontrak|contract)\b', re.IGNORECASE),
+]
+
+_V6_DESCRIPTIVE_PATTERNS = [
+    re.compile(r'\b(?:implementasi|kode|perubahan|widget|class|fungsi|method|ini|hal\s+ini)\s+(?:ini\s+)?(?:meng?ubah|merevisi)\s+(?:kontrak|antarmuka|kontrak\s+antarmuka)\b', re.IGNORECASE),
+]
+
+def classify_contract_mutation_demand(notes: str) -> Dict[str, Any]:
+    """
+    Mengklasifikasikan intensi catatan Reviewer terhadap kontrak ke dalam:
+    - 'DEMAND': Tuntutan imperatif aktif/pasif untuk mengubah/meng-unfreeze kontrak (is_mutation_demand=True).
+    - 'DESCRIPTIVE': Observasi analitis, deskripsi perilaku kode, atau larangan mutasi kontrak (is_mutation_demand=False).
+    - 'NONE': Catatan teknis biasa tanpa penyebutan mutasi kontrak (is_mutation_demand=False).
+    """
+    if not notes:
+        return {"classification": "NONE", "matched_pattern": None, "matched_text": None, "is_mutation_demand": False}
+
+    # 1. Evaluasi pola larangan/prohibisi eksplisit terlebih dahulu (contoh: "tidak boleh mengubah kontrak")
+    for pat in _V6_PROHIBITION_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            return {
+                "classification": "DESCRIPTIVE",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": False
+            }
+
+    # 2. Evaluasi tuntutan imperatif aktif/pasif (DEMAND)
+    for pat in _V6_DEMAND_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            # Periksa apakah ada negasi lokal tepat sebelum match (window 25 karakter)
+            start = max(0, m.start() - 25)
+            prefix = notes[start:m.start()].lower()
+            if any(neg in prefix for neg in ["tidak boleh", "jangan", "dilarang", "tidak "]):
+                return {
+                    "classification": "DESCRIPTIVE",
+                    "matched_pattern": pat.pattern,
+                    "matched_text": m.group(0),
+                    "is_mutation_demand": False
+                }
+            return {
+                "classification": "DEMAND",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": True
+            }
+
+    # 3. Evaluasi observasi deskriptif (contoh: "implementasi ini mengubah kontrak antarmuka")
+    for pat in _V6_DESCRIPTIVE_PATTERNS:
+        m = pat.search(notes)
+        if m:
+            return {
+                "classification": "DESCRIPTIVE",
+                "matched_pattern": pat.pattern,
+                "matched_text": m.group(0),
+                "is_mutation_demand": False
+            }
+
+    # 4. Fallback kata kunci umum non-imperatif
+    if any(k in notes.lower() for k in ["kontrak", "contract", "unfreeze"]):
+        return {
+            "classification": "DESCRIPTIVE",
+            "matched_pattern": "generic_keyword",
+            "matched_text": None,
+            "is_mutation_demand": False
+        }
+
+    return {"classification": "NONE", "matched_pattern": None, "matched_text": None, "is_mutation_demand": False}
+
+
 def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes: str = "") -> ValidatorContract:
     """
     B6: Validasi batas fase Reviewer -> END / Developer (Phase-End).
@@ -1403,9 +1495,8 @@ def validate_reviewer_phase(state: SquadState, review_verdict: str, review_notes
         # Aturan 2: NEEDS_REVISION hanya sah jika causal owner adalah Developer (artefak kode masih mutable)
         # dan remaining budget Developer > 0.
         # Kontrak yang sudah FROZEN tidak boleh di-unfreeze.
-        demands_contract_change = any(k in review_notes.lower() for k in [
-            "ubah kontrak", "revisi kontrak", "amend contract", "unfreeze", "ganti endpoint kontrak", "ganti model kontrak"
-        ])
+        classification_res = classify_contract_mutation_demand(review_notes)
+        demands_contract_change = classification_res["is_mutation_demand"]
         evidence.append({
             "item": "frozen_contract_immutability_check",
             "evidence_class": "DETERMINISTIC",
