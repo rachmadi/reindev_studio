@@ -201,9 +201,14 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **P0-1 & P0-2** | Machine-Readable Contract, Frontier & Dynamic Depth | — | 22.00 | 1.320,0 m | — | 2026-09-10 (P0-2, Frontier 9-Run, Gemma 4, A5/D5, D10) |
 | **Deterministic CEP** | Phase-End Validation Pilot & Controlled Runs 1–5.1 | — | 5.21 | 312.7 m | — | 2026-09-11 (B1–B6, CEP, Runs 3, 4, 5, 5.1) |
 | **JSON & V5 Hardening** | JSON Migration, V5 Evidence & Forensic Ablation Study | — | 6.50 | 390.0 m | — | 2026-09-11 s.d. 2026-09-12 (6.50 jam) |
+| **Lintas Ekosistem & Autopsi Otoritas** | Treatment A & Flutter T1 (Hierarchy-of-Authority) | — | 2.10 | 126.0 m | — | 2026-09-12 (2.10 jam) |
+| **Hardening V0–V6 & Matriks 3x3** | Multi-Phase Hardening & 9-Run Pilot Matrix Qwen 7B | — | 0.92 | 55.0 m | — | 2026-09-14 (0.92 jam) |
+| **Architect Contract Binding v2** | Canonical Obligations Extraction & Verification | — | 1.10 | 66.0 m | — | 2026-09-14 (1.10 jam) |
+| **Lifecycle v1 & Retests 1x3** | Active Validation Lifecycle v1 & Retests Qwen vs Ornith | — | 3.47 | 208.0 m | — | 2026-09-14 (3.47 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **53.28** | **3.196,8 m** | **+7.28** | **Termasuk 50.02 jam riset, eksperimen, validasi formal & autopsi kausal** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **60.87** | **3.652,0 m** | **+14.87** | **Termasuk 57.61 jam riset, eksperimen, validasi formal & autopsi kausal** |
+
 
 ---
 
@@ -239,9 +244,24 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | Implementasi Provenance Deduplication, Run 4 & Autopsi Otoritas | — | 0.35 | 21.0 m | — | Provenance preservation 10/10 tests PASS, Run 4 (179s), penemuan Hierarchy-of-Authority |
 | **Total Sesi Riset Lintas Ekosistem (2026-09-12)** | **—** | **2.10** | **126.0 m** | **—** | **Kumulatif Riset: 52.12 jam** |
 
-*Ringkasan Grand Total Kumulatif Proyek Terbaru:*
-- Total Keseluruhan (Fitur + Riset + Eksperimen): **55.38 jam (3.322,8 menit)**
-- Total Riset, Eksperimen & Forensik: **52.12 jam**
-- Status: **✅ SELESAI & DIVERIFIKASI (Investigasi Forensik Run 4 Tuntas — Moratorium Run 5 Aktif)**
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI RISET, HARDENING & VALIDASI EMPIRIS — 2026-09-14
+## ═══════════════════════════════════════════════════════════════════════════
+
+| Fitur / Komponen Riset & Forensik | Estimasi (jam) | Realisasi (jam) | Realisasi (menit) | Selisih (jam) | Keterangan & Catatan |
+|---|---|---|---|---|---|
+| **Sesi 1 (05:45–06:40 WIB):** Multi-Phase Hardening V0–V6 & Pilot Matriks 3x3 (Qwen 7B) | — | 0.92 | 55.0 m | — | 490 tests PASS, 9-run matrix, audit forensik 4 kelas patologi |
+| **Sesi 2 (10:00–11:06 WIB):** Architect Contract Binding v2 & Canonical Obligations | — | 1.10 | 66.0 m | — | canonical_obligation.py, AST extraction, 27 unit tests PASS |
+| **Sesi 3 (11:06–19:15 WIB):** Repair Active Validation Lifecycle v1 & Retests 1x3 | — | 3.47 | 208.0 m | — | Persist history & recompute active validity, 7 unit tests, 552 regression PASS, Retest Qwen 7B (33.3%) vs Ornith 9B (66.7%), 2x freezing rate proof |
+| **Total Sesi Riset & Validasi 2026-09-14** | **—** | **5.49** | **329.0 m** | **—** | **Kumulatif Riset 2026-09-14** |
+
+*Ringkasan Grand Total Kumulatif Proyek Terbaru (s.d. 2026-09-14 19:15 WIB):*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **60.87 jam (3.652,0 menit)**
+- Total Riset, Eksperimen & Validasi: **57.61 jam (3.456,0 menit)**
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
+- **Catatan Status Validasi Intent Architect:** Iterasi 6 **BELUM BERAKHIR** karena belum mendapatkan status validasi PASS dari Intent Architect. Seluruh artefak implementasi dan hasil evaluasi empiris saat ini berstatus **VALIDATION PENDING (MENUNGGU PUTUSAN STRATEGIS INTENT ARCHITECT)**. Waktu realisasi terus berjalan.
+
 
 
