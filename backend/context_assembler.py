@@ -527,6 +527,35 @@ def synthesize_b2_actionable_prescriptions(
             prescriptions.append(rx)
             rx_count += 1
 
+        # Case 4: Contract-Oracle Consistency / Missing Acceptance Obligation
+        elif "oracle" in crit.lower() or "consistency" in crit.lower() or "pre_freeze" in obs.lower() or "oracle" in obs.lower() or "gate" in crit.lower() or "frozen_status" in crit.lower():
+            rx = ActionableRepairPrescription(
+                prescription_id=f"RX-B2-OBL-{rx_count:03d}",
+                evidence_ref=v.violation_id,
+                observed_failure=v.observed_state,
+                oracle_call_site="PRE_FREEZE_AUTHORITY_COMPATIBILITY_GATE",
+                implementation_symbol=v.observed_symbol or "public interface contracts",
+                evidence_basis="CANONICAL_ACCEPTANCE_OBLIGATION_COVERAGE",
+                required_change=(
+                    "The contract lacks deterministic coverage for mandatory acceptance obligations required by the Frozen Acceptance Oracle. "
+                    "All mandatory acceptance obligations (public callable interfaces, interaction endpoints, data models, or runtime widgets) "
+                    "must have proven compatibility in interface_contracts or data_models before the contract can transition to FROZEN status."
+                ),
+                repair_boundary_allowed=[
+                    "Declare public interface contracts covering all mandatory Oracle acceptance obligations",
+                    "Align declared public endpoints, methods, symbols, or data models with Oracle acceptance obligations",
+                ],
+                repair_boundary_forbidden=[
+                    "Do NOT mutate, reduce, or bypass Oracle acceptance obligations",
+                    "Do NOT attempt to mark contract as FROZEN without deterministic coverage",
+                    "Do NOT rely on internal functions without public route or interface bindings",
+                ],
+                expected_post_repair_state="All mandatory Oracle acceptance obligations have status COVERED in CoverageMatrix.",
+                verification_evidence="check_obligation_coverage returns is_fully_covered == True with 0 MISSING or INCOMPATIBLE obligations.",
+            )
+            prescriptions.append(rx)
+            rx_count += 1
+
     return prescriptions
 
 

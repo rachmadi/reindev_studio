@@ -34,6 +34,21 @@ except (ImportError, ValueError):
     except ImportError:
         ContextIntegrityAuditor = None  # type: ignore
 
+try:
+    from .canonical_obligation import (
+        extract_canonical_oracle_obligations,
+        ObligationKind,
+    )
+except (ImportError, ValueError):
+    try:
+        from canonical_obligation import (
+            extract_canonical_oracle_obligations,
+            ObligationKind,
+        )
+    except ImportError:
+        extract_canonical_oracle_obligations = None  # type: ignore
+        ObligationKind = None  # type: ignore
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
@@ -204,76 +219,51 @@ def emit_context_telemetry(tracer: Any, agent: str, telemetry: ContextTelemetry)
 def extract_authoritative_oracle_interfaces(state: Dict[str, Any]) -> List[str]:
     """
     Mengekstrak simbol, method, dan endpoint yang diuji oleh Frozen Acceptance Oracle
-    secara deterministik (Read-Only Observer).
+    secara deterministik (Read-Only Observer) menggunakan Canonical Acceptance Obligation.
     HANYA bersumber dari test suite aktual (state['test_files'] dan/atau state['frozen_oracle_path']).
     """
     test_files = state.get("test_files") or {}
     frozen_path = state.get("frozen_oracle_path") or ""
 
-    test_contents: List[Tuple[str, str]] = []
-    for fname, content in test_files.items():
-        if content:
-            test_contents.append((fname, content))
+    if extract_canonical_oracle_obligations is not None:
+        try:
+            obligations = extract_canonical_oracle_obligations(
+                frozen_oracle_path=frozen_path if frozen_path else None,
+                test_files=test_files if test_files else None
+            )
+            tested_items: List[str] = []
+            seen = set()
 
-    if frozen_path and Path(frozen_path).exists() and Path(frozen_path).is_dir():
-        for root, _, files in os.walk(frozen_path):
-            for f in files:
-                if (f.startswith("test_") and f.endswith(".py")) or f.endswith("_test.dart") or f.endswith("_test.py"):
-                    try:
-                        fpath = Path(root) / f
-                        if f not in [t[0] for t in test_contents]:
-                            test_contents.append((f, fpath.read_text(encoding="utf-8")))
-                    except Exception:
-                        pass
+            for ob in obligations:
+                if ob.obligation_kind == ObligationKind.INTERACTION.value:
+                    method = ob.inputs.get("http_method", "").upper()
+                    ep = ob.public_identity
+                    key = f"{method} {ep}"
+                    if key not in seen:
+                        seen.add(key)
+                        tested_items.append(f"[ORACLE_FACT] {ep} [{method}] (Tested endpoint)")
+                elif ob.obligation_kind == ObligationKind.DATA_MODEL.value:
+                    sym = ob.public_identity
+                    if sym not in seen:
+                        seen.add(sym)
+                        tested_items.append(f"[ORACLE_FACT] {sym} (Tested widget/model)")
+                elif ob.obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value:
+                    sym = ob.public_identity
+                    if sym not in seen:
+                        seen.add(sym)
+                        tested_items.append(f"[ORACLE_FACT] {sym} (Tested widget/class)")
+                else:
+                    sym = ob.public_identity
+                    if sym not in seen:
+                        seen.add(sym)
+                        tag = "Required public symbol" if "hasattr" in str(ob.acceptance_evidence) else "Tested module symbol"
+                        tested_items.append(f"[ORACLE_FACT] {sym} ({tag})")
 
-    tested_items: List[str] = []
-    seen = set()
+            return sorted(tested_items)
+        except Exception:
+            pass
 
-    for fname, content in test_contents:
-        # 1. REST API endpoints via TestClient (e.g. client.get('/products', ...))
-        for method, ep in re.findall(r"client\.(get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content):
-            key = f"{method.upper()} {ep}"
-            if key not in seen:
-                seen.add(key)
-                tested_items.append(f"[ORACLE_FACT] {ep} [{method.upper()}] (Tested endpoint)")
-
-        # 2. Python symbols (hasattr(main, 'X') or main.X)
-        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
-            if sym not in ("app", "main") and sym not in seen:
-                seen.add(sym)
-                tested_items.append(f"[ORACLE_FACT] {sym} (Required public symbol)")
-
-        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
-            if sym not in ("app", "main") and sym not in seen:
-                seen.add(sym)
-                tested_items.append(f"[ORACLE_FACT] {sym} (Tested module symbol)")
-
-        # 3. Dart / Flutter symbols (find.byType or constructor instantiation)
-        if fname.endswith(".dart"):
-            dart_framework_types = {
-                "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
-                "Container", "Card", "Text", "Center", "Row", "Column", "Padding",
-                "WidgetTester", "Key", "Colors", "Icon", "Icons", "ConsumerWidget",
-                "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Widget",
-                "Expanded", "Flexible", "ListView", "SingleChildScrollView", "AppBar",
-                "FloatingActionButton", "ElevatedButton", "TextButton", "IconButton",
-                "Stack", "Positioned", "Align", "Duration", "Future", "Stream",
-                "ValueNotifier", "ChangeNotifier", "StateNotifier", "Provider",
-                "StateProvider", "FutureProvider", "StreamProvider", "NotifierProvider",
-                "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
-                "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
-            }
-            for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
-                if sym not in dart_framework_types and sym not in seen:
-                    seen.add(sym)
-                    tested_items.append(f"[ORACLE_FACT] {sym} (Tested widget/class)")
-
-            for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
-                if sym not in dart_framework_types and sym not in seen and not sym.startswith("Test"):
-                    seen.add(sym)
-                    tested_items.append(f"[ORACLE_FACT] {sym} (Tested widget/model)")
-
-    return sorted(tested_items)
+    return []
 
 
 # ===========================================================================

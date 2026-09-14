@@ -263,11 +263,14 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
 
     # 2. Evaluate Architect Phase Contract & Blueprint
     temp_state = dict(state)
+    temp_state["contract_validation_errors"] = errors
+    temp_state["contract_validation_warnings"] = warnings
     if success:
         temp_state["contract"] = frozen_contract
         temp_state["contract_status"] = ContractStatus.FROZEN.value
         temp_state["contract_sha256"] = sha256_seal
     else:
+        temp_state["contract"] = frozen_contract
         temp_state["contract_status"] = ContractStatus.REJECTED.value
 
     val_contract = validate_architect_phase(temp_state)
@@ -277,12 +280,24 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
     else:
         verdict = "FAIL"
 
+    cov_matrix_data = None
+    if isinstance(frozen_contract, dict):
+        cov_matrix_data = (
+            frozen_contract.get("provenance", {}).get("coverage_matrix")
+            or frozen_contract.get("coverage_matrix")
+        )
+
     if tracer:
         tracer.log_event(
             stage="phase_end_validation",
             event_type="architect_validation",
             iteration=count,
-            data={"verdict": verdict, "seal_success": success, "val_contract": val_contract}
+            data={
+                "verdict": verdict,
+                "seal_success": success,
+                "val_contract": val_contract,
+                "coverage_matrix": cov_matrix_data,
+            }
         )
 
     logs = list(state.get("logs") or [])
@@ -290,6 +305,8 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
 
     res: Dict[str, Any] = {
         "architect_validator_contract": val_contract,
+        "contract_validation_errors": errors,
+        "contract_validation_warnings": warnings,
         "contract_revision_count": count + 1,
         "logs": logs
     }
@@ -304,6 +321,7 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
             "contract_feedback": None
         })
     else:
+        res["contract"] = frozen_contract
         if count < max_repairs:
             new_counts = _increment_repair_count(state, "architect")
             res["repair_attempt_counts"] = new_counts

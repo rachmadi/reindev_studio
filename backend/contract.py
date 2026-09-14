@@ -13,6 +13,7 @@ dokumentasi-pengembangan/architecture/machine_readable_contract_design.md (v1.0.
 
 from __future__ import annotations
 
+import os
 import re
 import json
 import copy
@@ -22,6 +23,30 @@ from enum import Enum
 from typing import Dict, List, Any, Optional, Tuple, Set
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+try:
+    from .canonical_obligation import (
+        extract_canonical_oracle_obligations,
+        check_obligation_coverage,
+        CoverageStatus,
+        CoverageMatrix,
+        CanonicalObligation,
+        ObligationKind,
+        ObligationAuthority,
+        ObligationProvenance,
+    )
+except ImportError:
+    from canonical_obligation import (
+        extract_canonical_oracle_obligations,
+        check_obligation_coverage,
+        CoverageStatus,
+        CoverageMatrix,
+        CanonicalObligation,
+        ObligationKind,
+        ObligationAuthority,
+        ObligationProvenance,
+    )
+
 
 
 # ===========================================================================
@@ -185,10 +210,12 @@ def verify_contract_integrity(contract_dict: Dict[str, Any]) -> bool:
 # ===========================================================================
 
 class Provenance(BaseModel):
+    model_config = {"extra": "allow"}
     parent_intent_sha256: str = ""
     created_by: str = "System Architect"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     contract_sha256: Optional[str] = None
+    coverage_matrix: Optional[Dict[str, Any]] = None
 
 
 class TaskIntent(BaseModel):
@@ -278,9 +305,11 @@ class ExpectedReturn(BaseModel):
 
 
 class InterfaceContract(BaseModel):
+    model_config = {"extra": "allow"}
     interface_id: str
     interface_type: str  # HTTP_ENDPOINT, FUNCTION, CLASS_METHOD, WIDGET
     identifier: str
+    route: Optional[str] = None
     http_method: Optional[str] = None  # GET, POST, PUT, DELETE, PATCH, None
     target_file: str
     parameters: List[InterfaceParameter] = Field(default_factory=list)
@@ -357,12 +386,13 @@ class UnresolvedAmbiguity(BaseModel):
 
 
 class MachineReadableContract(BaseModel):
+    model_config = {"extra": "allow"}
     contract_version: str = "1.0.1"
     contract_id: str
     status: str = "DRAFT"  # DRAFT, ALIGNED, FROZEN, EXECUTING, VALIDATED, REJECTED
     provenance: Provenance = Field(default_factory=Provenance)
-    task_intent: TaskIntent
-    target_ecosystem: TargetEcosystem
+    task_intent: Optional[TaskIntent] = None
+    target_ecosystem: Optional[TargetEcosystem] = None
     data_models: List[DataModel] = Field(default_factory=list)
     interface_contracts: List[InterfaceContract] = Field(default_factory=list)
     functional_requirements: List[FunctionalRequirement] = Field(default_factory=list)
@@ -370,6 +400,7 @@ class MachineReadableContract(BaseModel):
     constraints: ContractConstraints = Field(default_factory=ContractConstraints)
     unresolved_ambiguities: List[UnresolvedAmbiguity] = Field(default_factory=list)
     target_file: Optional[str] = None
+    coverage_matrix: Optional[Dict[str, Any]] = None
 
     @field_validator("contract_version")
     @classmethod
@@ -441,77 +472,23 @@ def is_non_ui_computational_task(contract_dict: Dict[str, Any], task_text: Optio
 def extract_oracle_tested_symbols(frozen_oracle_path: str, target_lang: str = "") -> Set[str]:
     """
     Mengekstrak simbol, kelas, antarmuka, atau endpoint yang diuji oleh Frozen Oracle
-    secara deterministik (Read-Only Observer).
-    Digunakan untuk menegakkan wewenang Acceptance Oracle pada context evidence.
+    secara deterministik (Read-Only Observer) menggunakan Canonical Acceptance Adapter.
     """
-    import os
-    from pathlib import Path
-
     if not frozen_oracle_path:
         return set()
-
-    oracle_dir = Path(frozen_oracle_path)
-    if not oracle_dir.exists() or not oracle_dir.is_dir():
+    try:
+        obligations = extract_canonical_oracle_obligations(frozen_oracle_path=frozen_oracle_path)
+        symbols = set()
+        for ob in obligations:
+            symbols.add(ob.public_identity)
+            if ob.obligation_kind == ObligationKind.INTERACTION.value:
+                clean = ob.public_identity.strip("/").replace("/", "_")
+                if clean:
+                    symbols.add(clean)
+        return symbols
+    except Exception:
         return set()
 
-    test_contents: List[Tuple[str, str]] = []
-    for root, _, files in os.walk(oracle_dir):
-        for f in files:
-            if (f.startswith("test_") and f.endswith(".py")) or (f.endswith("_test.dart")) or (f.endswith("_test.py")):
-                try:
-                    fpath = Path(root) / f
-                    test_contents.append((f, fpath.read_text(encoding="utf-8")))
-                except Exception:
-                    pass
-
-    tested_symbols: Set[str] = set()
-
-    dart_framework_types = {
-        "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
-        "Container", "Card", "Text", "Center", "Row", "Column", "Padding",
-        "WidgetTester", "Key", "Colors", "Icon", "Icons", "ConsumerWidget",
-        "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Widget",
-        "Expanded", "Flexible", "ListView", "SingleChildScrollView", "AppBar",
-        "FloatingActionButton", "ElevatedButton", "TextButton", "IconButton",
-        "Stack", "Positioned", "Align", "Duration", "Future", "Stream",
-        "ValueNotifier", "ChangeNotifier", "StateNotifier", "Provider",
-        "StateProvider", "FutureProvider", "StreamProvider", "NotifierProvider",
-        "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
-        "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
-    }
-
-    for fname, content in test_contents:
-        # 1. REST API endpoints
-        for ep in re.findall(r"client\.(?:get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content):
-            base_ep = re.sub(r"/\{[^}]+\}", "", ep).rstrip("/")
-            if base_ep:
-                tested_symbols.add(base_ep)
-
-        # 2. Python symbols
-        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
-            tested_symbols.add(sym)
-        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
-            if sym not in ("app", "main"):
-                tested_symbols.add(sym)
-        for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
-            tested_symbols.add(dunder)
-
-        # 3. Dart symbols
-        if fname.endswith(".dart"):
-            dart_symbols = set()
-            for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
-                if sym not in dart_framework_types:
-                    dart_symbols.add(sym)
-            for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
-                if sym not in dart_framework_types:
-                    dart_symbols.add(sym)
-            if not dart_symbols:
-                for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
-                    if sym not in dart_framework_types:
-                        dart_symbols.add(sym)
-            tested_symbols.update(dart_symbols)
-
-    return tested_symbols
 
 
 def check_pre_freeze_authority_compatibility(
@@ -519,17 +496,19 @@ def check_pre_freeze_authority_compatibility(
     frozen_oracle_path: str
 ) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
     """
-    PRE-FREEZE AUTHORITY COMPATIBILITY GATE (Part 2 - Architectural Hardening v1).
+    PRE-FREEZE AUTHORITY COMPATIBILITY GATE (Part 2 - Architect Contract Binding v2).
     Memeriksa secara deterministik apakah seluruh kewajiban Acceptance Oracle
-    (authoritative Oracle obligations) telah terwakili dalam Draft Contract SEBELUM
+    (authoritative Oracle obligations) telah terbukti terwakili dalam Contract SEBELUM
     kontrak diizinkan bertransisi ke status FROZEN.
 
-    Non-negotiable:
-    - Tidak mendikte HOW TO REPAIR atau memilih solusi desain.
-    - Menghasilkan bukti eksplisit non-solver:
-        ORACLE_OBLIGATION: <obligation>
-        CONTRACT_COVERAGE: MISSING
-        RESULT: INCOMPATIBLE — CONTRACT MUST NOT FREEZE
+    DOKTRIN NON-NEGOTIABLE & KOREKSI:
+    - 1. Oracle adalah IMMUTABLE ACCEPTANCE AUTHORITY (WHAT).
+    - 2. Architect adalah DESIGN AUTHORITY (HOW).
+    - 3. Provenance eksklusif: HANYA ORACLE_FACT yang memegang otoritas penerimaan.
+    - 4. Koreksi 1: 100% Coverage membuktikan kompatibilitas struktural/semantik deterministik.
+    - 5. Koreksi 2: Adapters murni PARSE -> NORMALIZE -> REPRESENT (Dilarang INVENT/SOLVE).
+    - 6. Koreksi 3: Engine hanya memberikan DIAGNOSIS (WHAT), BUKAN instruksi HOW.
+    - 7. Invariant: CANONICAL OBLIGATION INTEGRITY.
     """
     import os
     from pathlib import Path
@@ -538,164 +517,70 @@ def check_pre_freeze_authority_compatibility(
     if not oracle_dir.exists() or not oracle_dir.is_dir():
         return True, [], []
 
-    test_contents: List[Tuple[str, str]] = []
-    for root, _, files in os.walk(oracle_dir):
-        for f in files:
-            if (f.startswith("test_") and f.endswith(".py")) or (f.endswith("_test.dart")) or (f.endswith("_test.py")):
-                try:
-                    fpath = Path(root) / f
-                    test_contents.append((f, fpath.read_text(encoding="utf-8")))
-                except Exception:
-                    pass
+    try:
+        obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(oracle_dir))
+    except Exception as e:
+        return False, [f"Failed to extract canonical obligations from Oracle: {e}"], []
 
-    if not test_contents:
+    if not obligations:
         return True, [], []
 
-    # Kumpulkan seluruh representasi kontrak saat ini
-    # 1. Endpoints & Methods
-    contract_http_endpoints: Dict[str, Set[str]] = {}  # {base_path: {methods}}
-    contract_symbols: Set[str] = set()
-
-    for iface in contract_obj.interface_contracts:
-        ident = iface.identifier.strip()
-        method = (iface.http_method or "").upper().strip()
-        if iface.interface_type == "HTTP_ENDPOINT" or ident.startswith("/"):
-            base_ep = re.sub(r"/\{[^}]+\}", "", ident).rstrip("/")
-            if not base_ep:
-                base_ep = "/"
-            contract_http_endpoints.setdefault(base_ep, set())
-            if method:
-                contract_http_endpoints[base_ep].add(method)
-        else:
-            parts = re.split(r"[.\(]", ident)
-            for p in parts:
-                p_clean = p.strip(" )\"'")
-                if p_clean:
-                    contract_symbols.add(p_clean)
-
-    for m in contract_obj.data_models:
-        if m.model_name:
-            contract_symbols.add(m.model_name.strip())
+    cov_matrix = check_obligation_coverage(obligations, contract_obj)
 
     missing_obligations: List[Dict[str, Any]] = []
     error_messages: List[str] = []
 
-    for fname, content in test_contents:
-        # A. REST API (FastAPI TestClient)
-        # Ekstrak seluruh panggilan: client.<method>("<path>")
-        for m_call, ep_call in re.findall(r"client\.(get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content, re.IGNORECASE):
-            m_upper = m_call.upper()
-            base_ep = re.sub(r"/\{[^}]+\}", "", ep_call).rstrip("/")
-            if not base_ep:
-                base_ep = "/"
+    declared_symbols: Set[str] = set()
+    for ifc in (contract_obj.interface_contracts or []):
+        if hasattr(ifc, "identifier") and ifc.identifier:
+            declared_symbols.add(ifc.identifier.strip())
+        elif isinstance(ifc, dict) and ifc.get("identifier"):
+            declared_symbols.add(str(ifc["identifier"]).strip())
+    for dm in (contract_obj.data_models or []):
+        if hasattr(dm, "model_name") and dm.model_name:
+            declared_symbols.add(dm.model_name.strip())
+        elif isinstance(dm, dict) and dm.get("model_name"):
+            declared_symbols.add(str(dm["model_name"]).strip())
 
-            # Periksa apakah ada coverage untuk endpoint dan metode ini
-            has_coverage = False
-            for c_ep, c_methods in contract_http_endpoints.items():
-                if c_ep == base_ep or c_ep.startswith(base_ep) or base_ep.startswith(c_ep):
-                    if not c_methods or m_upper in c_methods:
-                        has_coverage = True
-                        break
+    for r in cov_matrix.results:
+        if r.status != CoverageStatus.COVERED:
+            ob = r.obligation
+            st_val = r.status.value if isinstance(r.status, CoverageStatus) else str(r.status)
 
-            if not has_coverage:
-                ob_desc = f"HTTP {m_upper} {base_ep}"
-                if not any(o["obligation"] == ob_desc for o in missing_obligations):
-                    item = {
-                        "obligation": ob_desc,
-                        "coverage": "MISSING",
-                        "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
-                        "source_file": fname
-                    }
-                    missing_obligations.append(item)
-                    msg = (
-                        f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
-                        f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
-                        f"CONTRACT_COVERAGE:\nMISSING\n\n"
-                        f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
-                    )
-                    error_messages.append(msg)
+            if ob.obligation_kind == ObligationKind.INTERACTION.value:
+                method = ob.inputs.get("http_method", "").upper()
+                ob_desc = f"HTTP {method} {ob.public_identity}".strip()
+            elif ob.obligation_kind == ObligationKind.DATA_MODEL.value:
+                ob_desc = f"Data model / entity '{ob.public_identity}'"
+            elif ob.obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value:
+                ob_desc = f"Widget/Model '{ob.public_identity}'"
+            else:
+                ob_desc = f"Callable symbol '{ob.public_identity}'"
 
-        # B. Python Unit Test (CLI / Library / Module)
-        # Ekstrak simbol yang diuji/diimpor dari target
-        tested_symbols = set()
-        for sym in re.findall(r"from\s+main\s+import\s+([A-Za-z0-9_,\s]+)", content):
-            for s in sym.split(","):
-                s_clean = s.strip()
-                if s_clean and s_clean not in ("app", "main"):
-                    tested_symbols.add(s_clean)
-        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
-            tested_symbols.add(sym)
-        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
-            if sym not in ("app", "main"):
-                tested_symbols.add(sym)
-
-        for ts in tested_symbols:
-            if ts not in contract_symbols:
-                ob_desc = f"Callable symbol '{ts}'"
-                if not any(o["obligation"] == ob_desc for o in missing_obligations):
-                    item = {
-                        "obligation": ob_desc,
-                        "coverage": "MISSING",
-                        "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
-                        "source_file": fname
-                    }
-                    missing_obligations.append(item)
-                    msg = (
-                        f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
-                        f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
-                        f"CONTRACT_COVERAGE:\nMISSING\n\n"
-                        f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
-                    )
-                    error_messages.append(msg)
-
-        # C. Dart / Flutter Test (Widget / Riverpod Provider)
-        if fname.endswith(".dart"):
-            dart_framework_types = {
-                "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
-                "Container", "Card", "Text", "Center", "Row", "Column", "Padding",
-                "WidgetTester", "Key", "Colors", "Icon", "Icons", "ConsumerWidget",
-                "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Widget",
-                "Expanded", "Flexible", "ListView", "SingleChildScrollView", "AppBar",
-                "FloatingActionButton", "ElevatedButton", "TextButton", "IconButton",
-                "Stack", "Positioned", "Align", "Duration", "Future", "Stream",
-                "ValueNotifier", "ChangeNotifier", "StateNotifier", "Provider",
-                "StateProvider", "FutureProvider", "StreamProvider", "NotifierProvider",
-                "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
-                "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
+            cov_status_label = "MISSING" if r.status == CoverageStatus.MISSING else "INCOMPATIBLE"
+            item = {
+                "obligation": ob_desc,
+                "coverage": cov_status_label,
+                "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
+                "source_file": ob.source_reference,
+                "obligation_id": ob.obligation_id,
+                "reason": r.reason,
+                "missing_aspects": r.missing_aspects,
             }
-            dart_tested = set()
-            for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
-                if sym not in dart_framework_types:
-                    dart_tested.add(sym)
-            for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
-                if sym not in dart_framework_types:
-                    dart_tested.add(sym)
-            # Custom class instantiation in test bodies (e.g. MetricData(...))
-            for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
-                if sym not in dart_framework_types:
-                    dart_tested.add(sym)
+            missing_obligations.append(item)
 
-            for dts in dart_tested:
-                if dts not in contract_symbols:
-                    ob_desc = f"Widget/Model '{dts}'"
-                    if not any(o["obligation"] == ob_desc for o in missing_obligations):
-                        item = {
-                            "obligation": ob_desc,
-                            "coverage": "MISSING",
-                            "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
-                            "source_file": fname
-                        }
-                        missing_obligations.append(item)
-                        msg = (
-                            f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
-                            f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
-                            f"CONTRACT_COVERAGE:\nMISSING\n\n"
-                            f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
-                        )
-                        error_messages.append(msg)
+            msg = (
+                f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
+                f"CONTRACT_DECLARED_INTERFACES:\n{sorted(declared_symbols) if declared_symbols else '[]'}\n\n"
+                f"CONTRACT_COVERAGE:\n{cov_status_label}\n\n"
+                f"DIAGNOSIS:\n{r.reason}\n\n"
+                f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {ob.source_reference})"
+            )
+            error_messages.append(msg)
 
-    is_compatible = (len(missing_obligations) == 0)
+    is_compatible = cov_matrix.is_fully_covered
     return is_compatible, error_messages, missing_obligations
+
 
 
 def check_oracle_interface_consistency(
@@ -1103,6 +988,19 @@ def seal_and_freeze_contract(
         frozen_oracle_path=frozen_oracle_path,
         task_text=task_text
     )
+
+    # Compute and attach canonical coverage matrix telemetry
+    if frozen_oracle_path and os.path.exists(frozen_oracle_path):
+        try:
+            obs = extract_canonical_oracle_obligations(frozen_oracle_path=frozen_oracle_path)
+            if obs:
+                cov_mat = check_obligation_coverage(obs, c_dict)
+                c_dict["coverage_matrix"] = cov_mat.to_dict()
+                if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
+                    c_dict["provenance"] = {}
+                c_dict["provenance"]["coverage_matrix"] = cov_mat.to_telemetry_dict()
+        except Exception:
+            pass
 
     if not is_valid:
         c_dict["status"] = ContractStatus.REJECTED.value
