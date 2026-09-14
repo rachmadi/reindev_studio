@@ -575,6 +575,24 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/human_intervention.md`: Pencatatan intervensi #112 s.d. #116 (termasuk koreksi tata kelola waktu realisasi dan penegakan batas iterasi).
   - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi percakapan terkini.
 
+---
+
+### Commit: PENDING (Forensic Audit Report) — 2026-09-14
+- **Commit Hash:** PENDING
+- **Status:** TERVERIFIKASI PENUH (Integritas Frozen Oracle 100% Intact, Iterasi 6 OPEN / VALIDATION PENDING)
+- **Tipe:** `docs(forensics)`
+- **Pesan Commit:** `docs(forensics): publish deep forensic failure audit comparing qwen2.5-coder:7b and ornith:9b`
+- **Waktu:** 2026-09-14 19:35 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/laporan_forensik_komparasi_mendalam_qwen7b_vs_ornith9b.md` (NEW): Laporan investigasi & audit forensik mendalam membedah 248 event dari 6 run pada 2 eksperimen terkontrol terakhir (Qwen 7B vs Ornith 9B) dengan taksonomi 4 kelas patologi.
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-109 (Audit Forensik Komparatif 2 Model & Taksonomi 4 Kegagalan Eksekusi Pasca-Freezing).
+  - `dokumentasi-pengembangan/human_intervention.md`: Pencatatan intervensi #117.
+  - `dokumentasi-pengembangan/durasi_per_fitur.md`: Penambahan aktivitas forensik ke Sesi 3 (+20.0 m / 0.33 jam, total Sesi 3: 3.80 jam / 228 menit).
+  - `dokumentasi-pengembangan/waktu_estimasi_vs_realisasi.md`: Pemutakhiran Grand Total waktu realisasi proyek menjadi 61.20 jam (3.672,0 menit).
+  - `dokumentasi-pengembangan/validation_log.md`: Penambahan tautan laporan forensik dan penegasan status Iterasi 6 tetap OPEN (VALIDATION PENDING).
+  - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog audit forensik terkini.
+
+
 
 
 

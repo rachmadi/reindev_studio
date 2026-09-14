@@ -1991,6 +1991,27 @@ JANGAN mengubah Frozen Acceptance Oracle. JANGAN melonggarkan validation. JANGAN
  4. Memutakhirkan `human_intervention.md` dengan intervensi #112 s.d. #116.
  5. Menjalankan git commit & push ke GitHub remote).
 
+---
+
+[USER (INTENT ARCHITECT) - 19:20]
+"Investigasi dan audit forensik lengkap 2 pengujian terakhir dari 2 model untuk menggali di mana masalah dan penyebabnya. Buat laporan rinci"
+
+[ANTIGRAVITY - 19:35]
+(Melaksanakan investigasi dan audit forensik lengkap end-to-end terhadap 6 run dari 2 eksperimen terkontrol terakhir [Qwen 7B vs Ornith 9B]:
+ 1. Mengekstrak dan membedah seluruh 248 event kanonikal dari berkas `run_trace.jsonl`.
+ 2. Merekonstruksi kegagalan per turn dan per loop di level kode, pesan error, validator AST, dan compiler trace.
+ 3. Mengidentifikasi akar penyebab 4 kelas patologi:
+    - `fastapi_t1` (Qwen 7B): Delimiter syntax error (Turn 0-1) dan penghilangan `GET /products` di Gate V2 (Turn 2).
+    - `cli_t1` (Qwen 7B): Cross-Domain Archetype Hallucination (`Matrix(BaseModel)` pydantic positional arg mismatch di seluruh 5 test loop).
+    - `flutter_t1` (Qwen 7B): Attention Drift (`CardMetricWidget` vs `CardMetric` call-site Oracle).
+    - `fastapi_t1` (Ornith 9B): HTTP 422 payload mismatch pada Loop 0 disusul Hyper-Mutation / Architectural Drifting menjadi `class InventoryStore` yang dikarantina oleh Gate B3 pada Loop 1-2.
+    - `cli_t1` (Ornith 9B): Penghilangan `subtract_matrices` pada Turn 0 dan Instruction-Following Breakdown [kehilangan blok JSON] pada Turn 1-2.
+    - `flutter_t1` (Ornith 9B): Epistemic Proof of Active Validation Lifecycle v1 [FROZEN pada Turn 1], disusul Dart named parameter constructor mismatch [`cpu`, `title` vs `icon`, `data`] pada 5 loop di sandbox.
+ 4. Membuktikan integritas 100% Dual-Lock Acceptance Authority [Frozen Oracle SHA-256 intact] dan keberhasilan Active Validation Lifecycle v1.
+ 5. Menyusun laporan forensik komprehensif `laporan_forensik_komparasi_mendalam_qwen7b_vs_ornith9b.md` di `dokumentasi-pengembangan/experiments/`.
+ 6. Memutakhirkan `decision_log.md` [D-109], `human_intervention.md` [#117], `durasi_per_fitur.md`, dan `waktu_estimasi_vs_realisasi.md` [Grand Total: 61.20 jam / 3.672,0 menit]).
+
+
 
 
 

@@ -1201,12 +1201,14 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
 - **Status Validasi:** ⏳ **VALIDATION PENDING (HASIL EMPIRIS RETEST 1X3 SELESAI — MENUNGGU EVALUASI & PUTUSAN STRATEGIS INTENT ARCHITECT)**
 - **Catatan Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)** — Iterasi 6 belum berakhir karena belum mendapatkan status validasi PASS dari Intent Architect. Waktu realisasi iterasi 6 masih terus berjalan.
 - **Dokumentasi Terkait:**
-  - `dokumentasi-pengembangan/experiments/laporan_evaluasi_retest_1x3_qwen25_coder7b.md`
+  - `dokumentasi-pengembangan/experiments/laporan_forensik_komparasi_mendalam_qwen7b_vs_ornith9b.md` (Laporan Investigasi & Audit Forensik Mendalam 6 Run 2 Model)
   - `dokumentasi-pengembangan/experiments/laporan_evaluasi_komparasi_1x3_ornith9b_vs_qwen25.md`
+  - `dokumentasi-pengembangan/experiments/laporan_evaluasi_retest_1x3_qwen25_coder7b.md`
   - `dokumentasi-pengembangan/experiments/pilot_retest_1x3_qwen2.5_coder_7b.json`
   - `dokumentasi-pengembangan/experiments/pilot_retest_1x3_ornith9b_post_lifecycle_repair.json`
-- **Waktu Pencatatan Checkpoint:** 2026-09-14 19:15 WIB
+- **Waktu Pencatatan Checkpoint:** 2026-09-14 19:35 WIB
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+
 
 
 

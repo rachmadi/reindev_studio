@@ -204,10 +204,11 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 | **Lintas Ekosistem & Autopsi Otoritas** | Treatment A & Flutter T1 (Hierarchy-of-Authority) | — | 2.10 | 126.0 m | — | 2026-09-12 (2.10 jam) |
 | **Hardening V0–V6 & Matriks 3x3** | Multi-Phase Hardening & 9-Run Pilot Matrix Qwen 7B | — | 0.92 | 55.0 m | — | 2026-09-14 (0.92 jam) |
 | **Architect Contract Binding v2** | Canonical Obligations Extraction & Verification | — | 1.10 | 66.0 m | — | 2026-09-14 (1.10 jam) |
-| **Lifecycle v1 & Retests 1x3** | Active Validation Lifecycle v1 & Retests Qwen vs Ornith | — | 3.47 | 208.0 m | — | 2026-09-14 (3.47 jam) |
+| **Lifecycle v1, Retests 1x3 & Forensik** | Active Validation Lifecycle v1, Retests Qwen vs Ornith & Audit Forensik 6 Run | — | 3.80 | 228.0 m | — | 2026-09-14 (3.80 jam) |
 | 7 | Native Desktop & E2E Validation | 6.0 | — | — | — | — |
 | **TOTAL** | **Kumulatif Pengembangan Fitur (1a s.d. 6)** | **46.0** | **3.26** | **196.0 m** | **-42.74** | **14.1x lebih cepat** |
-| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **60.87** | **3.652,0 m** | **+14.87** | **Termasuk 57.61 jam riset, eksperimen, validasi formal & autopsi kausal** |
+| **GRAND TOTAL** | **Total Keseluruhan (Fitur + Riset + Eksperimen Terkontrol)** | **46.0** | **61.20** | **3.672,0 m** | **+15.20** | **Termasuk 57.94 jam riset, eksperimen, validasi formal & autopsi kausal** |
+
 
 
 ---
@@ -254,14 +255,15 @@ eviewer.py) | 1.0 | 0.03 | 1.6 m | -0.97 | Audit menyeluruh & penerbitan laporan
 |---|---|---|---|---|---|
 | **Sesi 1 (05:45–06:40 WIB):** Multi-Phase Hardening V0–V6 & Pilot Matriks 3x3 (Qwen 7B) | — | 0.92 | 55.0 m | — | 490 tests PASS, 9-run matrix, audit forensik 4 kelas patologi |
 | **Sesi 2 (10:00–11:06 WIB):** Architect Contract Binding v2 & Canonical Obligations | — | 1.10 | 66.0 m | — | canonical_obligation.py, AST extraction, 27 unit tests PASS |
-| **Sesi 3 (11:06–19:15 WIB):** Repair Active Validation Lifecycle v1 & Retests 1x3 | — | 3.47 | 208.0 m | — | Persist history & recompute active validity, 7 unit tests, 552 regression PASS, Retest Qwen 7B (33.3%) vs Ornith 9B (66.7%), 2x freezing rate proof |
-| **Total Sesi Riset & Validasi 2026-09-14** | **—** | **5.49** | **329.0 m** | **—** | **Kumulatif Riset 2026-09-14** |
+| **Sesi 3 (11:06–19:35 WIB):** Repair Active Validation Lifecycle v1, Retests 1x3 & Audit Forensik | — | 3.80 | 228.0 m | — | Persist history & recompute active validity, 7 unit tests, 552 regression PASS, Retest Qwen 7B (33.3%) vs Ornith 9B (66.7%), 2x freezing rate proof, audit forensik mendalam 6 run |
+| **Total Sesi Riset & Validasi 2026-09-14** | **—** | **5.82** | **349.0 m** | **—** | **Kumulatif Riset 2026-09-14** |
 
-*Ringkasan Grand Total Kumulatif Proyek Terbaru (s.d. 2026-09-14 19:15 WIB):*
-- Total Keseluruhan (Fitur + Riset + Eksperimen): **60.87 jam (3.652,0 menit)**
-- Total Riset, Eksperimen & Validasi: **57.61 jam (3.456,0 menit)**
+*Ringkasan Grand Total Kumulatif Proyek Terbaru (s.d. 2026-09-14 19:35 WIB):*
+- Total Keseluruhan (Fitur + Riset + Eksperimen): **61.20 jam (3.672,0 menit)**
+- Total Riset, Eksperimen & Validasi: **57.94 jam (3.476,0 menit)**
 - **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
 - **Catatan Status Validasi Intent Architect:** Iterasi 6 **BELUM BERAKHIR** karena belum mendapatkan status validasi PASS dari Intent Architect. Seluruh artefak implementasi dan hasil evaluasi empiris saat ini berstatus **VALIDATION PENDING (MENUNGGU PUTUSAN STRATEGIS INTENT ARCHITECT)**. Waktu realisasi terus berjalan.
+
 
 
 
