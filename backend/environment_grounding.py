@@ -30,11 +30,218 @@ except (ImportError, ValueError):
     except ImportError:
         catalog = None  # type: ignore[assignment]
 
+from dataclasses import dataclass, field
+
 # Root workspace — resolusi dari lokasi file ini (backend/)
 _BACKEND_DIR = Path(__file__).parent
 _WORKSPACE_DIR = _BACKEND_DIR.parent
 _SANDBOX_DIR = _BACKEND_DIR / "sandbox"
 _VENV_PYTHON = _BACKEND_DIR / ".venv" / ("Scripts" if sys.platform == "win32" else "bin") / "python"
+
+
+# ---------------------------------------------------------------------------
+# Epistemic Grounding Fact Definitions (Part 1 - Architectural Hardening v1)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class GroundingFact:
+    """
+    Fakta deterministik tentang execution environment dengan klasifikasi epistemik tegas.
+    Categories:
+      - ENVIRONMENT_FACT: Versi runtime, paket terpasang, OS, compiler availability.
+      - DOCUMENTATION_FACT: Panduan resmi kompatibilitas API, deprecation rules.
+      - RUNTIME_FACT: Observasi hasil eksekusi nyata dari compiler/test runner.
+      - MODEL_INFERENCE: Hipotesis/penalaran agen (bukan fakta sistem).
+    """
+    category: str
+    source: str
+    key: str
+    value: str
+    relevance_scope: str = "global"  # "python", "dart", "javascript", "global"
+    description: str = ""
+
+    def to_formatted_line(self) -> str:
+        prefix = f"[{self.category}]"
+        desc = f" — {self.description}" if self.description else ""
+        return f"{prefix} {self.key}: {self.value} (Source: {self.source}){desc}"
+
+
+class EnvironmentGroundingEngine:
+    """
+    Engine grounding generik untuk mengumpulkan dan memformat fakta lingkungan eksekusi
+    secara deterministik tanpa hardcoded solvers atau task-specific bias.
+    """
+
+    @classmethod
+    def collect_environment_facts(
+        cls,
+        target_language: str,
+        target_dir: Optional[str] = None,
+        dynamic_runtime_facts: Optional[List[str]] = None,
+    ) -> List[GroundingFact]:
+        facts: List[GroundingFact] = []
+        lang = (target_language or "").lower().strip()
+        is_dart = "dart" in lang or "flutter" in lang
+        is_py = "python" in lang
+        eco = "dart" if is_dart else ("python" if is_py else "javascript")
+
+        # 1. Runtime & Language Version
+        if is_py:
+            py_ver = sys.version.split()[0]
+            facts.append(GroundingFact(
+                category="ENVIRONMENT_FACT",
+                source="python_runtime",
+                key="language_runtime",
+                value=f"Python {py_ver}",
+                relevance_scope="python",
+                description="Interpreter Python aktif pada subproses eksekusi"
+            ))
+            # Compiler API availability
+            try:
+                import ast
+                facts.append(GroundingFact(
+                    category="ENVIRONMENT_FACT",
+                    source="python_standard_library",
+                    key="compiler_api",
+                    value="ast.parse, type annotations, dataclasses available",
+                    relevance_scope="python",
+                    description="Standard AST compiler toolchain aktif"
+                ))
+            except Exception:
+                pass
+
+        elif is_dart:
+            dart_v = _get_dart_sdk_version()
+            if dart_v:
+                facts.append(GroundingFact(
+                    category="ENVIRONMENT_FACT",
+                    source="dart_sdk",
+                    key="language_runtime",
+                    value=f"Dart SDK {dart_v}",
+                    relevance_scope="dart",
+                    description="Kompiler Dart aktif pada toolchain"
+                ))
+            flutter_v = _get_flutter_version()
+            if flutter_v:
+                facts.append(GroundingFact(
+                    category="ENVIRONMENT_FACT",
+                    source="flutter_framework",
+                    key="framework_version",
+                    value=f"Flutter {flutter_v}",
+                    relevance_scope="dart",
+                    description="Framework Flutter aktif pada environment"
+                ))
+
+        # 2. Package & Dependency Versions from Manifests
+        packages = find_active_manifest_packages(eco, target_dir=target_dir)
+        for pkg_name, pkg_ver in packages.items():
+            facts.append(GroundingFact(
+                category="ENVIRONMENT_FACT",
+                source="environment_manifest",
+                key=f"package:{pkg_name}",
+                value=str(pkg_ver),
+                relevance_scope=eco,
+                description=f"Versi terpasang pada environment: {pkg_ver}"
+            ))
+
+        # 3. Documentation Facts from Declarative Knowledge Catalog
+        if catalog:
+            matched_rules = catalog.get_matching_rules(eco, packages)
+            for r in matched_rules:
+                proh = f" Prohibited: {', '.join(r.prohibited_patterns)}" if r.prohibited_patterns else ""
+                desc = (r.rationale or r.architect_instruction or "") + proh
+                facts.append(GroundingFact(
+                    category="DOCUMENTATION_FACT",
+                    source=f"knowledge_catalog:{r.id}",
+                    key=f"api_compatibility:{r.package}",
+                    value=r.developer_instruction or r.architect_instruction or "API compatibility rule",
+                    relevance_scope=eco,
+                    description=desc
+                ))
+
+        # 4. Runtime Facts from actual test execution / compiler output
+        if dynamic_runtime_facts:
+            for i, df in enumerate(dynamic_runtime_facts):
+                facts.append(GroundingFact(
+                    category="RUNTIME_FACT",
+                    source="runtime_execution_diagnostic",
+                    key=f"observed_feedback_{i+1}",
+                    value=df,
+                    relevance_scope=eco,
+                    description="Fakta yang teramati dari eksekutor atau kompiler sebelumnya"
+                ))
+
+        return facts
+
+    @classmethod
+    def filter_relevant_facts(
+        cls,
+        facts: List[GroundingFact],
+        target_language: str,
+        active_tokens: Optional[List[str]] = None,
+    ) -> List[GroundingFact]:
+        """Menyaring fakta agar hanya menyertakan yang relevan dengan ekosistem aktif."""
+        lang = (target_language or "").lower().strip()
+        is_dart = "dart" in lang or "flutter" in lang
+        is_py = "python" in lang
+        target_eco = "dart" if is_dart else ("python" if is_py else "javascript")
+
+        filtered: List[GroundingFact] = []
+        for f in facts:
+            if f.relevance_scope not in (target_eco, "global"):
+                continue
+            filtered.append(f)
+
+        if not active_tokens:
+            return filtered
+
+        # Prioritaskan fakta yang namanya atau nilainya disebut dalam active_tokens
+        token_lower = [t.lower() for t in active_tokens]
+        relevant: List[GroundingFact] = []
+        secondary: List[GroundingFact] = []
+        for f in filtered:
+            if any(t in f.key.lower() or t in f.value.lower() or t in f.description.lower() for t in token_lower):
+                relevant.append(f)
+            else:
+                secondary.append(f)
+
+        return relevant + secondary
+
+    @classmethod
+    def format_grounding_block(
+        cls,
+        facts: List[GroundingFact],
+        title: str = "ENVIRONMENT GROUNDING",
+    ) -> str:
+        """Memformat daftar fakta grounding ke dalam blok terstruktur menurut kategori epistemik."""
+        if not facts:
+            return ""
+
+        by_cat: Dict[str, List[GroundingFact]] = {
+            "ENVIRONMENT_FACT": [],
+            "DOCUMENTATION_FACT": [],
+            "RUNTIME_FACT": [],
+            "MODEL_INFERENCE": [],
+        }
+        for f in facts:
+            by_cat.setdefault(f.category, []).append(f)
+
+        lines = [f"[{title}]"]
+        lines.append("Fakta di bawah ini bersumber dari verifikasi deterministik environment aktual (Bukan hafalan model).")
+        lines.append("Grounding ini memperkaya fakta teknis; model bebas menentukan cara pemecahan (HOW TO REPAIR) yang memenuhi fakta ini.")
+        lines.append("")
+
+        for cat, items in by_cat.items():
+            if not items:
+                continue
+            lines.append(f"--- {cat} ---")
+            for item in items:
+                lines.append(f"• {item.key}: {item.value} (Sumber: {item.source})")
+                if item.description and item.category == "DOCUMENTATION_FACT":
+                    lines.append(f"  Catatan: {item.description}")
+            lines.append("")
+
+        return "\n".join(lines).strip()
 
 
 # ---------------------------------------------------------------------------

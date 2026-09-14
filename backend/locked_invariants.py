@@ -171,12 +171,15 @@ class LockedInvariant:
     regression_count: int = 0              # Jumlah kali mengalami regresi
     regression_history: List[Dict[str, Any]] = field(default_factory=list)  # Riwayat regresi
     oscillation_detected: bool = False     # Flag jika terdeteksi osilasi (flip-flop)
+    mutation: str = "FORBIDDEN"            # Melarang mutasi perilaku terbukti
+    ever_regressed: bool = False           # Flag permanen apakah pernah regresi
 
     def record_regression(self, failure_evidence: Any, turn: int = 0) -> None:
         """Mencatat kejadian regresi secara permanen."""
         was_previously_regressed = self.regression_count > 0
         self.status = "REGRESSION"
         self.state = "VIOLATED"
+        self.ever_regressed = True
         self.regression_count += 1
         if was_previously_regressed:
             self.oscillation_detected = True
@@ -204,7 +207,16 @@ class LockedInvariant:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> LockedInvariant:
         clean = dict(data)
-        return cls(**clean)
+        if "target_symbol" not in clean:
+            clean["target_symbol"] = clean.get("invariant_id", "")
+        if "target_file" not in clean:
+            clean["target_file"] = "main.py"
+        if "condition" not in clean:
+            clean["condition"] = clean.get("description", "")
+        import inspect
+        valid_keys = set(inspect.signature(cls).parameters.keys())
+        filtered = {k: v for k, v in clean.items() if k in valid_keys}
+        return cls(**filtered)
 
 
 # ===========================================================================
@@ -575,7 +587,7 @@ def format_separated_repair_context(
     regressions: List[LockedInvariant],
     repair_boundary_allowed: List[str],
     repair_boundary_forbidden: List[str],
-    target_file: str = "lib/card_metric.dart"
+    target_file: str = "main.py"
 ) -> str:
     """
     Menghasilkan 4 Dimensi Konteks Perbaikan Eksplisit sesuai Section D & J Mandat IA:

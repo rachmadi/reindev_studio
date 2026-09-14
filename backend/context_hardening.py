@@ -26,6 +26,14 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from .context_integrity import ContextIntegrityAuditor
+except (ImportError, ValueError):
+    try:
+        from context_integrity import ContextIntegrityAuditor
+    except ImportError:
+        ContextIntegrityAuditor = None  # type: ignore
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
@@ -163,6 +171,7 @@ class ContextTelemetry:
     current_failures: int
     repair_boundary_items: int
     authority_conflicts_resolved: int = 0
+    integrity_violations_detected: int = 0
     output_size: int = 0
     validator_result: str = ""
     routing_result: str = ""
@@ -598,6 +607,20 @@ def build_architect_decision_context(
     # Deterministic Consistency Check & Authority Conflict Resolution
     sections, conflicts = check_and_resolve_authority_conflicts(sections, state, pkg=pkg)
 
+    # Part 3: Context Integrity & Task Isolation Audit
+    integrity_violations: List[str] = []
+    if ContextIntegrityAuditor is not None:
+        target_domain = ""
+        contract_obj = state.get("contract")
+        if isinstance(contract_obj, dict):
+            target_domain = (contract_obj.get("task_intent") or {}).get("domain", "")
+        sections, integrity_violations = ContextIntegrityAuditor.audit_context_dict(
+            sections,
+            target_domain=target_domain,
+            target_phase="ARCHITECT",
+            state=state
+        )
+
     result = compress_context_semantic(sections, max_chars=max_chars)
 
     telemetry_data = {
@@ -611,6 +634,7 @@ def build_architect_decision_context(
             getattr(getattr(pkg, "repair_boundary", None), "allowed_changes", []) or []
         ) if pkg else 0,
         "authority_conflicts_resolved": len(conflicts),
+        "integrity_violations_detected": len(integrity_violations),
     }
 
     return result, telemetry_data
@@ -910,6 +934,20 @@ def build_developer_repair_context(
         + vc_text
     )
 
+    # Part 3: Context Integrity & Task Isolation Audit
+    integrity_violations: List[str] = []
+    if ContextIntegrityAuditor is not None:
+        target_domain = ""
+        contract_obj = state.get("contract")
+        if isinstance(contract_obj, dict):
+            target_domain = (contract_obj.get("task_intent") or {}).get("domain", "")
+        sections, integrity_violations = ContextIntegrityAuditor.audit_context_dict(
+            sections,
+            target_domain=target_domain,
+            target_phase="DEVELOPER",
+            state=state
+        )
+
     result = compress_context_semantic(sections, max_chars=max_chars)
 
     telemetry_data = {
@@ -922,6 +960,7 @@ def build_developer_repair_context(
         "repair_boundary_items": len(
             getattr(getattr(pkg, "repair_boundary", None), "allowed_changes", []) or []
         ) if pkg else 0,
+        "integrity_violations_detected": len(integrity_violations),
     }
 
     return result, telemetry_data

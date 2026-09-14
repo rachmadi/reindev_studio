@@ -514,23 +514,29 @@ def extract_oracle_tested_symbols(frozen_oracle_path: str, target_lang: str = ""
     return tested_symbols
 
 
-def check_oracle_interface_consistency(
-    interface_contracts: List[InterfaceContract],
+def check_pre_freeze_authority_compatibility(
+    contract_obj: MachineReadableContract,
     frozen_oracle_path: str
-) -> Tuple[bool, Optional[str]]:
+) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
     """
-    Memeriksa konsistensi interface contract terhadap Frozen Oracle (Requirement 3 - P0-2.1).
-    HANYA melakukan read-only scan untuk verifikasi keselarasan (consistency check),
-    BUKAN sebagai mekanisme generator atau pembuat contract.
-    Jika oracle menguji simbol atau endpoint tertentu, kontrak tidak boleh bertentangan
-    (misal: oracle memanggil endpoint X tapi kontrak hanya mendeklarasikan endpoint Y).
+    PRE-FREEZE AUTHORITY COMPATIBILITY GATE (Part 2 - Architectural Hardening v1).
+    Memeriksa secara deterministik apakah seluruh kewajiban Acceptance Oracle
+    (authoritative Oracle obligations) telah terwakili dalam Draft Contract SEBELUM
+    kontrak diizinkan bertransisi ke status FROZEN.
+
+    Non-negotiable:
+    - Tidak mendikte HOW TO REPAIR atau memilih solusi desain.
+    - Menghasilkan bukti eksplisit non-solver:
+        ORACLE_OBLIGATION: <obligation>
+        CONTRACT_COVERAGE: MISSING
+        RESULT: INCOMPATIBLE — CONTRACT MUST NOT FREEZE
     """
     import os
     from pathlib import Path
 
     oracle_dir = Path(frozen_oracle_path)
     if not oracle_dir.exists() or not oracle_dir.is_dir():
-        return True, None
+        return True, [], []
 
     test_contents: List[Tuple[str, str]] = []
     for root, _, files in os.walk(oracle_dir):
@@ -543,16 +549,23 @@ def check_oracle_interface_consistency(
                     pass
 
     if not test_contents:
-        return True, None
+        return True, [], []
 
-    contract_endpoints = set()
-    contract_symbols = set()
-    for iface in interface_contracts:
+    # Kumpulkan seluruh representasi kontrak saat ini
+    # 1. Endpoints & Methods
+    contract_http_endpoints: Dict[str, Set[str]] = {}  # {base_path: {methods}}
+    contract_symbols: Set[str] = set()
+
+    for iface in contract_obj.interface_contracts:
         ident = iface.identifier.strip()
-        if iface.interface_type == "HTTP_ENDPOINT":
+        method = (iface.http_method or "").upper().strip()
+        if iface.interface_type == "HTTP_ENDPOINT" or ident.startswith("/"):
             base_ep = re.sub(r"/\{[^}]+\}", "", ident).rstrip("/")
-            if base_ep:
-                contract_endpoints.add(base_ep)
+            if not base_ep:
+                base_ep = "/"
+            contract_http_endpoints.setdefault(base_ep, set())
+            if method:
+                contract_http_endpoints[base_ep].add(method)
         else:
             parts = re.split(r"[.\(]", ident)
             for p in parts:
@@ -560,45 +573,82 @@ def check_oracle_interface_consistency(
                 if p_clean:
                     contract_symbols.add(p_clean)
 
+    for m in contract_obj.data_models:
+        if m.model_name:
+            contract_symbols.add(m.model_name.strip())
+
+    missing_obligations: List[Dict[str, Any]] = []
+    error_messages: List[str] = []
+
     for fname, content in test_contents:
-        # 1. Kasus REST API (FastAPI testclient)
-        tested_endpoints = set()
-        for ep in re.findall(r"client\.(?:get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content):
-            base_ep = re.sub(r"/\{[^}]+\}", "", ep).rstrip("/")
-            if base_ep:
-                tested_endpoints.add(base_ep)
+        # A. REST API (FastAPI TestClient)
+        # Ekstrak seluruh panggilan: client.<method>("<path>")
+        for m_call, ep_call in re.findall(r"client\.(get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content, re.IGNORECASE):
+            m_upper = m_call.upper()
+            base_ep = re.sub(r"/\{[^}]+\}", "", ep_call).rstrip("/")
+            if not base_ep:
+                base_ep = "/"
 
-        if tested_endpoints and contract_endpoints:
-            matches = any(
-                any(te == ce or te.startswith(ce) or ce.startswith(te) for ce in contract_endpoints)
-                for te in tested_endpoints
-            )
-            if not matches:
-                return False, (
-                    f"Contract endpoint {sorted(contract_endpoints)} tidak konsisten dengan authoritative specification. "
-                    f"Tinjau kembali endpoint terhadap spesifikasi dan pertahankan path yang ditetapkan; jangan mengimprovisasi path."
-                )
+            # Periksa apakah ada coverage untuk endpoint dan metode ini
+            has_coverage = False
+            for c_ep, c_methods in contract_http_endpoints.items():
+                if c_ep == base_ep or c_ep.startswith(base_ep) or base_ep.startswith(c_ep):
+                    if not c_methods or m_upper in c_methods:
+                        has_coverage = True
+                        break
 
-        # 2. Kasus Python unit test (CLI / Library / Module)
+            if not has_coverage:
+                ob_desc = f"HTTP {m_upper} {base_ep}"
+                if not any(o["obligation"] == ob_desc for o in missing_obligations):
+                    item = {
+                        "obligation": ob_desc,
+                        "coverage": "MISSING",
+                        "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
+                        "source_file": fname
+                    }
+                    missing_obligations.append(item)
+                    msg = (
+                        f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
+                        f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
+                        f"CONTRACT_COVERAGE:\nMISSING\n\n"
+                        f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
+                    )
+                    error_messages.append(msg)
+
+        # B. Python Unit Test (CLI / Library / Module)
+        # Ekstrak simbol yang diuji/diimpor dari target
         tested_symbols = set()
+        for sym in re.findall(r"from\s+main\s+import\s+([A-Za-z0-9_,\s]+)", content):
+            for s in sym.split(","):
+                s_clean = s.strip()
+                if s_clean and s_clean not in ("app", "main"):
+                    tested_symbols.add(s_clean)
         for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
             tested_symbols.add(sym)
         for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
             if sym not in ("app", "main"):
                 tested_symbols.add(sym)
-        for dunder in re.findall(r"hasattr\s*\(\s*[a-zA-Z0-9_]+\s*,\s*['\"](__[a-z]+__)['\"]", content):
-            tested_symbols.add(dunder)
 
-        if tested_symbols and contract_symbols:
-            common = contract_symbols.intersection(tested_symbols)
-            if not common:
-                return False, (
-                    f"Contract interface {sorted(contract_symbols)} tidak konsisten dengan authoritative specification. "
-                    f"Tinjau kembali seluruh public interface terhadap spesifikasi dan pertahankan nama/signature yang ditetapkan; "
-                    f"jangan mengimprovisasi atau menyingkat interface."
-                )
+        for ts in tested_symbols:
+            if ts not in contract_symbols:
+                ob_desc = f"Callable symbol '{ts}'"
+                if not any(o["obligation"] == ob_desc for o in missing_obligations):
+                    item = {
+                        "obligation": ob_desc,
+                        "coverage": "MISSING",
+                        "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
+                        "source_file": fname
+                    }
+                    missing_obligations.append(item)
+                    msg = (
+                        f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
+                        f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
+                        f"CONTRACT_COVERAGE:\nMISSING\n\n"
+                        f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
+                    )
+                    error_messages.append(msg)
 
-        # 3. Kasus Dart / Flutter test (Widget Test & Dart Unit Test)
+        # C. Dart / Flutter Test (Widget / Riverpod Provider)
         if fname.endswith(".dart"):
             dart_framework_types = {
                 "MaterialApp", "Scaffold", "ThemeData", "ProviderScope", "SizedBox",
@@ -613,32 +663,57 @@ def check_oracle_interface_consistency(
                 "AsyncValue", "BoxConstraints", "ConstrainedBox", "EdgeInsets",
                 "FontWeight", "TextStyle", "BorderRadius", "RoundedRectangleBorder",
             }
-            dart_tested_symbols = set()
-            # 3a. find.byType(WidgetName)
+            dart_tested = set()
             for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
                 if sym not in dart_framework_types:
-                    dart_tested_symbols.add(sym)
-            # 3b. Widget constructors in test widget trees (body: WidgetName(, child: WidgetName(, home: WidgetName()
+                    dart_tested.add(sym)
             for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
                 if sym not in dart_framework_types:
-                    dart_tested_symbols.add(sym)
-            # 3c. General class/widget invocations in test bodies (fallback if no byType / tree calls)
-            if not dart_tested_symbols:
-                for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
-                    if sym not in dart_framework_types:
-                        dart_tested_symbols.add(sym)
+                    dart_tested.add(sym)
+            # Custom class instantiation in test bodies (e.g. MetricData(...))
+            for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
+                if sym not in dart_framework_types:
+                    dart_tested.add(sym)
 
-            if dart_tested_symbols and contract_symbols:
-                common = contract_symbols.intersection(dart_tested_symbols)
-                if not common:
-                    return False, (
-                        f"Contract interface {sorted(contract_symbols)} tidak konsisten dengan authoritative acceptance call-site "
-                        f"{sorted(dart_tested_symbols)} pada berkas pengujian '{fname}'. "
-                        f"Otoritas pengujian acceptance menuntut antarmuka {sorted(dart_tested_symbols)}. "
-                        f"Tinjau kembali rencana arsitektur dan selaraskan interface_contracts terhadap acceptance call-site sebelum kontrak dapat dibekukan (FROZEN)."
-                    )
+            for dts in dart_tested:
+                if dts not in contract_symbols:
+                    ob_desc = f"Widget/Model '{dts}'"
+                    if not any(o["obligation"] == ob_desc for o in missing_obligations):
+                        item = {
+                            "obligation": ob_desc,
+                            "coverage": "MISSING",
+                            "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
+                            "source_file": fname
+                        }
+                        missing_obligations.append(item)
+                        msg = (
+                            f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
+                            f"CONTRACT_DECLARED_INTERFACES:\n{sorted(contract_symbols) if contract_symbols else '[]'}\n\n"
+                            f"CONTRACT_COVERAGE:\nMISSING\n\n"
+                            f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {fname})"
+                        )
+                        error_messages.append(msg)
 
+    is_compatible = (len(missing_obligations) == 0)
+    return is_compatible, error_messages, missing_obligations
+
+
+def check_oracle_interface_consistency(
+    interface_contracts: List[InterfaceContract],
+    frozen_oracle_path: str
+) -> Tuple[bool, Optional[str]]:
+    """
+    Backward-compatible wrapper di sekitar check_pre_freeze_authority_compatibility.
+    """
+    temp_contract = MachineReadableContract(
+        contract_id="temp_compat_check",
+        interface_contracts=interface_contracts
+    )
+    is_compat, errors, _ = check_pre_freeze_authority_compatibility(temp_contract, frozen_oracle_path)
+    if not is_compat and errors:
+        return False, errors[0]
     return True, None
+
 
 
 def extract_proven_semantic_interfaces(
@@ -947,20 +1022,20 @@ def validate_contract_gate(
                         f"(Konvensi REST umum menyarankan 200 OK)."
                     )
 
-    # 4. Oracle Interface Consistency Check (Requirement 3 - P0-2.1)
+    # 4. Pre-Freeze Authority Compatibility Gate (Part 2 - Architectural Hardening v1)
     if frozen_oracle_path:
-        consistent, reason_detail = check_oracle_interface_consistency(
-            contract_obj.interface_contracts,
+        is_compat, err_msgs, missing_obs = check_pre_freeze_authority_compatibility(
+            contract_obj,
             frozen_oracle_path
         )
-        if not consistent:
+        if not is_compat:
             structured_err = (
-                "CONTRACT_VALIDATION_FAILED\n\n"
+                "CONTRACT_VALIDATION_FAILED: PRE_FREEZE_AUTHORITY_INCOMPATIBLE\n\n"
                 "reason:\n"
-                "Architect interface contract is inconsistent with the frozen test interface."
+                "Architect interface contract is inconsistent with the frozen test interface. (does not cover authoritative obligations demanded by the Frozen Oracle)."
             )
-            if reason_detail:
-                structured_err += f"\n\ndetails:\n{reason_detail}"
+            if err_msgs:
+                structured_err += "\n\ndetails:\n" + "\n".join(err_msgs)
             errors.append(f"Pilar 4 (Oracle Consistency): {structured_err}")
 
     is_valid = (len(errors) == 0)
