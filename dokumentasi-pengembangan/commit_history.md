@@ -525,5 +525,41 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
     - `deterministic_cep_pilot_summary.json` (Data telemetri matriks 3x3 kanonikal).
   - `dokumentasi-pengembangan/`: Sinkronisasi log tata kelola IIDD (`decision_log.md` D-102..D-106, `validation_log.md`, `conversation_log.md`, `commit_history.md`).
 
+---
+
+### Commit: 7758589 — 2026-09-14
+- **Commit Hash:** `7758589`
+- **Status:** TERVERIFIKASI PENUH (Pre-Flight Gates A–I PASS, 545/545 Unit Tests PASS)
+- **Tipe:** `feat(architect)`
+- **Pesan Commit:** `feat(architect): implement Architect Contract Binding v2 with Canonical Acceptance Obligations`
+- **Waktu:** 2026-09-14 11:06 WIB
+- **Cakupan Perubahan:**
+  - `backend/canonical_obligation.py` (NEW): Ekstraksi otomatis kewajiban penerimaan kanonikal dari Frozen Acceptance Oracle untuk Python (FastAPI, CLI) dan Dart (Flutter).
+  - `backend/contract.py`: Integrasi binding obligasi kanonikal dan verifikasi kesesuaian pada Gate V2 sebelum pembekuan kontrak.
+  - `backend/tests/test_architect_contract_binding_v2.py` (NEW): 27 unit test verifikasi binding kanonikal.
+  - `backend/context_assembler.py`, `backend/context_hardening.py`, `backend/graph.py`: Penguatan propagasi umpan balik obligasi kanonikal.
+
+---
+
+### Commit: [PENDING COMMIT] — 2026-09-14
+- **Commit Hash:** `[PENDING COMMIT]`
+- **Status:** TERVERIFIKASI PENUH (552/552 Pytest Unit Tests PASS, Pre-Flight Gates A–I PASS, 100% SHA-256 Intact)
+- **Tipe:** `feat(lifecycle)` / `docs(research)`
+- **Pesan Commit:** `feat(lifecycle): repair active validation state lifecycle v1, execute 1x3 comparative retests, and sync IIDD documentation`
+- **Waktu:** 2026-09-14 19:15 WIB
+- **Cakupan Perubahan:**
+  - `backend/contract.py`: Pemisahan `provenance.validation_history` (append-only) dan `provenance.active_validation_errors` (recomputed fresh). Kandidat baru diinisialisasi bersih melalui `complete_aligned_contract()`; validitas aktif dinilai segar oleh `seal_and_freeze_contract()`.
+  - `backend/agents/architect.py`: Sinkronisasi lifecycle error pada parsing blueprint dan normalisasi skema.
+  - `backend/graph.py`: Penambahan metrik telemetri forensik pada `architect_validator_node` (`active_error_count`, `historical_error_count`, `resolved_error_count`, `resolved_failures`).
+  - `backend/blueprint_schema.py` & `backend/canonical_obligation.py`: Representasi generik data models dan normalisasi format legacy vs kanonikal.
+  - `backend/tests/test_active_validation_state_lifecycle_v1.py` (NEW): 7/7 unit tests PASS menguji Skenario A–H, negative tests, dan telemetri graph.
+  - `backend/tests/test_architect_contract_binding_v2.py`: Penguatan skenario pengujian 16–27 (34/34 PASS).
+  - `dokumentasi-pengembangan/experiments/`:
+    - `laporan_evaluasi_retest_1x3_qwen25_coder7b.md`: Evaluasi retest 1x3 Qwen2.5-Coder 7B (1/3 FROZEN, 33.3%).
+    - `laporan_evaluasi_komparasi_1x3_ornith9b_vs_qwen25.md`: Analisis komparasi empiris Qwen 7B vs Ornith 9B (2/3 FROZEN, 66.7%).
+    - `pilot_retest_1x3_qwen2.5_coder_7b.json` & `pilot_retest_1x3_ornith9b_post_lifecycle_repair.json`: Data telemetri kanonikal kedua retest.
+  - `dokumentasi-pengembangan/`: Sinkronisasi log tata kelola IIDD (`decision_log.md` D-107..D-108, `error_log.md` E-068, `validation_log.md`, `conversation_log.md`, `commit_history.md`).
+
+
 
 

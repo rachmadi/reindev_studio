@@ -42,6 +42,8 @@ class BlueprintFileModule(BaseModel):
 
 class BlueprintInterfaceContract(BaseModel):
     """Spesifikasi kontrak antarmuka publik."""
+    model_config = {"extra": "allow"}
+
     identifier: str = Field(..., min_length=1, description="Nama fungsi/endpoint/metode")
     route: Optional[str] = Field(None, description="Route path (misal: /products)")
     method: Optional[str] = Field(None, description="HTTP Method (misal: GET, POST)")
@@ -54,6 +56,35 @@ class BlueprintInterfaceContract(BaseModel):
         if not cleaned:
             raise ValueError("target_file pada kontrak antarmuka tidak boleh kosong")
         return cleaned
+
+
+class BlueprintModelField(BaseModel):
+    """Spesifikasi atribut/field entitas data model dalam blueprint."""
+    model_config = {"extra": "allow"}
+
+    field_name: Optional[str] = Field(None, description="Nama atribut kanonikal")
+    name: Optional[str] = Field(None, description="Alias nama atribut dalam blueprint")
+    field_type: Optional[str] = Field(None, description="Tipe data kanonikal")
+    type: Optional[str] = Field(None, description="Alias tipe data dalam blueprint")
+    is_required: bool = Field(default=True, description="Apakah atribut wajib ada")
+    constraints: Optional[Union[str, Dict[str, Any], List[Any]]] = Field(default=None, description="Batasan nilai atribut")
+    description: Optional[str] = Field(default=None, description="Deskripsi semantik atribut")
+
+
+class BlueprintDataModel(BaseModel):
+    """Spesifikasi entitas data model dalam blueprint arsitektur."""
+    model_config = {"extra": "allow"}
+
+    model_name: str = Field(..., min_length=1, description="Nama kelas/entitas data model")
+    target_file: str = Field(default="main.py", description="Berkas target tempat model didefinisikan")
+    fields: List[Union[BlueprintModelField, Dict[str, Any]]] = Field(
+        default_factory=list,
+        description="Daftar field entitas data model"
+    )
+    construction_shape: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Bentuk konstruksi atau instansiasi (opsional)"
+    )
 
 
 class ArchitecturalBlueprint(BaseModel):
@@ -73,7 +104,7 @@ class ArchitecturalBlueprint(BaseModel):
         default_factory=list,
         description="Kontrak antarmuka publik yang didefinisikan"
     )
-    data_models: List[Dict[str, Any]] = Field(
+    data_models: List[Union[BlueprintDataModel, Dict[str, Any]]] = Field(
         default_factory=list,
         description="Spesifikasi data models"
     )
@@ -197,8 +228,8 @@ def extract_blueprint_json_text(raw_text: str) -> Optional[str]:
     if not raw_text or not raw_text.strip():
         return None
 
-    # 1. Penanda kanonikal ReinDev Studio
-    marker_pattern = r"=== BLUEPRINT JSON ===\s*(\{.*?\})\s*=== END BLUEPRINT JSON ==="
+    # 1. Penanda kanonikal ReinDev Studio (mendukung opsional markdown block di dalam marker)
+    marker_pattern = r"=== BLUEPRINT JSON ===\s*(?:```(?:json)?\s*)?(\{.*?\})\s*(?:```)?\s*=== END BLUEPRINT JSON ==="
     match = re.search(marker_pattern, raw_text, re.DOTALL)
     if match:
         return match.group(1).strip()
@@ -247,6 +278,156 @@ def parse_blueprint_json(raw_text: str) -> Tuple[Optional[ArchitecturalBlueprint
         return blueprint, None
     except Exception as e:
         return None, f"Validasi skema ArchitecturalBlueprint gagal: {e}"
+
+
+def normalize_blueprint_data_models(
+    raw_models: List[Any],
+    default_target_file: str = "main.py"
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """
+    Deterministic boundary adapter:
+    Mentransformasikan Blueprint data_models menjadi representasi kanonikal strict ModelField
+    sebelum diserahkan ke MachineReadableContract.
+
+    Aturan Normalisasi:
+    1. Deterministic & lossless: memetakan 'name' -> 'field_name' dan 'type' -> 'field_type'.
+    2. Zero semantic inference: tidak menambah field yang tidak diberikan, tidak mengubah meaning.
+    3. Conflict Detection: jika kedua bentuk hadir sekaligus dengan nilai berbeda
+       (field_name != name atau field_type != type), ditandai sebagai 'REPRESENTATION CONFLICT'
+       dan ditolak secara deterministik untuk perbaikan mandiri.
+    4. Completeness: jika field_name atau field_type tidak tersedia setelah normalisasi, ditolak.
+    5. Domain-agnostic: murni transformasi representasional tanpa asumsi domain (FastAPI/CLI/Flutter).
+    """
+    canonical_models: List[Dict[str, Any]] = []
+    errors: List[str] = []
+
+    if not raw_models:
+        return canonical_models, errors
+
+    for m_idx, raw_m in enumerate(raw_models, 1):
+        if hasattr(raw_m, "model_dump"):
+            m_dict = raw_m.model_dump()
+        elif hasattr(raw_m, "to_dict"):
+            m_dict = raw_m.to_dict()
+        elif isinstance(raw_m, dict):
+            m_dict = dict(raw_m)
+        else:
+            errors.append(f"Data model #{m_idx} bukan berupa dictionary/model valid")
+            continue
+
+        model_name = str(m_dict.get("model_name") or m_dict.get("name") or "").strip()
+        if not model_name:
+            errors.append(f"Data model #{m_idx} tidak memiliki 'model_name' yang valid")
+            continue
+
+        target_file = str(m_dict.get("target_file") or default_target_file).strip().replace("\\", "/")
+        raw_fields = m_dict.get("fields") or []
+
+        canonical_fields: List[Dict[str, Any]] = []
+        for f_idx, raw_f in enumerate(raw_fields, 1):
+            if hasattr(raw_f, "model_dump"):
+                f_dict = raw_f.model_dump()
+            elif hasattr(raw_f, "to_dict"):
+                f_dict = raw_f.to_dict()
+            elif isinstance(raw_f, dict):
+                f_dict = dict(raw_f)
+            else:
+                errors.append(f"Model '{model_name}' field #{f_idx} bukan berupa dictionary valid")
+                continue
+
+            # 1. Resolve field_name (dengan deteksi konflik representasi)
+            has_canonical_name = "field_name" in f_dict and f_dict["field_name"] is not None
+            has_alias_name = "name" in f_dict and f_dict["name"] is not None
+
+            resolved_field_name: Optional[str] = None
+            if has_canonical_name and has_alias_name:
+                c_val = str(f_dict["field_name"]).strip()
+                a_val = str(f_dict["name"]).strip()
+                if c_val != a_val:
+                    errors.append(
+                        f"REPRESENTATION CONFLICT pada model '{model_name}' field #{f_idx}: "
+                        f"field_name='{c_val}' != name='{a_val}'"
+                    )
+                    continue
+                resolved_field_name = c_val
+            elif has_canonical_name:
+                resolved_field_name = str(f_dict["field_name"]).strip()
+            elif has_alias_name:
+                resolved_field_name = str(f_dict["name"]).strip()
+            else:
+                errors.append(
+                    f"MISSING FIELD NAME pada model '{model_name}' field #{f_idx}: "
+                    f"wajib menyertakan 'field_name' (atau alias 'name')"
+                )
+                continue
+
+            if not resolved_field_name:
+                errors.append(f"Model '{model_name}' field #{f_idx} memiliki nama field kosong")
+                continue
+
+            # 2. Resolve field_type (dengan deteksi konflik representasi)
+            has_canonical_type = "field_type" in f_dict and f_dict["field_type"] is not None
+            has_alias_type = "type" in f_dict and f_dict["type"] is not None
+
+            resolved_field_type: Optional[str] = None
+            if has_canonical_type and has_alias_type:
+                c_type = str(f_dict["field_type"]).strip()
+                a_type = str(f_dict["type"]).strip()
+                if c_type != a_type:
+                    errors.append(
+                        f"REPRESENTATION CONFLICT pada model '{model_name}' field '{resolved_field_name}': "
+                        f"field_type='{c_type}' != type='{a_type}'"
+                    )
+                    continue
+                resolved_field_type = c_type
+            elif has_canonical_type:
+                resolved_field_type = str(f_dict["field_type"]).strip()
+            elif has_alias_type:
+                resolved_field_type = str(f_dict["type"]).strip()
+            else:
+                errors.append(
+                    f"MISSING FIELD TYPE pada model '{model_name}' field '{resolved_field_name}': "
+                    f"wajib menyertakan 'field_type' (atau alias 'type')"
+                )
+                continue
+
+            if not resolved_field_type:
+                errors.append(f"Model '{model_name}' field '{resolved_field_name}' memiliki tipe data kosong")
+                continue
+
+            # 3. Lossless mapping atribut sekunder (memastikan constraints sesuai skema ModelField: Optional[str])
+            raw_constraints = f_dict.get("constraints")
+            if raw_constraints is not None:
+                if isinstance(raw_constraints, (dict, list)):
+                    resolved_constraints = json.dumps(raw_constraints, sort_keys=True)
+                else:
+                    resolved_constraints = str(raw_constraints)
+            else:
+                resolved_constraints = None
+
+            raw_desc = f_dict.get("description")
+            resolved_desc = str(raw_desc) if raw_desc is not None else None
+
+            canonical_field = {
+                "field_name": resolved_field_name,
+                "field_type": resolved_field_type,
+                "is_required": bool(f_dict.get("is_required", True)),
+                "constraints": resolved_constraints,
+                "description": resolved_desc
+            }
+            canonical_fields.append(canonical_field)
+
+        canonical_model = {
+            "model_name": model_name,
+            "target_file": target_file,
+            "fields": canonical_fields
+        }
+        if "construction_shape" in m_dict:
+            canonical_model["construction_shape"] = m_dict["construction_shape"]
+
+        canonical_models.append(canonical_model)
+
+    return canonical_models, errors
 
 
 def blueprint_to_narrative_markdown(bp: ArchitecturalBlueprint) -> str:

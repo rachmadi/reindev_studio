@@ -844,11 +844,29 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Eksperimen Lintas Ekosistem flutter_t1):
-- **Diselesaikan Mandiri oleh Agen:** 29 kasus (termasuk E-065)
+### Kasus E-068: Ghost Stale Error Invalidation on Contract Turn N+1
+- **Waktu:** 2026-09-14 ~11:20 WIB (Retest 1x3 Architect Binding v2)
+- **Tingkat Keparahan:** Critical (Lifecycle Validation State Pollution / False Contract Rejection)
+- **Gejala:** Pada Turn 1 kasus `flutter_t1`, model Architect berhasil memperbaiki seluruh defisiensi kontrak dan mencapai 100% cakupan kewajiban Acceptance Oracle (`uncovered_count = 0`), namun kontrak tetap berstatus `REJECTED` dan gagal disegel (`is_sealed: False`).
+- **Akar Masalah:**
+  1. Terjadi polusi state validasi: `contract_validation_errors` dari Turn 0 yang belum dibersihkan masih tersimpan pada objek kontrak dan diakumulasi secara naif ke turn berikutnya.
+  2. Fungsi `seal_and_freeze_contract()` memeriksa keberadaan error dalam list tanpa membedakan apakah error tersebut merupakan error validasi aktif pada artefak saat ini (*active validity*) atau rekaman kegagalan di masa lalu (*historical evidence*).
+  3. Akibatnya, kontrak turn N+1 yang secara deterministik sudah valid tetap dinyatakan ditolak karena membawa "hantu" error dari turn N (*Ghost Stale Error*).
+- **Tindakan Korektif (Doktrin IA: Persist History, Recompute Active Validity):**
+  1. Memisahkan lifecycle error ke dalam dua field eksplisit pada `Provenance`:
+     - `provenance.validation_history`: riwayat kesalahan audit append-only yang tidak pernah dihapus untuk kebutuhan forensik dan telemetri.
+     - `provenance.active_validation_errors`: error validasi aktif yang dihitung ulang segar (*recomputed*) pada setiap turn.
+  2. Saat kandidat kontrak baru dibuat melalui `complete_aligned_contract()`, error dari turn sebelumnya diarsipkan ke `validation_history` dan `active_validation_errors` diinisialisasi kosong (`[]`).
+  3. Fungsi `seal_and_freeze_contract()` mengevaluasi ulang 4 Pilar Arsitektur dan kewajiban Acceptance Oracle pada kandidat saat ini: jika lolos, status menjadi `FROZEN`; jika gagal, status menjadi `REJECTED` dan `active_validation_errors` diisi dengan temuan validasi turn berjalan.
+  4. Menambahkan telemetri forensik pada `architect_validator_node`: `active_error_count`, `historical_error_count`, `resolved_error_count`, dan `resolved_failures`.
+- **Sumber Solusi:** IA (Ketetapan Prinsip Epistemik D-107) & AGEN.
+- **Status:** Tuntas (Resolved & Verified 100% via 7/7 lifecycle unit tests, 552/552 regression suite, dan pembuktian empiris 2x peningkatan kontrak beku pada Ornith-9B).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Implementasi Active Validation Lifecycle v1):
+- **Diselesaikan Mandiri oleh Agen:** 30 kasus (termasuk E-065, E-068)
 - **Diselesaikan atas Intervensi IA:** 7 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
-- **Kasus Forensik & Rekomendasi Terbuka:** 5 kasus (E-060, E-061, E-062, E-066, E-067)
-- **Total Galat Terdokumentasi:** 67 kasus (E-001 s/d E-067)
-
-
+- **Kasus Forensik & Rekomendasi Terbuka:** 4 kasus (E-060, E-061, E-062, E-066)
+- **Total Galat Terdokumentasi:** 68 kasus (E-001 s/d E-068)

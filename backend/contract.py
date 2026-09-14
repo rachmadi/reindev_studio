@@ -216,6 +216,9 @@ class Provenance(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     contract_sha256: Optional[str] = None
     coverage_matrix: Optional[Dict[str, Any]] = None
+    active_validation_errors: List[str] = Field(default_factory=list)
+    validation_history: List[Dict[str, Any]] = Field(default_factory=list)
+    contract_validation_errors: List[str] = Field(default_factory=list)
 
 
 class TaskIntent(BaseModel):
@@ -989,6 +992,20 @@ def seal_and_freeze_contract(
         task_text=task_text
     )
 
+    # Periksa HANYA error pra-segel aktif pada kandidat saat ini (misal: JSON parse failure atau model mapping error pada turn aktif)
+    # JANGAN membaca atau mewariskan historical failure evidence dari turn sebelumnya.
+    active_boundary_errors = c_dict.get("provenance", {}).get("active_validation_errors")
+    if active_boundary_errors is None:
+        # Fallback kompatibilitas jika caller langsung memasukkan contract_validation_errors pada turn saat ini
+        active_boundary_errors = c_dict.get("provenance", {}).get("contract_validation_errors", [])
+
+    if active_boundary_errors and isinstance(active_boundary_errors, list):
+        for ae in active_boundary_errors:
+            ae_str = str(ae)
+            if ae_str not in errors:
+                errors.append(ae_str)
+        is_valid = False
+
     # Compute and attach canonical coverage matrix telemetry
     if frozen_oracle_path and os.path.exists(frozen_oracle_path):
         try:
@@ -1004,16 +1021,37 @@ def seal_and_freeze_contract(
 
     if not is_valid:
         c_dict["status"] = ContractStatus.REJECTED.value
+        if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
+            c_dict["provenance"] = {}
+        c_dict["provenance"]["active_validation_errors"] = list(errors)
+        c_dict["provenance"]["contract_validation_errors"] = list(errors)
+        val_hist = list(c_dict["provenance"].get("validation_history") or [])
+        val_hist.append({
+            "timestamp": datetime.now().isoformat(),
+            "phase": "CONTRACT_SEAL",
+            "status": ContractStatus.REJECTED.value,
+            "errors": list(errors)
+        })
+        c_dict["provenance"]["validation_history"] = val_hist
         return False, c_dict, errors, warnings
 
     # Transisi status ke FROZEN sebelum menghitung canonical hash agar segel mengunci state FROZEN
     c_dict["status"] = ContractStatus.FROZEN.value
+    if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
+        c_dict["provenance"] = {}
+    c_dict["provenance"]["active_validation_errors"] = []
+    c_dict["provenance"]["contract_validation_errors"] = []
+    val_hist = list(c_dict["provenance"].get("validation_history") or [])
+    val_hist.append({
+        "timestamp": datetime.now().isoformat(),
+        "phase": "CONTRACT_SEAL",
+        "status": ContractStatus.FROZEN.value,
+        "errors": []
+    })
+    c_dict["provenance"]["validation_history"] = val_hist
 
     # Hitung Canonical SHA-256 (Anti-Circular)
     c_hash = compute_contract_canonical_hash(c_dict)
-
-    if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
-        c_dict["provenance"] = {}
     c_dict["provenance"]["contract_sha256"] = c_hash
 
     return True, c_dict, [], warnings
@@ -1159,10 +1197,35 @@ def complete_aligned_contract(
 ) -> Dict[str, Any]:
     """
     Helper untuk System Architect Agent: Melengkapi DRAFT contract menjadi ALIGNED contract.
+    Prinsip: PERSIST HISTORY, RECOMPUTE ACTIVE VALIDITY.
+    Mewariskan konteks desain relevan, tetapi mengarsipkan active errors lama ke validation_history
+    dan menginisialisasi active_validation_errors kandidat baru menjadi [].
     """
     aligned = copy.deepcopy(draft_dict)
     aligned["status"] = ContractStatus.ALIGNED.value
+    if "provenance" not in aligned or not isinstance(aligned["provenance"], dict):
+        aligned["provenance"] = {}
     aligned["provenance"]["created_by"] = "System Architect"
+
+    # Lifecycle management: arsipkan active errors lama jika belum tercatat di history
+    prev_active = (
+        aligned["provenance"].get("active_validation_errors")
+        or aligned["provenance"].get("contract_validation_errors", [])
+    )
+    val_history = list(aligned["provenance"].get("validation_history") or [])
+    if prev_active and isinstance(prev_active, list):
+        val_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "phase": "ARCHITECT_PREVIOUS_TURN",
+            "status": draft_dict.get("status", "REJECTED"),
+            "errors": list(prev_active)
+        })
+
+    aligned["provenance"]["validation_history"] = val_history
+    # Reset active validation errors untuk kandidat baru (akan diuji oleh gate turn berjalan)
+    aligned["provenance"]["active_validation_errors"] = []
+    aligned["provenance"]["contract_validation_errors"] = []
+
     aligned["data_models"] = data_models
     aligned["interface_contracts"] = interface_contracts
     aligned["testable_assertions"] = testable_assertions

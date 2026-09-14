@@ -165,6 +165,60 @@ class CanonicalObligation:
         )
 
 
+@dataclass
+class CanonicalInterfaceDeclaration:
+    """
+    Representasi kanonikal tunggal untuk interface contract yang dideklarasikan Architect.
+    Menjamin Coverage Engine bekerja di atas bentuk kanonikal yang seragam tanpa bergantung
+    pada variasi nama field (seperti 'method' vs 'http_method').
+    """
+    identifier: str
+    target_file: str = ""
+    interface_type: str = ""
+    canonical_route: Optional[str] = None
+    canonical_method: Optional[str] = None  # Uppercase string (misal: 'GET', 'POST') atau None
+    parameters: List[Dict[str, Any]] = field(default_factory=list)
+    raw_declaration: Dict[str, Any] = field(default_factory=dict)
+
+
+def normalize_interface_declaration(raw_ifc: Any) -> Optional[CanonicalInterfaceDeclaration]:
+    """
+    Normalisasi satu deklarasi interface contract ke CanonicalInterfaceDeclaration.
+    Mengekstrak method kanonikal dari 'method' atau 'http_method' dan route kanonikal.
+    """
+    if not isinstance(raw_ifc, dict):
+        if hasattr(raw_ifc, "model_dump"):
+            raw_ifc = raw_ifc.model_dump()
+        elif hasattr(raw_ifc, "to_dict"):
+            raw_ifc = raw_ifc.to_dict()
+        else:
+            return None
+
+    ident = str(raw_ifc.get("identifier", "")).strip()
+    itype = str(raw_ifc.get("interface_type", "")).upper().strip()
+    target_file = str(raw_ifc.get("target_file", "")).strip()
+
+    # Canonical HTTP method: konsolidasi 'http_method' dan 'method' ke satu nilai kanonikal
+    raw_m = raw_ifc.get("http_method") or raw_ifc.get("method")
+    canonical_m = str(raw_m).upper().strip() if raw_m else None
+
+    # Canonical route:
+    raw_route = raw_ifc.get("route") or raw_ifc.get("path")
+    if not raw_route and (itype == "HTTP_ENDPOINT" or ident.startswith("/")):
+        raw_route = ident
+    canonical_r = str(raw_route).strip() if raw_route else None
+
+    return CanonicalInterfaceDeclaration(
+        identifier=ident,
+        target_file=target_file,
+        interface_type=itype,
+        canonical_route=canonical_r,
+        canonical_method=canonical_m,
+        parameters=raw_ifc.get("parameters") or [],
+        raw_declaration=raw_ifc
+    )
+
+
 # ===========================================================================
 # 4. Canonical Obligation Integrity Guard
 # ===========================================================================
@@ -687,41 +741,32 @@ def check_obligation_coverage(
     declared_models = contract_dict.get("data_models") or []
 
     # Map public interfaces by normalized identity
-    # 1. HTTP endpoints map: {base_path: list of interface dicts}
-    http_endpoints: Dict[str, List[Dict[str, Any]]] = {}
-    # 2. Named callable/symbol map: {identifier: list of interface dicts}
-    symbol_interfaces: Dict[str, List[Dict[str, Any]]] = {}
+    # 1. HTTP endpoints map: {base_path: list of CanonicalInterfaceDeclaration}
+    http_endpoints: Dict[str, List[CanonicalInterfaceDeclaration]] = {}
+    # 2. Named callable/symbol map: {identifier: list of CanonicalInterfaceDeclaration}
+    symbol_interfaces: Dict[str, List[CanonicalInterfaceDeclaration]] = {}
 
     declarations_count = len(declared_interfaces) + len(declared_models)
 
-    for ifc in declared_interfaces:
-        if not isinstance(ifc, dict):
-            if hasattr(ifc, "model_dump"):
-                ifc = ifc.model_dump()
-            elif hasattr(ifc, "to_dict"):
-                ifc = ifc.to_dict()
-            else:
-                continue
+    canonical_interfaces: List[CanonicalInterfaceDeclaration] = []
+    for raw_ifc in declared_interfaces:
+        c_ifc = normalize_interface_declaration(raw_ifc)
+        if not c_ifc:
+            continue
+        canonical_interfaces.append(c_ifc)
 
-        ident = str(ifc.get("identifier", "")).strip()
-        itype = str(ifc.get("interface_type", "")).upper().strip()
-        method = str(ifc.get("http_method", "")).upper().strip() if ifc.get("http_method") else None
-
-        # Route mapping extraction: e.g. if interface specifies route="/products"
-        route_path = ifc.get("route") or (ident if (itype == "HTTP_ENDPOINT" or ident.startswith("/")) else None)
-
-        if route_path:
-            base_path = re.sub(r"/\{[^}]+\}", "", str(route_path)).rstrip("/")
+        if c_ifc.canonical_route:
+            base_path = re.sub(r"/\{[^}]+\}", "", c_ifc.canonical_route).rstrip("/")
             if not base_path:
                 base_path = "/"
-            http_endpoints.setdefault(base_path, []).append(ifc)
+            http_endpoints.setdefault(base_path, []).append(c_ifc)
 
-        symbol_interfaces.setdefault(ident, []).append(ifc)
-        if "." in ident:
-            for part in ident.split("."):
+        symbol_interfaces.setdefault(c_ifc.identifier, []).append(c_ifc)
+        if "." in c_ifc.identifier:
+            for part in c_ifc.identifier.split("."):
                 p_clean = part.strip()
                 if p_clean:
-                    symbol_interfaces.setdefault(p_clean, []).append(ifc)
+                    symbol_interfaces.setdefault(p_clean, []).append(c_ifc)
 
     # Map models by name: {model_name: model dict}
     data_models_map: Dict[str, Dict[str, Any]] = {}
@@ -760,13 +805,13 @@ def check_obligation_coverage(
         # A. INTERACTION OBLIGATION (e.g. HTTP POST /products)
         if ob.obligation_kind == ObligationKind.INTERACTION.value:
             req_path = ob.public_identity
-            req_method = ob.inputs.get("http_method", "").upper() if ob.inputs else ""
+            req_method = ob.inputs.get("http_method", "").upper().strip() if ob.inputs else ""
 
-            # Pembuktian Kompatibilitas Semantik (Koreksi 1):
+            # Pembuktian Kompatibilitas Semantik:
             # Cocok jika:
             # 1. Path endpoint cocok secara langsung atau melalui declared route mapping
             # 2. Atau jika fungsi interface mendeklarasikan route parameter yang selaras
-            matched_ifcs: List[Dict[str, Any]] = []
+            matched_ifcs: List[CanonicalInterfaceDeclaration] = []
             for ep_path, ifc_list in http_endpoints.items():
                 if ep_path == req_path or ep_path.rstrip("/") == req_path.rstrip("/"):
                     matched_ifcs.extend(ifc_list)
@@ -776,11 +821,9 @@ def check_obligation_coverage(
             if not matched_ifcs:
                 # Cek apakah ada antarmuka yang membuktikan mapping semantik ke path ini
                 for sym_name, ifc_list in symbol_interfaces.items():
-                    for ifc in ifc_list:
-                        # Cek apakah interface mendeklarasikan endpoint/route di metadata/parameters
-                        ifc_route = str(ifc.get("route") or ifc.get("path") or "")
-                        if ifc_route and (ifc_route == req_path or req_path.startswith(ifc_route)):
-                            matched_ifcs.append(ifc)
+                    for c_ifc in ifc_list:
+                        if c_ifc.canonical_route and (c_ifc.canonical_route == req_path or req_path.startswith(c_ifc.canonical_route)):
+                            matched_ifcs.append(c_ifc)
 
             if not matched_ifcs:
                 clean_name = req_path.strip("/").replace("/", "_")
@@ -803,40 +846,70 @@ def check_obligation_coverage(
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({ob.public_identity})")
 
             else:
-                # Path found, now evaluate method compatibility
-                method_matched = False
-                declared_methods: List[str] = []
-                matched_id = None
-                for ifc in matched_ifcs:
-                    m = (ifc.get("http_method") or "").upper()
-                    if m:
-                        declared_methods.append(m)
-                    if m == req_method or not m:
-                        method_matched = True
-                        matched_id = ifc.get("interface_id")
-                        break
+                # Path found, now evaluate method compatibility rigorously (NO WILDCARD)
+                if req_method:
+                    compatible_ifc: Optional[CanonicalInterfaceDeclaration] = None
+                    declared_methods: List[str] = []
+                    has_absent_method = False
 
-                if method_matched:
+                    for c_ifc in matched_ifcs:
+                        m = c_ifc.canonical_method
+                        if m:
+                            declared_methods.append(m)
+                            if m == req_method:
+                                compatible_ifc = c_ifc
+                                break
+                        else:
+                            has_absent_method = True
+
+                    if compatible_ifc is not None:
+                        matched_id = compatible_ifc.raw_declaration.get("interface_id") or compatible_ifc.identifier
+                        res = ObligationCoverageResult(
+                            obligation=ob,
+                            status=CoverageStatus.COVERED,
+                            matched_declaration_id=matched_id,
+                            reason=f"HTTP endpoint '{req_path}' [{req_method}] has proven coverage by interface contract '{matched_id}'"
+                        )
+                        results.append(res)
+                        covered_cnt += 1
+                    elif declared_methods:
+                        # Endpoint dideklarasikan, tetapi method eksplisit berbeda (INCOMPATIBLE / MISSING method)
+                        # Contoh: Oracle demands GET, contract only declared ['POST', 'DELETE']
+                        matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
+                        res = ObligationCoverageResult(
+                            obligation=ob,
+                            status=CoverageStatus.MISSING,
+                            matched_declaration_id=matched_id,
+                            reason=f"HTTP endpoint '{req_path}' declared with method(s) {declared_methods}, but expected method [{req_method}] is missing from contract",
+                            missing_aspects=[f"HTTP method: {req_method}"]
+                        )
+                        results.append(res)
+                        missing_cnt += 1
+                        summary_reasons.append(f"MISSING: {ob.obligation_id} (Method [{req_method}] missing, found {declared_methods})")
+                    else:
+                        # Route cocok tetapi method absent pada deklarasi contract (bukan wildcard!)
+                        matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
+                        res = ObligationCoverageResult(
+                            obligation=ob,
+                            status=CoverageStatus.UNDETERMINED,
+                            matched_declaration_id=matched_id,
+                            reason=f"HTTP endpoint '{req_path}' declared in contract without explicit HTTP method (cannot prove compatibility with expected method [{req_method}])",
+                            missing_aspects=[f"Explicit HTTP method [{req_method}] on {req_path}"]
+                        )
+                        results.append(res)
+                        undetermined_cnt += 1
+                        summary_reasons.append(f"UNDETERMINED: {ob.obligation_id} (HTTP method absent on contract declaration)")
+                else:
+                    # Obligation tidak mensyaratkan method spesifik (hanya eksistensi route/endpoint)
+                    matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
                     res = ObligationCoverageResult(
                         obligation=ob,
                         status=CoverageStatus.COVERED,
                         matched_declaration_id=matched_id,
-                        reason=f"HTTP endpoint '{req_path}' [{req_method}] has proven coverage by interface contract {matched_id}"
+                        reason=f"HTTP endpoint '{req_path}' has proven coverage by interface contract '{matched_id}'"
                     )
                     results.append(res)
                     covered_cnt += 1
-                else:
-                    # Method is missing from contract for this endpoint
-                    res = ObligationCoverageResult(
-                        obligation=ob,
-                        status=CoverageStatus.MISSING,
-                        matched_declaration_id=matched_ifcs[0].get("interface_id"),
-                        reason=f"HTTP endpoint '{req_path}' declared with methods {declared_methods}, but method [{req_method}] is missing from contract",
-                        missing_aspects=[f"HTTP method: {req_method}"]
-                    )
-                    results.append(res)
-                    missing_cnt += 1
-                    summary_reasons.append(f"MISSING: {ob.obligation_id} (Method [{req_method}] missing, found {declared_methods})")
 
         # B. DATA MODEL OBLIGATION (e.g. MetricData, Product, Matrix)
         elif ob.obligation_kind == ObligationKind.DATA_MODEL.value:
@@ -851,10 +924,12 @@ def check_obligation_coverage(
                 results.append(res)
                 covered_cnt += 1
             elif model_name in symbol_interfaces:
+                c_ifc = symbol_interfaces[model_name][0]
+                matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.COVERED,
-                    matched_declaration_id=symbol_interfaces[model_name][0].get("interface_id"),
+                    matched_declaration_id=matched_id,
                     reason=f"Data model/class '{model_name}' covered in contract interface_contracts"
                 )
                 results.append(res)
@@ -874,12 +949,13 @@ def check_obligation_coverage(
         elif ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value:
             symbol_name = ob.public_identity
             if symbol_name in symbol_interfaces:
-                ifc = symbol_interfaces[symbol_name][0]
+                c_ifc = symbol_interfaces[symbol_name][0]
+                matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.COVERED,
-                    matched_declaration_id=ifc.get("interface_id"),
-                    reason=f"Callable interface '{symbol_name}' covered by interface contract {ifc.get('interface_id')}"
+                    matched_declaration_id=matched_id,
+                    reason=f"Callable interface '{symbol_name}' covered by interface contract {matched_id}"
                 )
                 results.append(res)
                 covered_cnt += 1
@@ -907,12 +983,13 @@ def check_obligation_coverage(
         elif ob.obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value:
             widget_name = ob.public_identity
             if widget_name in symbol_interfaces:
-                ifc = symbol_interfaces[widget_name][0]
+                c_ifc = symbol_interfaces[widget_name][0]
+                matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.COVERED,
-                    matched_declaration_id=ifc.get("interface_id"),
-                    reason=f"Observable runtime widget '{widget_name}' covered by interface contract {ifc.get('interface_id')}"
+                    matched_declaration_id=matched_id,
+                    reason=f"Observable runtime widget '{widget_name}' covered by interface contract {matched_id}"
                 )
                 results.append(res)
                 covered_cnt += 1

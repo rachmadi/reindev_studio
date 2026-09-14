@@ -288,6 +288,15 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
         )
 
     if tracer:
+        current_active_errors = list(errors)
+        prov = frozen_contract.get("provenance", {}) if isinstance(frozen_contract, dict) else {}
+        val_history = list(prov.get("validation_history", [])) if isinstance(prov, dict) else []
+        historical_errs = set()
+        for h in val_history:
+            if isinstance(h, dict) and "errors" in h and isinstance(h["errors"], list):
+                historical_errs.update(h["errors"])
+        resolved_errors = list(historical_errs - set(current_active_errors))
+
         tracer.log_event(
             stage="phase_end_validation",
             event_type="architect_validation",
@@ -297,6 +306,16 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
                 "seal_success": success,
                 "val_contract": val_contract,
                 "coverage_matrix": cov_matrix_data,
+                "telemetry": {
+                    "turn_id": count,
+                    "phase": "ARCHITECT",
+                    "current_validation_errors": current_active_errors,
+                    "active_error_count": len(current_active_errors),
+                    "historical_error_count": len(val_history),
+                    "resolved_error_count": len(resolved_errors),
+                    "resolved_failures": resolved_errors,
+                    "repair_attempt": count
+                }
             }
         )
 

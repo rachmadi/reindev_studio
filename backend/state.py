@@ -25,8 +25,8 @@ class SquadState(TypedDict):
     contract_version: Optional[str]    # Versi kontrak aktif (misal: "1.0.1")
     contract_status: Optional[str]     # Status lifecycle kontrak: DRAFT, ALIGNED, FROZEN, EXECUTING, VALIDATED, REJECTED
     contract_sha256: Optional[str]     # Hash kanonikal SHA-256 (RFC 8785) segel integritas kontrak
-    contract_change_requested: Optional[bool] # Flag permintaan amandemen kontrak jika ada kontradiksi/ambiguitas
-    contract_validation_errors: Optional[List[str]] # Daftar pesan galat validasi deterministik jika ditolak gate
+    contract_validation_errors: Optional[List[str]] # Daftar pesan galat validasi deterministik aktif turn saat ini
+    contract_validation_history: Optional[List[Dict[str, Any]]] # Riwayat kegagalan turn masa lalu yang diarsipkan (immutable)
     contract_feedback: Optional[str]  # Umpan balik terstruktur P0-2.1 jika kontrak ditolak gate
     contract_revision_count: int      # Penghitung putaran revisi kontrak antara gate dan architect (P0-2.1)
     blueprint_revision_count: Optional[int] # Akumulasi putaran revisi Blueprint Validator AST (P0-2.2)

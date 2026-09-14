@@ -10,6 +10,7 @@ Self-Healing Revision Loop (max 2 revisions).
 
 import re
 import json
+from datetime import datetime
 from pathlib import Path
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
@@ -56,7 +57,8 @@ try:
         ArchitecturalBlueprint,
         parse_blueprint_json,
         extract_blueprint_json_text,
-        blueprint_to_narrative_markdown
+        blueprint_to_narrative_markdown,
+        normalize_blueprint_data_models
     )
 except (ImportError, ValueError):
     try:
@@ -64,13 +66,15 @@ except (ImportError, ValueError):
             ArchitecturalBlueprint,
             parse_blueprint_json,
             extract_blueprint_json_text,
-            blueprint_to_narrative_markdown
+            blueprint_to_narrative_markdown,
+            normalize_blueprint_data_models
         )
     except ImportError:
         ArchitecturalBlueprint = None
         parse_blueprint_json = lambda t: (None, "Schema not available")
         extract_blueprint_json_text = lambda t: None
         blueprint_to_narrative_markdown = lambda b: ""
+        normalize_blueprint_data_models = lambda m, **kw: (m, [])
 
 ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
@@ -82,29 +86,35 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 {
   "authoritative_target_file": "main.py",
   "file_tree": ["main.py"],
-  "architecture_summary": "Deskripsi ringkas arsitektur modul",
+  "architecture_summary": "Rencana arsitektur modular yang mendefinisikan antarmuka dan model data",
   "files": {
     "main.py": {
       "module_role": "Authoritative Single Module",
-      "imports": [
-        "from fastapi import FastAPI, HTTPException",
-        "from pydantic import BaseModel, field_validator"
-      ],
-      "code_scaffold": "from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, field_validator\n\napp = FastAPI()\n\nclass Product(BaseModel):\n    id: int\n    name: str\n    price: float\n    stock: int\n\n    @field_validator('price', 'stock')\n    def validate_non_negative(cls, v):\n        if v < 0:\n            raise ValueError('Cannot be negative')\n        return v\n\n@app.post('/products', status_code=201)\ndef create_product(product: Product) -> Product:\n    pass\n\n@app.get('/products')\ndef list_products() -> list[Product]:\n    pass\n"
+      "imports": [],
+      "code_scaffold": "class EntityA:\n    def __init__(self, attribute_a: str = ''):\n        self.attribute_a = attribute_a\n\ndef operation_a(entity: EntityA) -> EntityA:\n    pass\n"
     }
   },
   "interface_contracts": [
     {
-      "identifier": "create_product",
-      "route": "/products",
+      "identifier": "operation_a",
+      "route": "/operation_a",
       "method": "POST",
       "target_file": "main.py"
-    },
+    }
+  ],
+  "data_models": [
     {
-      "identifier": "list_products",
-      "route": "/products",
-      "method": "GET",
-      "target_file": "main.py"
+      "model_name": "EntityA",
+      "target_file": "main.py",
+      "fields": [
+        {
+          "field_name": "attribute_a",
+          "field_type": "str",
+          "is_required": true,
+          "description": "Atribut abstrak entitas"
+        }
+      ],
+      "construction_shape": {}
     }
   ]
 }
@@ -115,31 +125,107 @@ PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
    - BATAS SCAFFOLD WAJIB: `code_scaffold` HANYA berupa interface signatures & stubs (misal: deklarasi fungsi/metode dengan `pass`).
    - TARGET UKURAN: <=800 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
 2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator, instance dan class dekorator WAJIB dideklarasikan atau diimpor secara lokal di berkas yang bersangkutan.
-3. Specification Authority: Pertahankan antarmuka yang telah ditentukan spesifikasi secara eksak.
+3. Specification Authority: Pertahankan antarmuka dan data model yang telah ditentukan spesifikasi secara eksak.
 4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
+5. Canonical Data Models: Setiap entitas dalam `data_models` WAJIB menggunakan format kanonikal: `field_name` dan `field_type` untuk setiap item dalam `fields`.
 
 Tuliskan output JSON yang valid, presisi, dan konsisten tanpa teks pengantar berlebih di luar penanda.
 """
 
 def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang: str, arch_plan: str = "") -> dict:
-    """Membangun spesifikasi teknis ALIGNED yang konsisten dengan 4 pilar validasi gate."""
+    """Membangun spesifikasi teknis ALIGNED yang konsisten dengan 4 pilar validasi gate secara generik."""
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
-    task_l = task.lower()
+    default_itype = "WIDGET" if is_dart else "FUNCTION"
 
-    if is_dart:
-        data_models = []
+    # Ekstraksi fungsi atau method yang dirancang oleh Architect di arch_plan
+    func_matches = re.findall(
+        r"(?:def\s+|-\s*|\*\s*|`)([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\], ]+))?",
+        arch_plan
+    )
+    # Ekstraksi class yang dideklarasikan secara sintaksis formal dalam Python:
+    raw_class_matches = re.findall(
+        r"(?:^|[;\n`])\s*class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*\([^)]*\))?\s*:",
+        arch_plan,
+        re.MULTILINE
+    )
+    _CLASS_STOP_WORDS = {
+        "dengan", "and", "or", "in", "is", "for", "the", "a", "an", "to", "of",
+        "pass", "def", "return", "class", "from", "import", "as", "not"
+    }
+    seen_classes = set()
+    class_matches = []
+    for cname in raw_class_matches:
+        cname_clean = cname.strip()
+        if cname_clean and cname_clean.lower() not in _CLASS_STOP_WORDS and cname_clean not in seen_classes:
+            seen_classes.add(cname_clean)
+            class_matches.append(cname_clean)
+
+    plan_files = [f for f in re.findall(r"(?:^|[;\n`\-\*])\s*([A-Za-z0-9_./\-]+\.(?:py|dart))\b", arch_plan) if not Path(f).name.startswith("test")]
+    primary_target_file = plan_files[0] if plan_files else ("lib/main.dart" if is_dart else "main.py")
+
+    data_models = []
+    interface_contracts = []
+    testable_assertions = []
+
+    if class_matches:
+        for cname in class_matches:
+            data_models.append({
+                "model_name": cname,
+                "target_file": primary_target_file,
+                "fields": []
+            })
+
+    if func_matches:
+        seen_fns = set()
+        for idx, (fn_name, params_str, ret_type) in enumerate(func_matches, 1):
+            if fn_name in ("if", "for", "while", "with", "print", "assert", "return"):
+                continue
+            if fn_name in seen_fns:
+                continue
+            seen_fns.add(fn_name)
+            ifid = f"IFC-0{idx}" if idx < 10 else f"IFC-{idx}"
+            astid = f"AST-0{idx}" if idx < 10 else f"AST-{idx}"
+            ret = ret_type.strip() if ret_type else "float"
+            interface_contracts.append({
+                "interface_id": ifid,
+                "interface_type": default_itype,
+                "identifier": fn_name,
+                "http_method": None,
+                "target_file": primary_target_file,
+                "parameters": [],
+                "expected_return": {
+                    "return_type": ret,
+                    "status_code_success": None,
+                    "status_code_errors": []
+                }
+            })
+            testable_assertions.append({
+                "assertion_id": astid,
+                "linked_req_id": "REQ-01",
+                "linked_interface_id": ifid,
+                "test_scenario": f"Execution of {fn_name} returns expected value",
+                "target_symbol": fn_name,
+                "input_fixture": f"{fn_name}()",
+                "expected_outcome": {
+                    "outcome_type": "VALUE_EQUALS",
+                    "value": 0
+                }
+            })
+    else:
+        fn_name = "execute"
         interface_contracts = [
             {
                 "interface_id": "IFC-01",
-                "interface_type": "WIDGET",
-                "identifier": "CardMetric",
+                "interface_type": default_itype,
+                "identifier": fn_name,
                 "http_method": None,
-                "target_file": "lib/card_metric.dart",
+                "target_file": primary_target_file,
                 "parameters": [
-                    {"param_name": "data", "param_type": "dynamic", "param_location": "PROP", "is_required": False}
+                    {"param_name": "a", "param_type": "float", "param_location": "ARGUMENT", "is_required": True},
+                    {"param_name": "b", "param_type": "float", "param_location": "ARGUMENT", "is_required": True}
                 ],
                 "expected_return": {
-                    "return_type": "Widget",
+                    "return_type": "float",
                     "status_code_success": None,
                     "status_code_errors": []
                 }
@@ -150,196 +236,15 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
                 "assertion_id": "AST-01",
                 "linked_req_id": "REQ-01",
                 "linked_interface_id": "IFC-01",
-                "test_scenario": "Widget renders properly inside ProviderScope",
-                "target_symbol": "CardMetric",
-                "input_fixture": "CardMetric()",
+                "test_scenario": f"Execution of {fn_name} returns expected value",
+                "target_symbol": fn_name,
+                "input_fixture": f"{fn_name}(2.0, 3.0)",
                 "expected_outcome": {
-                    "outcome_type": "WIDGET_FOUND",
-                    "expected_value": "CardMetric"
+                    "outcome_type": "VALUE_EQUALS",
+                    "value": 5.0
                 }
             }
         ]
-    elif any(k in task_l for k in ["fastapi", "rest", "api", "crud", "endpoint", "inventaris"]):
-        data_models = [
-            {
-                "model_name": "Product",
-                "target_file": "main.py",
-                "fields": [
-                    {"field_name": "id", "field_type": "int", "is_required": True, "description": "ID unik produk"},
-                    {"field_name": "name", "field_type": "str", "is_required": True, "description": "Nama produk"},
-                    {"field_name": "price", "field_type": "float", "is_required": False, "description": "Harga produk"}
-                ]
-            }
-        ]
-        interface_contracts = [
-            {
-                "interface_id": "IFC-01",
-                "interface_type": "HTTP_ENDPOINT",
-                "identifier": "/products",
-                "http_method": "GET",
-                "target_file": "main.py",
-                "parameters": [],
-                "expected_return": {
-                    "return_type": "List[Product]",
-                    "status_code_success": 200,
-                    "status_code_errors": []
-                }
-            },
-            {
-                "interface_id": "IFC-02",
-                "interface_type": "HTTP_ENDPOINT",
-                "identifier": "/products",
-                "http_method": "POST",
-                "target_file": "main.py",
-                "parameters": [
-                    {"param_name": "product", "param_type": "Product", "param_location": "BODY", "is_required": True}
-                ],
-                "expected_return": {
-                    "return_type": "Product",
-                    "status_code_success": 200,
-                    "status_code_errors": [{"code": 422, "condition": "Validation Error"}]
-                }
-            }
-        ]
-        testable_assertions = [
-            {
-                "assertion_id": "AST-01",
-                "linked_req_id": "REQ-01",
-                "linked_interface_id": "IFC-01",
-                "test_scenario": "Read all products returns 200 OK",
-                "target_symbol": "/products",
-                "input_fixture": "client.get('/products')",
-                "expected_outcome": {
-                    "outcome_type": "HTTP_STATUS",
-                    "expected_status": 200
-                }
-            },
-            {
-                "assertion_id": "AST-02",
-                "linked_req_id": "REQ-01",
-                "linked_interface_id": "IFC-02",
-                "test_scenario": "Create product returns 200 OK",
-                "target_symbol": "/products",
-                "input_fixture": "client.post('/products', json={'name': 'Item', 'price': 100})",
-                "expected_outcome": {
-                    "outcome_type": "HTTP_STATUS",
-                    "expected_status": 200
-                }
-            }
-        ]
-    else:
-        # Generic CLI / Algorithm / Computational module
-        # Ekstraksi fungsi atau method yang dirancang oleh Architect di arch_plan
-        func_matches = re.findall(
-            r"(?:def\s+|-\s*|\*\s*|`)([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\], ]+))?",
-            arch_plan
-        )
-        # Ekstraksi class yang dideklarasikan secara sintaksis formal dalam Python:
-        # Mengharuskan batasan awal baris/delimiter, kata kunci 'class', nama identifier,
-        # opsional parameter inheritance/type arguments, dan penutup tanda titik dua ':'
-        raw_class_matches = re.findall(
-            r"(?:^|[;\n`])\s*class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*\([^)]*\))?\s*:",
-            arch_plan,
-            re.MULTILINE
-        )
-        # Defense-in-depth: abaikan keyword/stop-words dan deduplikasi berurutan
-        _CLASS_STOP_WORDS = {
-            "dengan", "and", "or", "in", "is", "for", "the", "a", "an", "to", "of",
-            "pass", "def", "return", "class", "from", "import", "as", "not"
-        }
-        seen_classes = set()
-        class_matches = []
-        for cname in raw_class_matches:
-            cname_clean = cname.strip()
-            if cname_clean and cname_clean.lower() not in _CLASS_STOP_WORDS and cname_clean not in seen_classes:
-                seen_classes.add(cname_clean)
-                class_matches.append(cname_clean)
-
-        plan_files = [f for f in re.findall(r"(?:^|[;\n`\-\*])\s*([A-Za-z0-9_./\-]+\.(?:py|dart))\b", arch_plan) if not Path(f).name.startswith("test")]
-        primary_target_file = plan_files[0] if plan_files else "main.py"
-
-        data_models = []
-        interface_contracts = []
-        testable_assertions = []
-
-        if class_matches:
-            for cname in class_matches:
-                data_models.append({
-                    "model_name": cname,
-                    "target_file": primary_target_file,
-                    "fields": []
-                })
-
-        if func_matches:
-            seen_fns = set()
-            for idx, (fn_name, params_str, ret_type) in enumerate(func_matches, 1):
-                if fn_name in ("if", "for", "while", "with", "print", "assert", "return"):
-                    continue
-                if fn_name in seen_fns:
-                    continue
-                seen_fns.add(fn_name)
-                ifid = f"IFC-0{idx}" if idx < 10 else f"IFC-{idx}"
-                astid = f"AST-0{idx}" if idx < 10 else f"AST-{idx}"
-                ret = ret_type.strip() if ret_type else "float"
-                interface_contracts.append({
-                    "interface_id": ifid,
-                    "interface_type": "FUNCTION",
-                    "identifier": fn_name,
-                    "http_method": None,
-                    "target_file": primary_target_file,
-                    "parameters": [],
-                    "expected_return": {
-                        "return_type": ret,
-                        "status_code_success": None,
-                        "status_code_errors": []
-                    }
-                })
-                testable_assertions.append({
-                    "assertion_id": astid,
-                    "linked_req_id": "REQ-01",
-                    "linked_interface_id": ifid,
-                    "test_scenario": f"Execution of {fn_name} returns expected value",
-                    "target_symbol": fn_name,
-                    "input_fixture": f"{fn_name}()",
-                    "expected_outcome": {
-                        "outcome_type": "VALUE_EQUALS",
-                        "value": 0
-                    }
-                })
-        else:
-            fn_name = "calculate" if any(k in task_l for k in ["hitung", "kalkulator", "calc", "math"]) else "execute"
-            interface_contracts = [
-                {
-                    "interface_id": "IFC-01",
-                    "interface_type": "FUNCTION",
-                    "identifier": fn_name,
-                    "http_method": None,
-                    "target_file": primary_target_file,
-                    "parameters": [
-                        {"param_name": "a", "param_type": "float", "param_location": "ARGUMENT", "is_required": True},
-                        {"param_name": "b", "param_type": "float", "param_location": "ARGUMENT", "is_required": True}
-                    ],
-                    "expected_return": {
-                        "return_type": "float",
-                        "status_code_success": None,
-                        "status_code_errors": []
-                    }
-                }
-            ]
-            testable_assertions = [
-                {
-                    "assertion_id": "AST-01",
-                    "linked_req_id": "REQ-01",
-                    "linked_interface_id": "IFC-01",
-                    "test_scenario": "Calculate basic arithmetic calculation returns value",
-                    "target_symbol": fn_name,
-                    "input_fixture": f"{fn_name}(2.0, 3.0)",
-                    "expected_outcome": {
-                        "outcome_type": "VALUE_EQUALS",
-                        "value": 5.0
-                    }
-                }
-            ]
 
     return complete_aligned_contract(
         draft_dict=draft_contract,
@@ -347,6 +252,7 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
         interface_contracts=interface_contracts,
         testable_assertions=testable_assertions
     )
+
 
 def architect_agent(state: SquadState) -> dict:
     llm = get_llm(role="architect", provider=state.get("provider"))
@@ -484,7 +390,10 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
 
     # 1. Coba ekstrak dari skema ArchitecturalBlueprint JSON
     extracted_bp, bp_err = parse_blueprint_json(arch_plan)
-    if extracted_bp and extracted_bp.interface_contracts:
+    contract_errors = []
+    is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
+
+    if extracted_bp and not bp_err:
         ifaces = []
         assertions = []
         for idx, ifc in enumerate(extracted_bp.interface_contracts, 1):
@@ -493,7 +402,7 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
             if not d.get("interface_id"):
                 d["interface_id"] = ifid
             if not d.get("interface_type"):
-                d["interface_type"] = "WIDGET" if "dart" in target_lang.lower() else "FUNCTION"
+                d["interface_type"] = "WIDGET" if is_dart else "FUNCTION"
             ifaces.append(d)
             ident = d.get("identifier", "target")
             assertions.append({
@@ -508,57 +417,91 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
                     "value": 0
                 }
             })
-        models = [
-            m.model_dump() if hasattr(m, "model_dump") else m
-            for m in extracted_bp.data_models
-        ]
-        aligned_contract = complete_aligned_contract(
-            draft_dict=draft_contract,
-            data_models=models,
-            interface_contracts=ifaces,
-            testable_assertions=assertions
+
+        # Boundary canonicalization: petakan data_models blueprint ke format kanonikal strict ModelField
+        primary_file = extracted_bp.authoritative_target_file or ("lib/main.dart" if is_dart else "main.py")
+        canonical_models, model_errs = normalize_blueprint_data_models(
+            extracted_bp.data_models,
+            default_target_file=primary_file
         )
-    else:
-        # 2. Fallback cek apakah LLM menghasilkan blok kontrak JSON konvensional
-        extracted_json = extract_contract_json_from_text(arch_plan)
-        if extracted_json and isinstance(extracted_json, dict) and "interface_contracts" in extracted_json:
+
+        if model_errs:
+            contract_errors.extend(model_errs)
+            aligned_contract = dict(draft_contract)
+            aligned_contract["status"] = "REJECTED"
+            if "provenance" not in aligned_contract or not isinstance(aligned_contract["provenance"], dict):
+                aligned_contract["provenance"] = {}
+            aligned_contract["provenance"]["active_validation_errors"] = list(contract_errors)
+            aligned_contract["provenance"]["contract_validation_errors"] = list(contract_errors)
+            val_hist = list(aligned_contract["provenance"].get("validation_history") or [])
+            val_hist.append({
+                "timestamp": datetime.now().isoformat(),
+                "phase": "ARCHITECT_MODEL_NORMALIZATION",
+                "status": "REJECTED",
+                "errors": list(contract_errors)
+            })
+            aligned_contract["provenance"]["validation_history"] = val_hist
+        else:
             aligned_contract = complete_aligned_contract(
                 draft_dict=draft_contract,
-                data_models=extracted_json.get("data_models", []),
-                interface_contracts=extracted_json.get("interface_contracts", []),
-                testable_assertions=extracted_json.get("testable_assertions", []),
-                constraints=extracted_json.get("constraints"),
-                ambiguities=extracted_json.get("unresolved_ambiguities")
+                data_models=canonical_models,
+                interface_contracts=ifaces,
+                testable_assertions=assertions
             )
-        else:
-            aligned_contract = _build_default_aligned_contract(draft_contract, user_task, target_lang, arch_plan)
+    else:
+        # Blueprint JSON parsing failed or produced schema errors.
+        # Strict Principle: JANGAN gunakan semantic regex fallback (zero fabricated contract).
+        # Tolak kontrak secara deterministik dan sampaikan bukti error untuk perbaikan mandiri Architect.
+        parse_msg = f"SCHEMA_VIOLATION: Blueprint JSON parse failure: {bp_err or 'Invalid or missing blueprint JSON'}"
+        contract_errors.append(parse_msg)
+        aligned_contract = dict(draft_contract)
+        aligned_contract["status"] = "REJECTED"
+        if "provenance" not in aligned_contract or not isinstance(aligned_contract["provenance"], dict):
+            aligned_contract["provenance"] = {}
+        aligned_contract["provenance"]["active_validation_errors"] = list(contract_errors)
+        aligned_contract["provenance"]["contract_validation_errors"] = list(contract_errors)
+        val_hist = list(aligned_contract["provenance"].get("validation_history") or [])
+        val_hist.append({
+            "timestamp": datetime.now().isoformat(),
+            "phase": "ARCHITECT_BLUEPRINT_PARSE",
+            "status": "REJECTED",
+            "errors": list(contract_errors)
+        })
+        aligned_contract["provenance"]["validation_history"] = val_hist
 
-    # Observability: Catat penyelarasan kontrak ALIGNED
+    # Observability: Catat penyelarasan kontrak ALIGNED / REJECTED
     tracer = get_tracer(state.get("run_id"))
     if tracer:
+        prov = aligned_contract.get("provenance", {}) if isinstance(aligned_contract, dict) else {}
+        hist_count = len(prov.get("validation_history", [])) if isinstance(prov, dict) else 0
         tracer.log_event(
             stage="contract",
             event_type="contract_aligned",
             iteration=0,
             data={
                 "contract_id": aligned_contract.get("contract_id"),
-                "status": "ALIGNED",
+                "status": aligned_contract.get("status", "ALIGNED"),
                 "models_count": len(aligned_contract.get("data_models", [])),
                 "interfaces_count": len(aligned_contract.get("interface_contracts", [])),
-                "assertions_count": len(aligned_contract.get("testable_assertions", []))
+                "assertions_count": len(aligned_contract.get("testable_assertions", [])),
+                "active_error_count": len(contract_errors),
+                "active_validation_errors": list(contract_errors),
+                "historical_error_count": hist_count
             }
         )
     
+    status_label = aligned_contract.get("status", "ALIGNED")
     new_log = (
         f"[System Architect]: Rencana arsitektur ({len(arch_plan)} char) dirancang. "
-        f"Kontrak dialignasikan ({len(aligned_contract.get('testable_assertions', []))} assertions)."
+        f"Status kontrak: {status_label} ({len(aligned_contract.get('testable_assertions', []))} assertions)."
     )
     current_logs = state.get("logs", [])
     
     return {
         "architecture_plan": arch_plan,
         "contract": aligned_contract,
-        "contract_status": "ALIGNED",
+        "contract_status": status_label,
+        "contract_validation_errors": contract_errors,
         "blueprint_revision_count": state.get("blueprint_revision_count", 0),
         "status": "architect_done",
         "logs": current_logs + [new_log]

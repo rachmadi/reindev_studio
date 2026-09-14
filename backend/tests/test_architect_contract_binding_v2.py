@@ -19,9 +19,14 @@ Verifies all 15 core scenarios:
 13. Non-solver guarantee (diagnoses WHAT is missing, zero imperative HOW instructions).
 14. Language-agnostic adapter boundary test (pure PARSE -> NORMALIZE -> REPRESENT).
 15. Telemetry verification (CoverageMatrix logged to tracer).
+16. HTTP method normalization matrix across blueprint & contract interfaces.
+17. Blueprint prompt canonical data_models and contamination-free validation.
 """
 
+import json
+import re
 import pytest
+from unittest.mock import MagicMock
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -34,6 +39,8 @@ from backend.canonical_obligation import (
     CoverageStatus,
     ObligationCoverageResult,
     CoverageMatrix,
+    CanonicalInterfaceDeclaration,
+    normalize_interface_declaration,
     PythonAstOracleAdapter,
     DartAstOracleAdapter,
     extract_canonical_oracle_obligations,
@@ -51,6 +58,15 @@ from backend.contract import (
     seal_and_freeze_contract,
     check_pre_freeze_authority_compatibility,
 )
+from backend.blueprint_schema import (
+    BlueprintInterfaceContract,
+    BlueprintDataModel,
+    BlueprintModelField,
+    ArchitecturalBlueprint,
+    parse_blueprint_json,
+    normalize_blueprint_data_models,
+)
+from backend.agents.architect import ARCHITECT_SYSTEM_PROMPT, architect_agent
 from backend.phase_validators import validate_architect_phase
 from backend.graph import architect_validator_node
 
@@ -679,3 +695,600 @@ def test_scenario_15_telemetry_coverage_matrix_logged(tmp_oracle_dir):
     assert cov_dict["covered_count"] == 2
     assert cov_dict["missing_count"] == 0
     assert cov_dict["is_fully_covered"] is True
+
+
+def test_scenario_16_http_method_normalization_matrix():
+    """
+    Scenario 16: HTTP method normalization matrix across blueprint & contract interfaces.
+    Verifies that:
+    1. normalize_interface_declaration handles both 'method' (blueprint) and 'http_method' (contract).
+    2. Missing method is treated as UNDETERMINED (never wildcard match).
+    3. Method mismatch is treated as MISSING.
+    4. Exact method matches are COVERED.
+    5. Multi-method contracts cover expected single-method obligations.
+    """
+    # 1. Normalization unit test
+    bp_ifc = {"identifier": "list_items", "route": "/items", "method": "get"}
+    c1 = normalize_interface_declaration(bp_ifc)
+    assert c1 is not None
+    assert c1.canonical_method == "GET"
+    assert c1.canonical_route == "/items"
+
+    contract_ifc = {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "http_method": "post"}
+    c2 = normalize_interface_declaration(contract_ifc)
+    assert c2 is not None
+    assert c2.canonical_method == "POST"
+    assert c2.canonical_route == "/items"
+
+    pydantic_ifc = BlueprintInterfaceContract(identifier="patch_item", route="/items", method="patch", target_file="main.py")
+    c3 = normalize_interface_declaration(pydantic_ifc)
+    assert c3 is not None
+    assert c3.canonical_method == "PATCH"
+
+    missing_m_ifc = {"identifier": "/items", "route": "/items"}
+    c4 = normalize_interface_declaration(missing_m_ifc)
+    assert c4 is not None
+    assert c4.canonical_method is None
+    assert c4.canonical_route == "/items"
+
+    # 2. Coverage engine evaluation across the 5 cases
+    ob_get = CanonicalObligation(
+        obligation_id="OBL-GET",
+        authority=ObligationAuthority.ORACLE.value,
+        provenance=ObligationProvenance.ORACLE_FACT.value,
+        obligation_kind=ObligationKind.INTERACTION.value,
+        public_identity="/items",
+        inputs={"http_method": "GET"},
+        source_reference="test_api.py:1"
+    )
+    ob_post = CanonicalObligation(
+        obligation_id="OBL-POST",
+        authority=ObligationAuthority.ORACLE.value,
+        provenance=ObligationProvenance.ORACLE_FACT.value,
+        obligation_kind=ObligationKind.INTERACTION.value,
+        public_identity="/items",
+        inputs={"http_method": "POST"},
+        source_reference="test_api.py:10"
+    )
+
+    draft = create_draft_contract(raw_intent="Test API", target_language="python", domain="REST_API")
+
+    def _make_contract(ifcs):
+        cdict = complete_aligned_contract(
+            draft_dict=draft,
+            data_models=[],
+            interface_contracts=ifcs,
+            testable_assertions=[]
+        )
+        return MachineReadableContract(**cdict)
+
+    # Case 1: Oracle GET + Contract POST -> MISSING (is_fully_covered = False)
+    contract_post = _make_contract([
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "method": "POST", "target_file": "main.py"}
+    ])
+    cov_case1 = check_obligation_coverage([ob_get], contract_post)
+    assert cov_case1.is_fully_covered is False
+    assert cov_case1.missing_count == 1
+    assert cov_case1.results[0].status == CoverageStatus.MISSING
+    assert "missing from contract" in cov_case1.results[0].reason.lower()
+
+    # Case 2: Oracle POST + Contract POST -> COVERED (is_fully_covered = True)
+    cov_case2 = check_obligation_coverage([ob_post], contract_post)
+    assert cov_case2.is_fully_covered is True
+    assert cov_case2.covered_count == 1
+    assert cov_case2.results[0].status == CoverageStatus.COVERED
+
+    # Case 3: Oracle GET + Contract GET -> COVERED (is_fully_covered = True)
+    contract_get = _make_contract([
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "method": "GET", "target_file": "main.py"}
+    ])
+    cov_case3 = check_obligation_coverage([ob_get], contract_get)
+    assert cov_case3.is_fully_covered is True
+    assert cov_case3.covered_count == 1
+    assert cov_case3.results[0].status == CoverageStatus.COVERED
+
+    # Case 4: Oracle GET + Contract missing method -> UNDETERMINED (is_fully_covered = False)
+    contract_no_method = _make_contract([
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "target_file": "main.py"}
+    ])
+    cov_case4 = check_obligation_coverage([ob_get], contract_no_method)
+    assert cov_case4.is_fully_covered is False
+    assert cov_case4.undetermined_count == 1
+    assert cov_case4.results[0].status == CoverageStatus.UNDETERMINED
+    assert "without explicit http method" in cov_case4.results[0].reason.lower()
+
+    # Case 5: Oracle GET + Contract POST + Contract GET -> COVERED (is_fully_covered = True)
+    contract_both = _make_contract([
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "method": "POST", "target_file": "main.py"},
+        {"interface_id": "IFC-02", "interface_type": "HTTP_ENDPOINT", "identifier": "/items", "method": "GET", "target_file": "main.py"}
+    ])
+    cov_case5 = check_obligation_coverage([ob_get], contract_both)
+    assert cov_case5.is_fully_covered is True
+    assert cov_case5.covered_count == 1
+    assert cov_case5.results[0].status == CoverageStatus.COVERED
+
+
+def test_scenario_17_blueprint_prompt_canonical_data_models_and_contamination_free():
+    """
+    Scenario 17: Blueprint prompt canonical data_models and contamination-free validation.
+    Verifies that:
+    1. ARCHITECT_SYSTEM_PROMPT includes a canonical data_models array in its blueprint example.
+    2. Blueprint JSON example is syntactically valid JSON.
+    3. ARCHITECT_SYSTEM_PROMPT contains zero task-specific solver entities (Product, price, stock, Matrix, MetricData, CardMetric).
+    4. BlueprintInterfaceContract allows arbitrary extra attributes (model_config extra = allow).
+    """
+    # 1 & 2. Check JSON example in prompt
+    json_match = re.search(r"===\s*BLUEPRINT JSON\s*===\s*(\{.*?\})\s*===\s*END BLUEPRINT JSON\s*===", ARCHITECT_SYSTEM_PROMPT, re.DOTALL)
+    assert json_match is not None, "Architect system prompt must contain a valid === BLUEPRINT JSON === example"
+
+    parsed_bp = json.loads(json_match.group(1), strict=False)
+    assert "authoritative_target_file" in parsed_bp
+    assert "files" in parsed_bp
+    assert "interface_contracts" in parsed_bp
+    assert "data_models" in parsed_bp, "Blueprint example must declare 'data_models'"
+    assert isinstance(parsed_bp["data_models"], list)
+    assert len(parsed_bp["data_models"]) > 0
+    assert "model_name" in parsed_bp["data_models"][0]
+    assert "fields" in parsed_bp["data_models"][0]
+
+    # 3. Contamination-free check: No domain-specific solver entities in system prompt
+    banned_domain_tokens = ["class Product", "/products", "price", "stock", "Matrix", "MetricData", "CardMetric"]
+    for token in banned_domain_tokens:
+        assert token not in ARCHITECT_SYSTEM_PROMPT, f"Contamination token '{token}' found in ARCHITECT_SYSTEM_PROMPT"
+
+    # 4. BlueprintInterfaceContract extra='allow' check
+    permissive_ifc = BlueprintInterfaceContract(
+        identifier="operation_a",
+        route="/operation_a",
+        method="POST",
+        target_file="main.py",
+        public_identity="operation_a",
+        confidence=1.0,
+        tags=["core", "api"]
+    )
+    assert permissive_ifc.identifier == "operation_a"
+    assert permissive_ifc.route == "/operation_a"
+    assert permissive_ifc.method == "POST"
+    dumped = permissive_ifc.model_dump()
+    assert dumped.get("public_identity") == "operation_a"
+    assert dumped.get("confidence") == 1.0
+
+
+# ===========================================================================
+# 6. Blueprint Data Models & Boundary Adapter Scenarios (Scenarios 18-27)
+# ===========================================================================
+
+def test_scenario_18_canonical_field_input_passes():
+    """
+    Scenario 18 (Correction A): Canonical Field Input Passes.
+    Input blueprint data_models with canonical 'field_name' and 'field_type'.
+    Must pass normalization without modifying values, and validate into MachineReadableContract.
+    """
+    raw_models = [
+        {
+            "model_name": "InventoryItem",
+            "target_file": "main.py",
+            "fields": [
+                {"field_name": "sku", "field_type": "str", "is_required": True},
+                {"field_name": "quantity", "field_type": "int", "is_required": False, "constraints": {"ge": 0}}
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models)
+    assert errors == []
+    assert len(canonical_models) == 1
+    m = canonical_models[0]
+    assert m["model_name"] == "InventoryItem"
+    assert m["target_file"] == "main.py"
+    assert len(m["fields"]) == 2
+    assert m["fields"][0]["field_name"] == "sku"
+    assert m["fields"][0]["field_type"] == "str"
+    assert m["fields"][0]["is_required"] is True
+    assert m["fields"][1]["field_name"] == "quantity"
+    assert m["fields"][1]["field_type"] == "int"
+    assert m["fields"][1]["is_required"] is False
+    assert json.loads(m["fields"][1]["constraints"]) == {"ge": 0}
+
+    # Verify integration into MachineReadableContract
+    draft = create_draft_contract(raw_intent="Inventory", target_language="python", domain="CLI_TOOL")
+    contract_dict = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=canonical_models,
+        interface_contracts=[{"interface_id": "IFC-01", "interface_type": "FUNCTION", "identifier": "update_sku", "target_file": "main.py"}],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": "REQ-01", "test_scenario": "Test", "target_symbol": "update_sku", "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_obj = MachineReadableContract(**contract_dict)
+    assert len(contract_obj.data_models) == 1
+    assert contract_obj.data_models[0].model_name == "InventoryItem"
+    assert contract_obj.data_models[0].fields[0].field_name == "sku"
+
+
+def test_scenario_19_legacy_blueprint_representation_normalized():
+    """
+    Scenario 19 (Correction B): Legacy Blueprint Representation Normalized.
+    Input blueprint data_models using legacy 'name' and 'type' keys.
+    Must be losslessly normalized to 'field_name' and 'field_type' and pass validation.
+    """
+    raw_models = [
+        {
+            "model_name": "LegacyAccount",
+            "target_file": "main.py",
+            "fields": [
+                {"name": "account_id", "type": "str", "is_required": True},
+                {"name": "balance", "type": "float", "description": "Current balance"}
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models)
+    assert errors == []
+    assert len(canonical_models) == 1
+    fields = canonical_models[0]["fields"]
+    assert fields[0]["field_name"] == "account_id"
+    assert fields[0]["field_type"] == "str"
+    assert fields[1]["field_name"] == "balance"
+    assert fields[1]["field_type"] == "float"
+    assert fields[1]["description"] == "Current balance"
+
+    # Verify that MachineReadableContract validates without error
+    draft = create_draft_contract(raw_intent="Account", target_language="python", domain="CLI_TOOL")
+    contract_dict = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=canonical_models,
+        interface_contracts=[{"interface_id": "IFC-01", "interface_type": "FUNCTION", "identifier": "get_balance", "target_file": "main.py"}],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": "REQ-01", "test_scenario": "Test", "target_symbol": "get_balance", "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_obj = MachineReadableContract(**contract_dict)
+    assert contract_obj.data_models[0].fields[0].field_name == "account_id"
+    assert contract_obj.data_models[0].fields[1].field_name == "balance"
+
+
+def test_scenario_20_mixed_representation_identical_values_passes():
+    """
+    Scenario 20 (Correction C): Mixed Representation Identical Values Passes.
+    Input blueprint field containing both name == field_name and type == field_type.
+    Must pass normalization with identical values resolved cleanly.
+    """
+    raw_models = [
+        {
+            "model_name": "CoincidentModel",
+            "target_file": "main.py",
+            "fields": [
+                {
+                    "name": "uuid",
+                    "field_name": "uuid",
+                    "type": "str",
+                    "field_type": "str"
+                }
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models)
+    assert errors == []
+    assert len(canonical_models) == 1
+    f = canonical_models[0]["fields"][0]
+    assert f["field_name"] == "uuid"
+    assert f["field_type"] == "str"
+
+
+def test_scenario_21_conflicting_representation_rejected():
+    """
+    Scenario 21 (Correction D): Conflicting Representation Rejected.
+    Input blueprint field having name != field_name or type != field_type.
+    Must reject deterministically with an explicit REPRESENTATION CONFLICT error message.
+    """
+    # Name conflict
+    bad_name_models = [
+        {
+            "model_name": "ConflictedModel",
+            "target_file": "main.py",
+            "fields": [
+                {"name": "ident_a", "field_name": "ident_b", "type": "int"}
+            ]
+        }
+    ]
+    _, errors = normalize_blueprint_data_models(bad_name_models)
+    assert len(errors) > 0
+    assert any("REPRESENTATION CONFLICT" in err and "ident_b" in err and "ident_a" in err for err in errors)
+
+    # Type conflict
+    bad_type_models = [
+        {
+            "model_name": "ConflictedModel2",
+            "target_file": "main.py",
+            "fields": [
+                {"field_name": "amount", "type": "int", "field_type": "float"}
+            ]
+        }
+    ]
+    _, errors2 = normalize_blueprint_data_models(bad_type_models)
+    assert len(errors2) > 0
+    assert any("REPRESENTATION CONFLICT" in err and "int" in err and "float" in err for err in errors2)
+
+
+def test_scenario_22_missing_field_name_or_type_rejected():
+    """
+    Scenario 22 (Correction E): Missing Field Name or Type Rejected.
+    Input blueprint field with missing name or missing type.
+    Must produce deterministic validation errors.
+    """
+    missing_name = [
+        {
+            "model_name": "IncompleteModel",
+            "target_file": "main.py",
+            "fields": [
+                {"type": "str"}
+            ]
+        }
+    ]
+    _, errs1 = normalize_blueprint_data_models(missing_name)
+    assert len(errs1) > 0
+    assert any("MISSING FIELD NAME" in err or "nama field kosong" in err for err in errs1)
+
+    missing_type = [
+        {
+            "model_name": "IncompleteModel",
+            "target_file": "main.py",
+            "fields": [
+                {"name": "payload"}
+            ]
+        }
+    ]
+    _, errs2 = normalize_blueprint_data_models(missing_type)
+    assert len(errs2) > 0
+    assert any("MISSING FIELD TYPE" in err or "tipe data kosong" in err for err in errs2)
+
+
+def test_scenario_23_invalid_json_rejects_without_semantic_regex_fallback(monkeypatch):
+    """
+    Scenario 23 (Correction F): Invalid JSON Rejects Without Semantic Regex Fallback.
+    Corrupted / invalid JSON inside === BLUEPRINT JSON === must be deterministically rejected
+    as syntax error / blueprint validation error.
+    Must NOT fall back to semantic regex extraction of functions that silently drops HTTP routes.
+    """
+    corrupted_plan = (
+        "=== BLUEPRINT JSON ===\n"
+        "{\n"
+        '  "authoritative_target_file": "main.py",\n'
+        '  "interface_contracts": [{"identifier": "/products", "route": "/products", "method": "GET"}\n'
+        "  // Syntax error: missing closing brace and comma\n"
+        "=== END BLUEPRINT JSON ===\n\n"
+        "Here is the code:\n"
+        "```python\n"
+        "def get_products():\n"
+        "    return []\n"
+        "def add_product():\n"
+        "    pass\n"
+        "```\n"
+    )
+
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = MagicMock(content=corrupted_plan)
+    monkeypatch.setattr("backend.agents.architect.get_llm", lambda **kwargs: mock_llm)
+
+    state = {
+        "run_id": "test_corrupted_json",
+        "task": "Build Product API with GET /products",
+        "target_language": "python",
+        "architecture_plan": corrupted_plan,
+        "contract": create_draft_contract(raw_intent="API", target_language="python", domain="REST_API"),
+        "repair_attempt_counts": {"architect": 0},
+        "max_repairs": 3,
+        "logs": []
+    }
+
+    # Execute architect_agent directly with corrupted blueprint
+    result = architect_agent(state)
+
+    contract = result.get("contract", {})
+    # Contract must be explicitly REJECTED
+    assert contract.get("status") == ContractStatus.REJECTED.value
+    assert result.get("contract_status") == ContractStatus.REJECTED.value
+
+    # Provenance must report SCHEMA_VIOLATION parse failure
+    validation_errs = contract.get("provenance", {}).get("contract_validation_errors", [])
+    assert any("SCHEMA_VIOLATION" in err and "Blueprint JSON parse failure" in err for err in validation_errs)
+
+    # MUST NOT have fabricated functions from regex fallback
+    interfaces = contract.get("interface_contracts", [])
+    interface_ids = [ifc.get("identifier") for ifc in interfaces]
+    assert "get_products" not in interface_ids
+    assert "add_product" not in interface_ids
+
+
+def test_scenario_24_valid_json_with_data_models_preserved(monkeypatch):
+    """
+    Scenario 24 (Correction G): Valid JSON with data_models Preserved.
+    Valid blueprint JSON containing data_models is parsed, normalized, and integrated
+    into MachineReadableContract without data loss.
+    """
+    valid_blueprint_text = (
+        "=== BLUEPRINT JSON ===\n"
+        "{\n"
+        '  "schema_version": "1.0.0",\n'
+        '  "task_id": "task_valid_models",\n'
+        '  "target_language": "python",\n'
+        '  "authoritative_target_file": "main.py",\n'
+        '  "file_tree": ["main.py"],\n'
+        '  "architecture_summary": "Summary of system",\n'
+        '  "files": {\n'
+        '    "main.py": {\n'
+        '      "module_role": "Core",\n'
+        '      "imports": [],\n'
+        '      "code_scaffold": "class UserProfile: pass"\n'
+        "    }\n"
+        "  },\n"
+        '  "interface_contracts": [\n'
+        '    {"identifier": "create_user", "route": "", "method": "", "interface_type": "FUNCTION", "target_file": "main.py"}\n'
+        "  ],\n"
+        '  "data_models": [\n'
+        "    {\n"
+        '      "model_name": "UserProfile",\n'
+        '      "target_file": "main.py",\n'
+        '      "fields": [\n'
+        '        {"field_name": "user_id", "field_type": "int", "is_required": true},\n'
+        '        {"field_name": "email", "field_type": "str", "is_required": true, "constraints": {"format": "email"}}\n'
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "=== END BLUEPRINT JSON ==="
+    )
+
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = MagicMock(content=valid_blueprint_text)
+    monkeypatch.setattr("backend.agents.architect.get_llm", lambda **kwargs: mock_llm)
+
+    state = {
+        "run_id": "test_valid_blueprint",
+        "task": "User profile management",
+        "target_language": "python",
+        "architecture_plan": valid_blueprint_text,
+        "contract": create_draft_contract(raw_intent="User profile", target_language="python", domain="CLI_TOOL"),
+        "repair_attempt_counts": {"architect": 0},
+        "max_repairs": 3,
+        "logs": []
+    }
+
+    result = architect_agent(state)
+    contract = result.get("contract", {})
+    assert contract.get("status") == ContractStatus.ALIGNED.value
+
+    # Verify models preserved in contract
+    d_models = contract.get("data_models", [])
+    assert len(d_models) == 1
+    assert d_models[0]["model_name"] == "UserProfile"
+    assert len(d_models[0]["fields"]) == 2
+    assert d_models[0]["fields"][0]["field_name"] == "user_id"
+    assert d_models[0]["fields"][0]["field_type"] == "int"
+    assert d_models[0]["fields"][1]["field_name"] == "email"
+    assert d_models[0]["fields"][1]["field_type"] == "str"
+    assert json.loads(d_models[0]["fields"][1]["constraints"]) == {"format": "email"}
+
+    # Pydantic verification
+    contract_obj = MachineReadableContract(**contract)
+    assert len(contract_obj.data_models) == 1
+    assert json.loads(contract_obj.data_models[0].fields[1].constraints) == {"format": "email"}
+
+
+def test_scenario_25_fastapi_product_generic_representation():
+    """
+    Scenario 25 (Correction H): Generic FastAPI Product Representation.
+    Tests Product data model using the boundary adapter.
+    Confirms purely generic processing without task-specific FastAPI branching.
+    """
+    raw_models = [
+        {
+            "model_name": "Product",
+            "target_file": "main.py",
+            "fields": [
+                {"name": "id", "type": "int", "is_required": True},
+                {"name": "name", "type": "str", "is_required": True},
+                {"name": "price", "type": "float", "is_required": True, "constraints": {"ge": 0.0}},
+                {"name": "in_stock", "type": "bool", "is_required": False}
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models, default_target_file="main.py")
+    assert errors == []
+    assert len(canonical_models) == 1
+    pm = canonical_models[0]
+    assert pm["model_name"] == "Product"
+    assert [f["field_name"] for f in pm["fields"]] == ["id", "name", "price", "in_stock"]
+    assert [f["field_type"] for f in pm["fields"]] == ["int", "str", "float", "bool"]
+
+    # Verify zero FastAPI keyword contamination in normalization errors
+    assert "fastapi" not in str(errors).lower()
+
+    # Validates into strict MachineReadableContract
+    draft = create_draft_contract(raw_intent="Product API", target_language="python", domain="REST_API")
+    cdict = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=canonical_models,
+        interface_contracts=[{"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "/products", "method": "GET", "target_file": "main.py"}],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": "REQ-01", "test_scenario": "Test", "target_symbol": "/products", "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_obj = MachineReadableContract(**cdict)
+    assert contract_obj.data_models[0].model_name == "Product"
+
+
+def test_scenario_26_cli_matrix_generic_representation():
+    """
+    Scenario 26 (Correction I): Generic CLI Matrix Representation.
+    Tests Matrix data model using the boundary adapter.
+    Confirms purely generic processing without task-specific CLI branching.
+    """
+    raw_models = [
+        {
+            "model_name": "Matrix",
+            "target_file": "main.py",
+            "fields": [
+                {"name": "rows", "type": "int", "is_required": True},
+                {"name": "cols", "type": "int", "is_required": True},
+                {"name": "data", "type": "list", "is_required": True}
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models, default_target_file="main.py")
+    assert errors == []
+    assert len(canonical_models) == 1
+    mm = canonical_models[0]
+    assert mm["model_name"] == "Matrix"
+    assert [f["field_name"] for f in mm["fields"]] == ["rows", "cols", "data"]
+    assert [f["field_type"] for f in mm["fields"]] == ["int", "int", "list"]
+
+    # Verify zero CLI keyword contamination in normalization errors
+    assert "cli" not in str(errors).lower()
+
+    # Validates into strict MachineReadableContract
+    draft = create_draft_contract(raw_intent="Matrix Tool", target_language="python", domain="CLI_TOOL")
+    cdict = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=canonical_models,
+        interface_contracts=[{"interface_id": "IFC-01", "interface_type": "FUNCTION", "identifier": "matrix_multiply", "target_file": "main.py"}],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": "REQ-01", "test_scenario": "Test", "target_symbol": "matrix_multiply", "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_obj = MachineReadableContract(**cdict)
+    assert contract_obj.data_models[0].model_name == "Matrix"
+
+
+def test_scenario_27_flutter_metric_data_generic_representation():
+    """
+    Scenario 27 (Correction J): Generic Flutter MetricData Representation.
+    Tests MetricData data model using the boundary adapter.
+    Confirms purely generic processing without task-specific Flutter branching.
+    """
+    raw_models = [
+        {
+            "model_name": "MetricData",
+            "target_file": "lib/main.dart",
+            "fields": [
+                {"field_name": "label", "field_type": "String", "is_required": True},
+                {"field_name": "value", "field_type": "double", "is_required": True},
+                {"field_name": "unit", "field_type": "String", "is_required": False}
+            ]
+        }
+    ]
+    canonical_models, errors = normalize_blueprint_data_models(raw_models, default_target_file="lib/main.dart")
+    assert errors == []
+    assert len(canonical_models) == 1
+    fm = canonical_models[0]
+    assert fm["model_name"] == "MetricData"
+    assert fm["target_file"] == "lib/main.dart"
+    assert [f["field_name"] for f in fm["fields"]] == ["label", "value", "unit"]
+    assert [f["field_type"] for f in fm["fields"]] == ["String", "double", "String"]
+
+    # Verify zero Flutter keyword contamination in normalization errors
+    assert "flutter" not in str(errors).lower()
+
+    # Validates into strict MachineReadableContract
+    draft = create_draft_contract(raw_intent="Metric App", target_language="dart", domain="FLUTTER_WIDGET")
+    cdict = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=canonical_models,
+        interface_contracts=[{"interface_id": "IFC-01", "interface_type": "WIDGET", "identifier": "MetricCard", "target_file": "lib/main.dart"}],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": "REQ-01", "test_scenario": "Test", "target_symbol": "MetricCard", "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_obj = MachineReadableContract(**cdict)
+    assert contract_obj.data_models[0].model_name == "MetricData"
+
+
