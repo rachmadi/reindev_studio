@@ -30,6 +30,34 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+try:
+    from .canonical_scenario import (
+        CanonicalScenario,
+        BehavioralObservation,
+        ScenarioKind,
+        ComparisonStatus,
+        CausalStatus,
+        extract_canonical_scenarios,
+        evaluate_behavioral_observations,
+        format_scenarios_for_architect,
+        format_behavioral_mismatches_for_developer,
+    )
+except (ImportError, ValueError):
+    try:
+        from canonical_scenario import (
+            CanonicalScenario,
+            BehavioralObservation,
+            ScenarioKind,
+            ComparisonStatus,
+            CausalStatus,
+            extract_canonical_scenarios,
+            evaluate_behavioral_observations,
+            format_scenarios_for_architect,
+            format_behavioral_mismatches_for_developer,
+        )
+    except ImportError:
+        pass
+
 
 # ===========================================================================
 # 1. Custom Exceptions

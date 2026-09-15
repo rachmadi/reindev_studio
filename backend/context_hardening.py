@@ -61,15 +61,46 @@ except (ImportError, ValueError):
         deduplicate_evidence = None  # type: ignore
         ImplementationGroundingEngine = None  # type: ignore
 
+try:
+    from .canonical_scenario import (
+        extract_canonical_scenarios,
+        evaluate_behavioral_observations,
+        format_scenarios_for_architect,
+        format_behavioral_mismatches_for_developer,
+    )
+except (ImportError, ValueError):
+    try:
+        from canonical_scenario import (
+            extract_canonical_scenarios,
+            evaluate_behavioral_observations,
+            format_scenarios_for_architect,
+            format_behavioral_mismatches_for_developer,
+        )
+    except ImportError:
+        extract_canonical_scenarios = None  # type: ignore
+        evaluate_behavioral_observations = None  # type: ignore
+        format_scenarios_for_architect = None  # type: ignore
+        format_behavioral_mismatches_for_developer = None  # type: ignore
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
 # ===========================================================================
 
 DEFAULT_PRIORITY_ORDER: List[str] = [
+    "authority_acceptance",
+    "authority_scenario",
     "authority",
-    "invariant",
+    "evidence_mismatch",
+    "requirement_prescription",
     "requirement",
+    "invariant_locked",
+    "invariant",
+    "requirement_repair_boundary",
+    "requirement_expected_post_repair",
+    "authority_verification",
+    "evidence_validator",
+    "evidence_diagnostics",
     "evidence",
     "impl_ref",
     "historical",
@@ -115,7 +146,41 @@ def compress_context_semantic(
                 total = max_chars
             break
 
-    return "\n\n".join(result_parts)
+    result = "\n\n".join(result_parts)
+
+    # Section 10: Deterministic Omission Detection & Protection
+    # Acceptance scenarios and active mismatches must NEVER be silently dropped.
+    critical_prefixes = ("authority_acceptance", "authority_scenario", "evidence_mismatch")
+    for cp in critical_prefixes:
+        for k, content in sections.items():
+            if content and k.startswith(cp):
+                header = content.splitlines()[0] if content.splitlines() else ""
+                if header and header not in result:
+                    # Critical section was omitted due to severely undersized budget
+                    # Deterministic system detects and flags this omission explicitly
+                    import warnings
+                    warnings.warn(
+                        f"[CONTEXT_OMISSION_DETECTED]: Critical section '{k}' could not fit within max_chars={max_chars}. "
+                        "Deterministic system strictly forbids silent omission.",
+                        RuntimeWarning
+                    )
+
+    return result
+
+
+def check_context_omission(
+    sections: Dict[str, str],
+    result_text: str,
+    critical_prefixes: Tuple[str, ...] = ("authority_acceptance", "authority_scenario", "evidence_mismatch")
+) -> List[str]:
+    """Mendeteksi apakah ada seksi kritis penerimaan/mismatch yang dihilangkan secara diam-diam."""
+    omitted = []
+    for k, content in sections.items():
+        if content and any(k.startswith(cp) for cp in critical_prefixes):
+            header = content.splitlines()[0] if content.splitlines() else ""
+            if header and header not in result_text:
+                omitted.append(k)
+    return omitted
 
 
 def compress_scaffold_semantic(scaffold_text: str, target_chars: int = 800) -> str:
@@ -759,19 +824,35 @@ def build_developer_repair_context(
         if models_list:
             c_text += f"Required Models: {', '.join(models_list)}\n"
         c_text += f"Repair Budget: {iteration}/{max_iter}"
-        sections["authority_frozen_contract"] = (
-            "[1] FROZEN CONTRACT (source of truth — immutable)\n"
-            "==================================================\n"
+        sections["authority_acceptance_contract"] = (
+            "[1] FROZEN CONTRACT / AUTHORITATIVE ACCEPTANCE (immutable)\n"
+            "===========================================================\n"
             + c_text
         )
 
-    # [2] ORACLE EXPECTATION
+    # [2] ORACLE EXPECTATION & ACCEPTANCE BEHAVIOR SCENARIOS (Treatment #1.3)
+    scenarios: List[Any] = []
+    observations: List[Any] = []
+    if extract_canonical_scenarios is not None:
+        try:
+            scenarios = extract_canonical_scenarios(
+                frozen_oracle_path=state.get("frozen_oracle_path"),
+                test_files=test_files
+            )
+        except Exception:
+            scenarios = []
+
+    if scenarios and format_scenarios_for_architect is not None:
+        sc_block = format_scenarios_for_architect(scenarios)
+        if sc_block:
+            sections["authority_scenario"] = sc_block
+
     if test_files:
         oracle_excerpt = extract_oracle_callsite_assertions(test_files, interfaces, models_list)
         if oracle_excerpt:
             sections["authority_oracle"] = (
                 "[2] ORACLE EXPECTATION (Frozen Oracle — IMMUTABLE)\n"
-                "===================================================\\n"
+                "===================================================\n"
                 + oracle_excerpt
             )
 
@@ -812,6 +893,17 @@ def build_developer_repair_context(
             "==============================\n"
             + code_excerpt
         )
+
+    # [CURRENT FAILURE — BEHAVIORAL MISMATCH] (Treatment #1.3)
+    if evaluate_behavioral_observations is not None and scenarios:
+        try:
+            observations = evaluate_behavioral_observations(scenarios, state.get("test_results") or {})
+        except Exception:
+            observations = []
+        if observations and format_behavioral_mismatches_for_developer is not None:
+            mismatch_block = format_behavioral_mismatches_for_developer(observations, scenarios)
+            if mismatch_block:
+                sections["evidence_mismatch"] = mismatch_block
 
     # [5] VALIDATOR RESULT
     if pkg is not None:
@@ -901,6 +993,14 @@ def build_developer_repair_context(
                 "[8] PRESCRIPTION (WHAT must be true — model menentukan HOW)\n"
                 "=============================================================\n"
                 + "\n".join(pres_parts)
+            )
+
+        exp_states = getattr(pkg, "expected_post_repair_state", []) or []
+        if exp_states:
+            sections["requirement_expected_post_repair"] = (
+                "[EXPECTED POST-REPAIR STATE (deterministic)]\n"
+                "============================================\n"
+                + "\n".join(f"  ✓ {s}" for s in exp_states)
             )
 
     # [9] REPAIR BOUNDARY
