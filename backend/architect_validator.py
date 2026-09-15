@@ -160,6 +160,44 @@ def validate_python_blueprint_consistency(blueprint_text: str) -> Tuple[bool, Li
     return len(errors) == 0, errors
 
 
+def _extract_top_level_named_args_dart(args_str: str) -> List[str]:
+    """Ekstrak argumen bernama yang berada pada kedalaman teratas (depth 0)."""
+    depth = 0
+    in_single = False
+    in_double = False
+    current_token = ""
+    named_args = []
+
+    i = 0
+    n = len(args_str)
+    while i < n:
+        ch = args_str[i]
+        if ch == "'":
+            in_single = not in_single
+        elif ch == '"':
+            in_double = not in_double
+        elif not in_single and not in_double:
+            if ch in "({[":
+                depth += 1
+            elif ch in ")}]":
+                depth -= 1
+            elif depth == 0:
+                if ch == ':':
+                    match = re.search(r'([A-Za-z_][A-Za-z0-9_]*)\s*$', current_token)
+                    if match:
+                        named_args.append(match.group(1))
+                    current_token = ''
+                    i += 1
+                    continue
+                elif ch == ',':
+                    current_token = ''
+                    i += 1
+                    continue
+        current_token += ch
+        i += 1
+    return named_args
+
+
 def validate_dart_blueprint_consistency(blueprint_text: str) -> Tuple[bool, List[str]]:
     """
     Memvalidasi konsistensi deklarasi dan pemanggilan (Declaration ↔ Invocation) pada Dart/Flutter.
@@ -216,16 +254,37 @@ def validate_dart_blueprint_consistency(blueprint_text: str) -> Tuple[bool, List
 
     for cname, cinfo in constructors.items():
         declared = cinfo["declared"]
-        call_pattern = rf"\b{cname}\s*\(\s*([^{{][^)]*)\)"
-        for cm in re.finditer(call_pattern, full_code):
-            args_str = cm.group(1).strip()
-            named_args = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:", args_str)
-            for arg in named_args:
-                if arg not in declared and arg not in ("key",):
-                    errors.append(
-                        f"Parameter '{arg}' dilewatkan saat instansiasi '{cname}', "
-                        f"tetapi tidak terdaftar pada deklarasi constructor {cname} {sorted(declared)}."
-                    )
+        pattern = rf"\b{cname}\s*\("
+        for m in re.finditer(pattern, full_code):
+            start_idx = m.end()
+            depth = 1
+            i = start_idx
+            n = len(full_code)
+            in_single = False
+            in_double = False
+            while i < n and depth > 0:
+                ch = full_code[i]
+                if ch == "'":
+                    in_single = not in_single
+                elif ch == '"':
+                    in_double = not in_double
+                elif not in_single and not in_double:
+                    if ch == '(':
+                        depth += 1
+                    elif ch == ')':
+                        depth -= 1
+                        if depth == 0:
+                            break
+                i += 1
+            if depth == 0:
+                args_str = full_code[start_idx:i]
+                named_args = _extract_top_level_named_args_dart(args_str)
+                for arg in named_args:
+                    if arg not in declared and arg not in ("key",):
+                        errors.append(
+                            f"Parameter '{arg}' dilewatkan saat instansiasi '{cname}', "
+                            f"tetapi tidak terdaftar pada deklarasi constructor {cname} {sorted(declared)}."
+                        )
 
     return len(errors) == 0, errors
 

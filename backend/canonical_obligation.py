@@ -481,6 +481,11 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
         self.obligations: Dict[str, CanonicalObligation] = {}
         self.imported_from_main: Set[str] = set()
         self.proven_class_symbols: Set[str] = set()
+        self.external_modules: Set[str] = {
+            "pytest", "unittest", "mock", "os", "sys", "re", "json", "math",
+            "time", "logging", "warnings", "subprocess", "shutil", "tempfile",
+            "pathlib", "asyncio", "typing", "collections", "itertools", "functools"
+        }
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         prev = self.current_function
@@ -494,8 +499,16 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_function = prev
 
+    def visit_Import(self, node: ast.Import):
+        for alias in node.names:
+            name = alias.asname or alias.name
+            if name not in ("main", "app"):
+                self.external_modules.add(name)
+        self.generic_visit(node)
+
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        if node.module in ("main", "app"):
+        mod = node.module or ""
+        if mod in ("main", "app"):
             for alias in node.names:
                 sym = alias.name
                 if sym not in ("app", "main"):
@@ -524,6 +537,10 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
                             source_reference=f"{self.file_name}:{node.lineno}",
                             metadata={"target_module": node.module, "symbol_type": "import"}
                         )
+        else:
+            for alias in node.names:
+                name = alias.asname or alias.name
+                self.external_modules.add(name)
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):
@@ -604,10 +621,20 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
                 if sym not in ("app", "main"):
                     self._record_symbol_call(sym, node)
 
-            # 4. Method invocation: obj.<method>(*args, **kwargs) where obj is not main/client/math etc.
-            elif isinstance(node.func.value, (ast.Name, ast.Attribute, ast.Call)):
+            # 4. Method invocation: obj.<method>(*args, **kwargs) where obj is not an external module/client
+            elif isinstance(node.func.value, ast.Name):
+                obj_name = node.func.value.id
                 method_name = node.func.attr
-                if not method_name.startswith("__") and method_name not in ("status_code", "json", "text", "content"):
+                if (
+                    obj_name not in self.external_modules and
+                    obj_name not in ("self", "cls") and
+                    not method_name.startswith("__") and
+                    method_name not in ("status_code", "json", "text", "content", "get", "post", "put", "delete", "patch")
+                ):
+                    self._record_method_call(method_name, node)
+            elif isinstance(node.func.value, (ast.Attribute, ast.Call)):
+                method_name = node.func.attr
+                if not method_name.startswith("__") and method_name not in ("status_code", "json", "text", "content", "get", "post", "put", "delete", "patch"):
                     self._record_method_call(method_name, node)
 
         # 5. Direct call on imported symbol: e.g. Matrix(data) or add_numbers(1, 2)

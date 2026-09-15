@@ -491,6 +491,10 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
                 interface_contracts=ifaces,
                 testable_assertions=assertions
             )
+            if extracted_bp:
+                bp_dict_pre = extracted_bp.model_dump() if hasattr(extracted_bp, "model_dump") else (extracted_bp.to_dict() if hasattr(extracted_bp, "to_dict") else extracted_bp)
+                if isinstance(bp_dict_pre, dict) and "files" in bp_dict_pre:
+                    aligned_contract["files"] = bp_dict_pre.get("files", {})
     else:
         # Blueprint JSON parsing failed or produced schema errors.
         # Strict Principle: JANGAN gunakan semantic regex fallback (zero fabricated contract).
@@ -540,8 +544,13 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
     )
     current_logs = state.get("logs", [])
     
+    bp_dict = None
+    if extracted_bp:
+        bp_dict = extracted_bp.model_dump() if hasattr(extracted_bp, "model_dump") else (extracted_bp.to_dict() if hasattr(extracted_bp, "to_dict") else extracted_bp)
+
     return {
         "architecture_plan": arch_plan,
+        "architectural_blueprint": bp_dict,
         "contract": aligned_contract,
         "contract_status": status_label,
         "contract_validation_errors": contract_errors,
