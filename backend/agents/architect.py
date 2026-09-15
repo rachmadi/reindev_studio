@@ -332,13 +332,16 @@ def architect_agent(state: SquadState) -> dict:
             feedback_section = f"\n\n{decision_ctx}\n"
 
             if tracer and ContextTelemetry and emit_context_telemetry:
+                import dataclasses
+                known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
+                filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
                 telem = ContextTelemetry(
                     agent="architect",
                     model=str(state.get("model_name", "")),
                     context_version="hardening_v1",
                     run_id=str(state.get("run_id", "")),
                     iteration=state.get("contract_revision_count", 0),
-                    **telem_data
+                    **filtered_telem_data
                 )
                 emit_context_telemetry(tracer, "architect", telem)
                 if hasattr(tracer, "log_repair_attempt") and pkg:

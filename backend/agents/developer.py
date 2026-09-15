@@ -263,13 +263,16 @@ def developer_agent(state: SquadState) -> dict:
 
             tracer = get_tracer(state.get("run_id"))
             if tracer and ContextTelemetry and emit_context_telemetry:
+                import dataclasses
+                known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
+                filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
                 telem = ContextTelemetry(
                     agent="developer",
                     model=str(state.get("model_name", "")),
                     context_version="hardening_v1",
                     run_id=str(state.get("run_id", "")),
                     iteration=iteration,
-                    **telem_data
+                    **filtered_telem_data
                 )
                 emit_context_telemetry(tracer, "developer", telem)
                 if hasattr(tracer, "log_repair_attempt") and pkg:

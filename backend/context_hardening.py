@@ -327,6 +327,8 @@ class ContextTelemetry:
     implementation_facts_count: int = 0
     truncation_detected: bool = False
     repair_result: str = ""
+    delivery_valid: bool = True
+    delivery_errors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
