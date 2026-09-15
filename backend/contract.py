@@ -65,6 +65,36 @@ except ImportError:
         ScaffoldCompatibilityStatus = None
         ScaffoldScenarioMatrix = None
 
+try:
+    from .architect_preservation import (
+        RepairTransitionStatus,
+        RepairStateItem,
+        RepairStateLedger,
+        ArchitectScaffoldSnapshot,
+        generate_scaffold_snapshot,
+        compare_scaffold_snapshots,
+        evaluate_preservation_and_regression,
+    )
+except (ImportError, ValueError):
+    try:
+        from architect_preservation import (
+            RepairTransitionStatus,
+            RepairStateItem,
+            RepairStateLedger,
+            ArchitectScaffoldSnapshot,
+            generate_scaffold_snapshot,
+            compare_scaffold_snapshots,
+            evaluate_preservation_and_regression,
+        )
+    except ImportError:
+        RepairTransitionStatus = None
+        RepairStateItem = None
+        RepairStateLedger = None
+        ArchitectScaffoldSnapshot = None
+        generate_scaffold_snapshot = None
+        compare_scaffold_snapshots = None
+        evaluate_preservation_and_regression = None
+
 
 
 # ===========================================================================
@@ -515,7 +545,8 @@ def extract_oracle_tested_symbols(frozen_oracle_path: str, target_lang: str = ""
 def check_pre_freeze_authority_compatibility(
     contract_obj: MachineReadableContract,
     frozen_oracle_path: str,
-    blueprint: Optional[Dict[str, Any]] = None
+    blueprint: Optional[Dict[str, Any]] = None,
+    previous_snapshot: Optional[Any] = None
 ) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
     """
     PRE-FREEZE AUTHORITY COMPATIBILITY GATE (Part 2 - Architect Contract Binding v2).
@@ -639,6 +670,36 @@ def check_pre_freeze_authority_compatibility(
             scenarios = extract_canonical_scenarios(frozen_oracle_path=str(oracle_dir))
             if scenarios:
                 scaffold_matrix = evaluate_scaffold_scenario_compatibility(scenarios, scaffold_files)
+
+                # Treatment #1.5: Preservation & Regression Evaluation
+                if evaluate_preservation_and_regression is not None:
+                    try:
+                        ledger = evaluate_preservation_and_regression(
+                            previous_snapshot,
+                            scaffold_matrix,
+                            scenarios,
+                            obligations=obligations,
+                            scaffold_files=scaffold_files
+                        )
+                        if ledger.has_regression:
+                            is_compatible = False
+                            reg_text = ledger.to_regression_evidence_text()
+                            if reg_text:
+                                error_messages.append(reg_text)
+                            for it in ledger.items:
+                                if it.transition_status == "CRITICAL_REGRESSION" or it.current_status == "REGRESSION":
+                                    missing_obligations.append({
+                                        "obligation": f"Acceptance Scenario '{it.scenario_id}' ({it.source_reference})",
+                                        "coverage": "CRITICAL_REGRESSION",
+                                        "result": "CRITICAL_REGRESSION — CONTRACT MUST NOT FREEZE",
+                                        "source_file": it.source_reference,
+                                        "obligation_id": it.scenario_id,
+                                        "reason": f"Previously COMPATIBLE scenario regressed to {it.current_status}. {it.observed_change}",
+                                        "missing_aspects": [it.current_status, it.transition_status],
+                                    })
+                    except Exception:
+                        pass
+
                 if not scaffold_matrix.is_fully_compatible:
                     is_compatible = False
                     for diag in scaffold_matrix.to_diagnosis_lines():
@@ -747,7 +808,8 @@ def validate_contract_gate(
     contract_data: Any,
     frozen_oracle_path: Optional[str] = None,
     task_text: Optional[str] = None,
-    blueprint: Optional[Dict[str, Any]] = None
+    blueprint: Optional[Dict[str, Any]] = None,
+    previous_snapshot: Optional[Any] = None
 ) -> Tuple[bool, List[str], List[str]]:
     """
     Memvalidasi dokumen kontrak secara deterministik melalui empat pilar pengujian:
@@ -991,7 +1053,8 @@ def validate_contract_gate(
         is_compat, err_msgs, missing_obs = check_pre_freeze_authority_compatibility(
             contract_obj,
             frozen_oracle_path,
-            blueprint=blueprint
+            blueprint=blueprint,
+            previous_snapshot=previous_snapshot
         )
         if not is_compat:
             structured_err = (
@@ -1015,11 +1078,13 @@ def seal_and_freeze_contract(
     contract_data: Any,
     frozen_oracle_path: Optional[str] = None,
     task_text: Optional[str] = None,
-    blueprint: Optional[Dict[str, Any]] = None
+    blueprint: Optional[Dict[str, Any]] = None,
+    previous_snapshot: Optional[Any] = None,
+    state: Optional[Dict[str, Any]] = None
 ) -> Tuple[bool, Dict[str, Any], List[str], List[str]]:
     """
     Mengeksekusi transisi kritis ALIGNED -> FROZEN:
-    1. Memvalidasi kontrak melalui 4 pilar Validation Gate (termasuk P0-2.1).
+    1. Memvalidasi kontrak melalui 4 pilar Validation Gate (termasuk P0-2.1 & Treatment #1.5).
     2. Jika lulus 100%:
        - Menghitung canonical hash SHA-256 (RFC 8785) dengan mengeluarkan provenance.contract_sha256.
        - Menyuntikkan hash ke provenance.contract_sha256.
@@ -1035,6 +1100,13 @@ def seal_and_freeze_contract(
         c_dict = contract_data.to_dict()
     else:
         return False, {}, ["Input kontrak bukan dictionary atau model valid."], []
+
+    # Resolusi previous_snapshot jika belum diberikan
+    if previous_snapshot is None:
+        if state and isinstance(state, dict) and state.get("scaffold_snapshots"):
+            previous_snapshot = state["scaffold_snapshots"][-1]
+        elif c_dict.get("provenance", {}).get("scaffold_snapshots"):
+            previous_snapshot = c_dict["provenance"]["scaffold_snapshots"][-1]
 
     # Authoritative Target File Binding (Intervensi 1)
     domain = c_dict.get("task_intent", {}).get("domain", "")
@@ -1063,12 +1135,13 @@ def seal_and_freeze_contract(
         if isinstance(m, dict) and not m.get("target_file"):
             m["target_file"] = auth_tf
 
-    # Validasi 4 Pilar
+    # Validasi 4 Pilar (termasuk Treatment #1.5 pre-freeze authority & preservation)
     is_valid, errors, warnings = validate_contract_gate(
         c_dict,
         frozen_oracle_path=frozen_oracle_path,
         task_text=task_text,
-        blueprint=blueprint
+        blueprint=blueprint,
+        previous_snapshot=previous_snapshot
     )
 
     # Periksa HANYA error pra-segel aktif pada kandidat saat ini (misal: JSON parse failure atau model mapping error pada turn aktif)
@@ -1095,6 +1168,62 @@ def seal_and_freeze_contract(
                 if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
                     c_dict["provenance"] = {}
                 c_dict["provenance"]["coverage_matrix"] = cov_mat.to_telemetry_dict()
+        except Exception:
+            pass
+
+    # Treatment #1.5: Snapshot Generation & Provenance Attachment
+    scaffold_files: Dict[str, str] = {}
+    if blueprint:
+        if hasattr(blueprint, "files") and blueprint.files:
+            for fp, mod in blueprint.files.items():
+                scaffold_files[fp] = getattr(mod, "code_scaffold", "") or (mod.get("code_scaffold", "") if isinstance(mod, dict) else str(mod))
+        elif isinstance(blueprint, dict) and "files" in blueprint:
+            b_files = blueprint.get("files", {})
+            if isinstance(b_files, dict):
+                for fp, mod in b_files.items():
+                    if isinstance(mod, str):
+                        scaffold_files[fp] = mod
+                    elif isinstance(mod, dict):
+                        scaffold_files[fp] = mod.get("code_scaffold", "") or mod.get("content", "")
+                    elif hasattr(mod, "code_scaffold"):
+                        scaffold_files[fp] = getattr(mod, "code_scaffold", "") or ""
+
+    if not scaffold_files and c_dict.get("files"):
+        c_files = c_dict.get("files")
+        if isinstance(c_files, dict):
+            for fp, mod in c_files.items():
+                if isinstance(mod, str):
+                    scaffold_files[fp] = mod
+                elif isinstance(mod, dict):
+                    scaffold_files[fp] = mod.get("code_scaffold", "") or mod.get("content", "")
+
+    sc_matrix_res = None
+    if scaffold_files and evaluate_scaffold_scenario_compatibility is not None and extract_canonical_scenarios is not None and frozen_oracle_path and os.path.exists(frozen_oracle_path):
+        try:
+            scenarios = extract_canonical_scenarios(frozen_oracle_path=frozen_oracle_path)
+            if scenarios:
+                sc_matrix_res = evaluate_scaffold_scenario_compatibility(scenarios, scaffold_files)
+        except Exception:
+            pass
+
+    if generate_scaffold_snapshot is not None and scaffold_files:
+        try:
+            snap = generate_scaffold_snapshot(
+                scaffold_files,
+                compatibility_matrix=sc_matrix_res,
+                obligation_coverage=c_dict.get("coverage_matrix"),
+                contract_status=ContractStatus.FROZEN.value if is_valid else ContractStatus.REJECTED.value,
+                timestamp=datetime.now().isoformat()
+            )
+            if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
+                c_dict["provenance"] = {}
+            snaps = list(c_dict["provenance"].get("scaffold_snapshots") or [])
+            snaps.append(snap.to_dict())
+            c_dict["provenance"]["scaffold_snapshots"] = snaps
+            if state is not None and isinstance(state, dict):
+                state["scaffold_snapshots"] = snaps
+                if sc_matrix_res is not None:
+                    state["latest_scaffold_matrix"] = sc_matrix_res.to_dict() if hasattr(sc_matrix_res, "to_dict") else sc_matrix_res
         except Exception:
             pass
 

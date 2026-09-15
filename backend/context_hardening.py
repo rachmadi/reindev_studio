@@ -82,10 +82,56 @@ except (ImportError, ValueError):
         format_scenarios_for_architect = None  # type: ignore
         format_behavioral_mismatches_for_developer = None  # type: ignore
 
+try:
+    from .architect_preservation import (
+        RepairStateLedger,
+        RepairStateItem,
+        RepairTransitionStatus,
+        ArchitectScaffoldSnapshot,
+        generate_scaffold_snapshot,
+        compare_scaffold_snapshots,
+        evaluate_preservation_and_regression,
+        validate_architect_repair_context_delivery,
+    )
+except (ImportError, ValueError):
+    try:
+        from architect_preservation import (
+            RepairStateLedger,
+            RepairStateItem,
+            RepairTransitionStatus,
+            ArchitectScaffoldSnapshot,
+            generate_scaffold_snapshot,
+            compare_scaffold_snapshots,
+            evaluate_preservation_and_regression,
+            validate_architect_repair_context_delivery,
+        )
+    except ImportError:
+        RepairStateLedger = None  # type: ignore
+        RepairStateItem = None  # type: ignore
+        RepairTransitionStatus = None  # type: ignore
+        ArchitectScaffoldSnapshot = None  # type: ignore
+        generate_scaffold_snapshot = None  # type: ignore
+        compare_scaffold_snapshots = None  # type: ignore
+        evaluate_preservation_and_regression = None  # type: ignore
+        validate_architect_repair_context_delivery = None  # type: ignore
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
 # ===========================================================================
+
+ARCHITECT_REPAIR_PRIORITY_ORDER: List[str] = [
+    "sec_01_authority",
+    "sec_02_obligation_ledger",
+    "sec_03_current_failures",
+    "sec_04_locked_proven_state",
+    "sec_05_current_scaffold",
+    "sec_06_repair_target",
+    "sec_07_repair_boundary",
+    "sec_08_expected_post_repair",
+    "sec_09_grounding",
+    "sec_10_raw_diagnostics",
+]
 
 DEFAULT_PRIORITY_ORDER: List[str] = [
     "authority_acceptance",
@@ -441,8 +487,333 @@ def check_and_resolve_authority_conflicts(
 
 
 # ===========================================================================
-# 4. Architect Decision Context Package (11 Seksi)
+# 4. Architect Decision & Repair Context Packages (Treatment #1.5)
 # ===========================================================================
+
+def build_architect_repair_context(
+    state: Dict[str, Any],
+    pkg: Optional[Any] = None,
+    max_chars: int = 6500,
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Membangun 10-seksi Architect Repair Context Package secara generik (Treatment #1.5).
+    Urutan semantik absolut:
+    [1] IMMUTABLE ACCEPTANCE AUTHORITY
+    [2] ACCEPTANCE OBLIGATION LEDGER
+    [3] CURRENT COMPATIBILITY FAILURES
+    [4] LOCKED/PROVEN STATE
+    [5] CURRENT SCAFFOLD
+    [6] REPAIR TARGET
+    [7] REPAIR BOUNDARY
+    [8] EXPECTED POST-REPAIR STATE
+    [9] IMPLEMENTATION GROUNDING
+    [10] RAW DIAGNOSTICS
+    """
+    sections: Dict[str, str] = {}
+
+    frozen_path = state.get("frozen_oracle_path") or ""
+    contract = state.get("contract") or {}
+    arch_plan = state.get("architecture_plan", "")
+    blueprint = state.get("architectural_blueprint") or {}
+
+    # Extract scaffold files
+    scaffold_files: Dict[str, str] = {}
+    if blueprint:
+        if hasattr(blueprint, "files") and blueprint.files:
+            for fp, mod in blueprint.files.items():
+                scaffold_files[fp] = getattr(mod, "code_scaffold", "") or (mod.get("code_scaffold", "") if isinstance(mod, dict) else str(mod))
+        elif isinstance(blueprint, dict) and "files" in blueprint:
+            b_files = blueprint.get("files", {})
+            if isinstance(b_files, dict):
+                for fp, mod in b_files.items():
+                    if isinstance(mod, str):
+                        scaffold_files[fp] = mod
+                    elif isinstance(mod, dict):
+                        scaffold_files[fp] = mod.get("code_scaffold", "") or mod.get("content", "")
+                    elif hasattr(mod, "code_scaffold"):
+                        scaffold_files[fp] = getattr(mod, "code_scaffold", "") or ""
+    if not scaffold_files and state.get("code_files"):
+        scaffold_files = dict(state.get("code_files") or {})
+
+    # Extract scenarios & obligations
+    scenarios = []
+    if extract_canonical_scenarios and frozen_path and os.path.exists(frozen_path):
+        try:
+            scenarios = extract_canonical_scenarios(frozen_oracle_path=frozen_path)
+        except Exception:
+            pass
+
+    # Get previous snapshot
+    prev_snapshot = None
+    snapshots = state.get("scaffold_snapshots") or []
+    if snapshots:
+        last_s = snapshots[-1]
+        prev_snapshot = ArchitectScaffoldSnapshot.from_dict(last_s) if isinstance(last_s, dict) else last_s
+    elif isinstance(contract, dict) and contract.get("provenance", {}).get("scaffold_snapshots"):
+        last_s = contract["provenance"]["scaffold_snapshots"][-1]
+        prev_snapshot = ArchitectScaffoldSnapshot.from_dict(last_s) if isinstance(last_s, dict) else last_s
+
+    # Current matrix
+    curr_matrix = None
+    if scaffold_files and scenarios and evaluate_scaffold_scenario_compatibility is not None:
+        try:
+            curr_matrix = evaluate_scaffold_scenario_compatibility(scenarios, scaffold_files)
+        except Exception:
+            pass
+    if curr_matrix is None and state.get("latest_scaffold_matrix"):
+        curr_matrix = state.get("latest_scaffold_matrix")
+
+    # Ledger
+    ledger = None
+    if evaluate_preservation_and_regression is not None and scenarios:
+        try:
+            ledger = evaluate_preservation_and_regression(
+                prev_snapshot,
+                curr_matrix,
+                scenarios,
+                scaffold_files=scaffold_files
+            )
+        except Exception:
+            pass
+
+    # ========================================================
+    # [1] IMMUTABLE ACCEPTANCE AUTHORITY
+    # ========================================================
+    oracle_items = extract_authoritative_oracle_interfaces(state)
+    auth_lines = [
+        "[1] IMMUTABLE ACCEPTANCE AUTHORITY (ORACLE_FACT — verified test suite)",
+        "======================================================================",
+        "Authority Notice: Absolute acceptance authority belongs to Acceptance Oracle test suite.",
+        "Architect is strictly FORBIDDEN from altering, removing, or overriding these requirements."
+    ]
+    if oracle_items:
+        auth_lines.append("Authoritative Oracle Symbols:")
+        for it in oracle_items:
+            auth_lines.append(f"  - {it}")
+    sections["sec_01_authority"] = "\n".join(auth_lines).strip()
+
+    # ========================================================
+    # [2] ACCEPTANCE OBLIGATION LEDGER
+    # ========================================================
+    if ledger is not None:
+        sections["sec_02_obligation_ledger"] = (
+            "[2] ACCEPTANCE OBLIGATION LEDGER\n=================================\n"
+            + ledger.to_immutable_ledger_text()
+        )
+    else:
+        sc_lines = ["[2] ACCEPTANCE OBLIGATION LEDGER (READ-ONLY)\n============================================"]
+        for i, sc in enumerate(scenarios, 1):
+            sc_lines.append(f"{i}. SCENARIO: {getattr(sc, 'scenario_id', str(i))} | Stimulus: {getattr(sc, 'stimulus', '')}")
+            sc_lines.append(f"   Expected: {json.dumps(getattr(sc, 'expected_outcome', {}))}")
+        sections["sec_02_obligation_ledger"] = "\n".join(sc_lines).strip()
+
+    # ========================================================
+    # [3] CURRENT COMPATIBILITY FAILURES
+    # ========================================================
+    fail_lines = [
+        "[3] CURRENT COMPATIBILITY FAILURES (DETERMINISTIC EVIDENCE)",
+        "==========================================================="
+    ]
+    active_failures: List[str] = []
+    if pkg is not None:
+        for v in (getattr(pkg, "violations", []) or []):
+            vid = getattr(v, "violation_id", "?")
+            crit = getattr(v, "criterion", "")
+            obs = getattr(v, "observed_state", "")
+            exp = getattr(v, "expected_state", "")
+            active_failures.append(f"- [{vid}] {crit}\n    Observed: {obs}\n    Required: {exp}")
+
+    contract_errors = state.get("contract_validation_errors") or []
+    for ce in contract_errors:
+        if str(ce).strip() and str(ce) not in str(active_failures):
+            active_failures.append(f"- [CONTRACT_GATE] {ce}")
+
+    scenario_errors = [str(e) for e in contract_errors if "SCENARIO_SCAFFOLD_INCOMPATIBILITY" in str(e)]
+    if scenario_errors:
+        active_failures.append("[BEHAVIORAL COMPATIBILITY EVIDENCE — SCAFFOLD vs ACCEPTANCE SCENARIOS]")
+        for se in scenario_errors:
+            active_failures.append(f"  {se}")
+
+    if curr_matrix is not None and hasattr(curr_matrix, "to_diagnosis_lines"):
+        for diag in curr_matrix.to_diagnosis_lines():
+            if diag not in str(active_failures):
+                active_failures.append(f"- [COMPATIBILITY_DIAGNOSIS] {diag}")
+
+    if ledger and ledger.has_regression:
+        reg_text = ledger.to_regression_evidence_text()
+        if reg_text:
+            fail_lines.append(reg_text + "\n")
+
+    if active_failures:
+        fail_lines.append("ACTIVE FAILURES (Multi-failure representation):")
+        for af in active_failures:
+            fail_lines.append(f"  {af}")
+    else:
+        fail_lines.append("No active static failures detected.")
+    sections["sec_03_current_failures"] = "\n".join(fail_lines).strip()
+
+    # ========================================================
+    # [4] LOCKED/PROVEN STATE
+    # ========================================================
+    state_lines = [
+        "[4] LOCKED/PROVEN STATE (State Transition Ledger)",
+        "================================================="
+    ]
+    if ledger is not None:
+        state_lines.append(ledger.to_repair_state_text())
+    locked_dict = state.get("locked_invariants") or {}
+    if locked_dict:
+        state_lines.append("\nLocked Invariants (mutation FORBIDDEN):")
+        for lid, lval in locked_dict.items():
+            desc = lval.get("description", str(lval)) if isinstance(lval, dict) else str(lval)
+            state_lines.append(f"  - [LOCKED] {lid}: {desc}")
+    passing_tests = state.get("previous_passed_tests") or []
+    if passing_tests:
+        state_lines.append("\nPreviously Passed Tests (DO NOT BREAK):")
+        for pt in passing_tests[:6]:
+            tname = pt.get("test_name", str(pt)) if isinstance(pt, dict) else str(pt)
+            state_lines.append(f"  - [PROVEN] {tname}")
+    sections["sec_04_locked_proven_state"] = "\n".join(state_lines).strip()
+
+    # ========================================================
+    # [5] CURRENT SCAFFOLD
+    # ========================================================
+    scaff_lines = [
+        "[5] CURRENT SCAFFOLD (Previous Attempt State)",
+        "============================================="
+    ]
+    if scaffold_files:
+        for fp, code in sorted(scaffold_files.items()):
+            comp_code = compress_scaffold_semantic(code, target_chars=600)
+            scaff_lines.append(f"File: {fp}\n```\n{comp_code}\n```")
+    elif arch_plan:
+        scaff_lines.append(compress_scaffold_semantic(arch_plan.strip(), target_chars=800))
+    else:
+        scaff_lines.append("No prior scaffold files captured.")
+    sections["sec_05_current_scaffold"] = "\n".join(scaff_lines).strip()
+
+    # ========================================================
+    # [6] REPAIR TARGET
+    # ========================================================
+    if ledger is not None:
+        sections["sec_06_repair_target"] = (
+            "[6] REPAIR TARGET\n==================\n"
+            + ledger.to_repair_targets_text()
+        )
+    else:
+        sections["sec_06_repair_target"] = (
+            "[6] REPAIR TARGET\n"
+            "==================\n"
+            "ACTIVE TARGET: Repair all identified compatibility failures.\n"
+            "REQUIRED TRANSITION: INCOMPATIBLE -> COMPATIBLE\n"
+            "PRESERVE: All other existing valid interfaces and behavior."
+        )
+
+    # ========================================================
+    # [7] REPAIR BOUNDARY
+    # ========================================================
+    rb_lines = [
+        "[7] REPAIR BOUNDARY",
+        "===================",
+        "ALLOWED:",
+        "  + Fix constructor parameters / call shapes to match test invocations",
+        "  + Add missing endpoint routes or methods declared in Acceptance Oracle",
+        "  + Implement reachable conditional branches or error paths for error scenarios",
+        "  + Refine data models and function return shapes",
+        "FORBIDDEN:",
+        "  x Blind regeneration from scratch (discarding valid interfaces)",
+        "  x Dropping previously compatible public interfaces, scenarios, or modules",
+        "  x Mutating immutable acceptance obligations or oracle test suite",
+        "  x Introducing regressions on previously COMPATIBLE scenarios"
+    ]
+    sections["sec_07_repair_boundary"] = "\n".join(rb_lines).strip()
+
+    # ========================================================
+    # [8] EXPECTED POST-REPAIR STATE
+    # ========================================================
+    sections["sec_08_expected_post_repair"] = (
+        "[8] EXPECTED POST-REPAIR STATE\n"
+        "==============================\n"
+        "1. ArchitecturalBlueprint JSON is complete and valid with code_scaffold for all files.\n"
+        "2. All acceptance scenarios transition to COMPATIBLE.\n"
+        "3. Regression count must be ZERO (0 regressions).\n"
+        "4. Contract status transitions to FROZEN with canonical SHA-256 seal."
+    )
+
+    # ========================================================
+    # [9] IMPLEMENTATION GROUNDING
+    # ========================================================
+    user_task = state.get("task", "")
+    v0_model = state.get("v0_requirement_model")
+    ground_lines = [
+        "[9] IMPLEMENTATION GROUNDING",
+        "============================"
+    ]
+    if user_task:
+        ground_lines.append(f"User Task Intent:\n{user_task.strip()}")
+    if v0_model and isinstance(v0_model, dict):
+        reqs = v0_model.get("requirements", [])
+        if reqs:
+            ground_lines.append("\nV0 Core Requirements:")
+            for r in reqs[:6]:
+                desc = r.get("description", str(r)) if isinstance(r, dict) else str(r)
+                ground_lines.append(f"  - {desc}")
+    sections["sec_09_grounding"] = "\n".join(ground_lines).strip()
+
+    # ========================================================
+    # [10] RAW DIAGNOSTICS
+    # ========================================================
+    raw_diag = state.get("contract_feedback") or state.get("last_execution_error") or ""
+    raw_bounded = raw_diag.strip()[:600]
+    sections["sec_10_raw_diagnostics"] = (
+        "[10] RAW DIAGNOSTICS (Bounded to prevent displacement of priority context)\n"
+        "=========================================================================\n"
+        + (raw_bounded if raw_bounded else "No raw tracebacks.")
+    )
+
+    # Deterministic authority conflict resolution
+    sections, conflicts = check_and_resolve_authority_conflicts(sections, state, pkg=pkg)
+
+    # Context Integrity & Task Isolation Audit
+    integrity_violations: List[str] = []
+    if ContextIntegrityAuditor is not None:
+        target_domain = ""
+        contract_obj = state.get("contract")
+        if isinstance(contract_obj, dict):
+            target_domain = (contract_obj.get("task_intent") or {}).get("domain", "")
+        sections, integrity_violations = ContextIntegrityAuditor.audit_context_dict(
+            sections,
+            target_domain=target_domain,
+            target_phase="ARCHITECT",
+            state=state
+        )
+
+    # Compress context using strict priority order
+    result = compress_context_semantic(
+        sections,
+        max_chars=max_chars,
+        priority_order=ARCHITECT_REPAIR_PRIORITY_ORDER
+    )
+
+    # Pre-invocation Delivery Validation (Requirement 10)
+    delivery_valid, delivery_errs = validate_architect_repair_context_delivery(result)
+
+    telemetry_data = {
+        "context_sections": list(sections.keys()),
+        "context_size": len(result),
+        "authoritative_sources": ["FROZEN_ORACLE"],
+        "evidence_items": len(active_failures),
+        "locked_invariants": len(locked_dict),
+        "current_failures": len(active_failures),
+        "repair_boundary_items": len(rb_lines),
+        "authority_conflicts_resolved": len(conflicts),
+        "integrity_violations_detected": len(integrity_violations),
+        "delivery_valid": delivery_valid,
+        "delivery_errors": delivery_errs,
+    }
+
+    return result, telemetry_data
+
 
 def build_architect_decision_context(
     state: Dict[str, Any],
@@ -450,9 +821,13 @@ def build_architect_decision_context(
     max_chars: int = 6500,
 ) -> Tuple[str, Dict[str, Any]]:
     """
-    Membangun 11-seksi Architect Decision Context Package secara generik.
-    Bebas dari task-specific knowledge atau asumsi framework.
+    Membangun Architect Context Package secara generik.
+    Pada giliran repair: secara deterministik mendelegasikan ke build_architect_repair_context.
     """
+    rev_count = state.get("contract_revision_count", 0)
+    if pkg is not None or rev_count > 0:
+        return build_architect_repair_context(state, pkg=pkg, max_chars=max_chars)
+
     sections: Dict[str, str] = {}
 
     # [1] USER INTENT

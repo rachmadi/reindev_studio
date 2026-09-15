@@ -325,7 +325,7 @@ def architect_agent(state: SquadState) -> dict:
                     from contextual_evidence import ContextualEvidencePackage
                 except ImportError:
                     ContextualEvidencePackage = None
-            if ContextualEvidencePackage:
+            if ContextualEvidencePackage and latest_cep:
                 pkg = ContextualEvidencePackage.from_dict(latest_cep)
 
             decision_ctx, telem_data = build_architect_decision_context(state, pkg=pkg)

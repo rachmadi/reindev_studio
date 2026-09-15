@@ -258,7 +258,8 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
             contract,
             frozen_oracle_path=frozen_oracle_path,
             task_text=user_task,
-            blueprint=bp
+            blueprint=bp,
+            state=state
         )
         if success:
             sha256_seal = frozen_contract.get("provenance", {}).get("contract_sha256", "")
@@ -324,11 +325,19 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
     logs = list(state.get("logs") or [])
     logs.append(f"[V2 Architect Validator (Repair {count}/{max_repairs})]: Verdict = {verdict} (FROZEN={success})")
 
+    snaps = (
+        frozen_contract.get("provenance", {}).get("scaffold_snapshots")
+        if isinstance(frozen_contract, dict)
+        else (state.get("scaffold_snapshots") or [])
+    )
+
     res: Dict[str, Any] = {
         "architect_validator_contract": val_contract,
         "contract_validation_errors": errors,
         "contract_validation_warnings": warnings,
         "contract_revision_count": count + 1,
+        "scaffold_snapshots": snaps or list(state.get("scaffold_snapshots") or []),
+        "latest_scaffold_matrix": state.get("latest_scaffold_matrix"),
         "logs": logs
     }
 
