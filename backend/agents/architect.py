@@ -27,7 +27,8 @@ try:
     from ..architect_validator import validate_architect_blueprint
     from ..canonical_obligation import (
         extract_canonical_oracle_obligations,
-        format_authoritative_obligation_ledger
+        format_authoritative_obligation_ledger,
+        format_acceptance_usage_evidence
     )
 except (ImportError, ValueError):
     from state import SquadState
@@ -59,11 +60,13 @@ except (ImportError, ValueError):
     try:
         from canonical_obligation import (
             extract_canonical_oracle_obligations,
-            format_authoritative_obligation_ledger
+            format_authoritative_obligation_ledger,
+            format_acceptance_usage_evidence
         )
     except ImportError:
         def extract_canonical_oracle_obligations(*args, **kwargs): return []
         def format_authoritative_obligation_ledger(*args, **kwargs): return ""
+        def format_acceptance_usage_evidence(*args, **kwargs): return ""
 try:
     from ..blueprint_schema import (
         ArchitecturalBlueprint,
@@ -372,8 +375,14 @@ def architect_agent(state: SquadState) -> dict:
         )
         if oracle_obs:
             ledger_text = format_authoritative_obligation_ledger(oracle_obs)
+            usage_evidence_text = format_acceptance_usage_evidence(oracle_obs)
+            sections = []
             if ledger_text:
-                oracle_ledger_section = f"\n{ledger_text}\n"
+                sections.append(ledger_text)
+            if usage_evidence_text:
+                sections.append(usage_evidence_text)
+            if sections:
+                oracle_ledger_section = f"\n" + "\n\n".join(sections) + "\n"
     except Exception:
         oracle_ledger_section = ""
 
@@ -397,7 +406,7 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 1. Specification -> Coverage: Apakah seluruh requirement dari spesifikasi sudah terwakili tanpa ada yang terlewat?
 2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
 3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
-4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models`?
+4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] dan [ACCEPTANCE USAGE EVIDENCE] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan (argumen posisional/keyword) yang kompatibel?
 Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
 
     messages = [

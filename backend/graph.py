@@ -252,11 +252,13 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
     warnings = []
     sha256_seal = ""
 
+    bp = state.get("architectural_blueprint")
     if contract:
         success, frozen_contract, errors, warnings = seal_and_freeze_contract(
             contract,
             frozen_oracle_path=frozen_oracle_path,
-            task_text=user_task
+            task_text=user_task,
+            blueprint=bp
         )
         if success:
             sha256_seal = frozen_contract.get("provenance", {}).get("contract_sha256", "")
@@ -916,10 +918,12 @@ def contract_validation_node(state: SquadState) -> dict:
     frozen_oracle_path = state.get("frozen_oracle_path")
     user_task = state.get("task", "")
 
+    bp = state.get("architectural_blueprint")
     success, frozen_contract, errors, warnings = seal_and_freeze_contract(
         contract,
         frozen_oracle_path=frozen_oracle_path,
-        task_text=user_task
+        task_text=user_task,
+        blueprint=bp
     )
 
     if success:

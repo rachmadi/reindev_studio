@@ -63,6 +63,21 @@ class ObligationKind(str, Enum):
     INTERACTION = "INTERACTION"
     BEHAVIORAL = "BEHAVIORAL"
     OBSERVABLE_RUNTIME = "OBSERVABLE_RUNTIME"
+    UNKNOWN = "UNKNOWN"
+
+
+class InvocationKind(str, Enum):
+    CALL = "CALL"
+    CONSTRUCTOR = "CONSTRUCTOR"
+    FUNCTION = "FUNCTION"
+    METHOD = "METHOD"
+    UNKNOWN = "UNKNOWN"
+
+
+class EpistemicStatus(str, Enum):
+    PROVEN_FACT = "PROVEN_FACT"
+    HEURISTIC = "HEURISTIC"
+    UNKNOWN = "UNKNOWN"
 
 
 class CoverageStatus(str, Enum):
@@ -96,6 +111,16 @@ class CanonicalObligation:
     source_reference: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # First-Class Acceptance Usage & Call Shape Evidence (Treatment #1.2)
+    invocation_kind: str = InvocationKind.UNKNOWN.value
+    caller: str = ""
+    callee: str = ""
+    positional_arguments: int = 0
+    keyword_arguments: List[str] = field(default_factory=list)
+    argument_count: int = 0
+    argument_names: List[str] = field(default_factory=list)
+    epistemic_status: str = EpistemicStatus.PROVEN_FACT.value
+
     def __post_init__(self):
         # Penegakan Invariant: Otoritas ORACLE / FROZEN_ORACLE WAJIB ber-provenance ORACLE_FACT
         if self.authority in (ObligationAuthority.ORACLE.value, ObligationAuthority.FROZEN_ORACLE.value, "ORACLE", "FROZEN_ORACLE"):
@@ -108,6 +133,10 @@ class CanonicalObligation:
             raise CanonicalObligationIntegrityError("obligation_id cannot be empty")
         if not self.public_identity:
             raise CanonicalObligationIntegrityError("public_identity cannot be empty")
+        if not self.callee and self.public_identity:
+            object.__setattr__(self, "callee", self.public_identity)
+        if not self.argument_count and (self.positional_arguments or self.keyword_arguments):
+            object.__setattr__(self, "argument_count", self.positional_arguments + len(self.keyword_arguments))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -122,6 +151,14 @@ class CanonicalObligation:
             "acceptance_evidence": self.acceptance_evidence,
             "source_reference": self.source_reference,
             "metadata": dict(self.metadata),
+            "invocation_kind": self.invocation_kind,
+            "caller": self.caller,
+            "callee": self.callee,
+            "positional_arguments": self.positional_arguments,
+            "keyword_arguments": list(self.keyword_arguments),
+            "argument_count": self.argument_count,
+            "argument_names": list(self.argument_names),
+            "epistemic_status": self.epistemic_status,
         }
 
     @classmethod
@@ -138,6 +175,14 @@ class CanonicalObligation:
             acceptance_evidence=d.get("acceptance_evidence", ""),
             source_reference=d.get("source_reference", ""),
             metadata=dict(d.get("metadata") or {}),
+            invocation_kind=d.get("invocation_kind", InvocationKind.UNKNOWN.value),
+            caller=d.get("caller", ""),
+            callee=d.get("callee", ""),
+            positional_arguments=d.get("positional_arguments", 0),
+            keyword_arguments=list(d.get("keyword_arguments") or []),
+            argument_count=d.get("argument_count", 0),
+            argument_names=list(d.get("argument_names") or []),
+            epistemic_status=d.get("epistemic_status", EpistemicStatus.PROVEN_FACT.value),
         )
 
     def to_prompt_line(self) -> str:
@@ -157,6 +202,14 @@ class CanonicalObligation:
                 extra_info.append(f"Expected Status: {self.outputs['expected_status']}")
             elif "return_type" in self.outputs:
                 extra_info.append(f"Expected Return: {self.outputs['return_type']}")
+        if self.invocation_kind and self.invocation_kind != InvocationKind.UNKNOWN.value:
+            extra_info.append(f"Invocation: {self.invocation_kind}")
+        if self.positional_arguments:
+            extra_info.append(f"Positional Args: {self.positional_arguments}")
+        if self.keyword_arguments:
+            extra_info.append(f"Keyword Args: {self.keyword_arguments}")
+        if self.caller:
+            extra_info.append(f"Caller: {self.caller}")
 
         extra_str = f" ({', '.join(extra_info)})" if extra_info else ""
         return (
@@ -408,6 +461,271 @@ class BaseOracleTestAdapter:
         raise NotImplementedError
 
 
+class PythonOracleAstVisitor(ast.NodeVisitor):
+    """
+    NodeVisitor deterministik untuk test suite Python.
+    Mengekstrak observable usage & invocation shape:
+    - caller (fungsi test aktif)
+    - callee (simbol yang dipanggil)
+    - positional_arguments count
+    - keyword_arguments names
+    - invocation_kind (CALL, CONSTRUCTOR, METHOD, UNKNOWN)
+    - obligation_kind (INTERACTION, DATA_MODEL, CALLABLE_INTERFACE, UNKNOWN)
+    - TANPA heuristik huruf kapital (isupper() dilarang).
+    """
+
+    def __init__(self, file_name: str, func_status_map: Dict[Tuple[str, str], int]):
+        self.file_name = file_name
+        self.func_status_map = func_status_map
+        self.current_function: Optional[str] = None
+        self.obligations: Dict[str, CanonicalObligation] = {}
+        self.imported_from_main: Set[str] = set()
+        self.proven_class_symbols: Set[str] = set()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        prev = self.current_function
+        self.current_function = node.name
+        self.generic_visit(node)
+        self.current_function = prev
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        prev = self.current_function
+        self.current_function = node.name
+        self.generic_visit(node)
+        self.current_function = prev
+
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        if node.module in ("main", "app"):
+            for alias in node.names:
+                sym = alias.name
+                if sym not in ("app", "main"):
+                    self.imported_from_main.add(sym)
+                    if sym not in self.obligations:
+                        # ZERO HEURISTICS: Default role is UNKNOWN (tidak menebak DATA_MODEL / FUNCTION)
+                        ob_id = f"OBL-SYM-{sym}"
+                        self.obligations[sym] = CanonicalObligation(
+                            obligation_id=ob_id,
+                            authority=ObligationAuthority.FROZEN_ORACLE.value,
+                            provenance=ObligationProvenance.ORACLE_FACT.value,
+                            obligation_kind=ObligationKind.UNKNOWN.value,
+                            invocation_kind=InvocationKind.UNKNOWN.value,
+                            caller=self.current_function or "",
+                            callee=sym,
+                            public_identity=sym,
+                            inputs={},
+                            outputs={},
+                            positional_arguments=0,
+                            keyword_arguments=[],
+                            argument_count=0,
+                            argument_names=[],
+                            epistemic_status=EpistemicStatus.UNKNOWN.value,
+                            observable_behavior=f"Symbol '{sym}' imported from authoritative module '{node.module}' without explicit invocation evidence",
+                            acceptance_evidence=f"from {node.module} import {sym}",
+                            source_reference=f"{self.file_name}:{node.lineno}",
+                            metadata={"target_module": node.module, "symbol_type": "import"}
+                        )
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call):
+        # 1. isinstance(x, Symbol) / issubclass(x, Symbol) -> Proves Symbol is a class/DATA_MODEL
+        if isinstance(node.func, ast.Name) and node.func.id in ("isinstance", "issubclass"):
+            if len(node.args) >= 2:
+                arg1 = node.args[1]
+                target_sym = None
+                if isinstance(arg1, ast.Name):
+                    target_sym = arg1.id
+                elif isinstance(arg1, ast.Attribute) and isinstance(arg1.value, ast.Name) and arg1.value.id in ("main", "app"):
+                    target_sym = arg1.attr
+                if target_sym and target_sym in self.obligations:
+                    self.proven_class_symbols.add(target_sym)
+                    ob = self.obligations[target_sym]
+                    self.obligations[target_sym] = replace(
+                        ob,
+                        obligation_kind=ObligationKind.DATA_MODEL.value,
+                        epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                        observable_behavior=f"Symbol '{target_sym}' proven to be a type/class via {node.func.id} inspection"
+                    )
+
+        # 2. client.<method>("/path", ...) -> HTTP Interaction Obligation
+        if isinstance(node.func, ast.Attribute):
+            method_name = node.func.attr.upper()
+            if method_name in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+                is_client = False
+                if isinstance(node.func.value, ast.Name) and "client" in node.func.value.id.lower():
+                    is_client = True
+                elif isinstance(node.func.value, ast.Attribute) and "client" in node.func.value.attr.lower():
+                    is_client = True
+
+                if is_client and node.args:
+                    first_arg = node.args[0]
+                    path_val = None
+                    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+                        path_val = first_arg.value
+                    elif isinstance(first_arg, ast.JoinedStr):
+                        parts = [str(p.value) if isinstance(p, ast.Constant) else "{id}" for p in first_arg.values]
+                        path_val = "".join(parts)
+
+                    if path_val and path_val.startswith("/"):
+                        norm_path = normalize_route_path(path_val)
+                        ep_key = f"HTTP:{method_name}:{norm_path}"
+                        if ep_key not in self.obligations:
+                            clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
+                            ob_id = f"OBL-HTTP-{method_name}-{clean_id}"
+                            exp_status = self.func_status_map.get((method_name, norm_path))
+                            outputs = {"expected_status": exp_status} if exp_status else {}
+                            status_info = f" (expected status: {exp_status})" if exp_status else ""
+                            num_pos = len(node.args)
+                            kw_names = [kw.arg for kw in node.keywords if kw.arg]
+                            self.obligations[ep_key] = CanonicalObligation(
+                                obligation_id=ob_id,
+                                authority=ObligationAuthority.FROZEN_ORACLE.value,
+                                provenance=ObligationProvenance.ORACLE_FACT.value,
+                                obligation_kind=ObligationKind.INTERACTION.value,
+                                invocation_kind=InvocationKind.CALL.value,
+                                caller=self.current_function or "",
+                                callee=norm_path,
+                                public_identity=norm_path,
+                                inputs={"http_method": method_name, "raw_path": path_val},
+                                outputs=outputs,
+                                positional_arguments=num_pos,
+                                keyword_arguments=kw_names,
+                                argument_count=num_pos + len(kw_names),
+                                argument_names=kw_names,
+                                epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                                observable_behavior=f"HTTP endpoint '{norm_path}' accepting {method_name} method{status_info}",
+                                acceptance_evidence=f"client.{method_name.lower()}('{path_val}')",
+                                source_reference=f"{self.file_name}:{node.lineno}",
+                                metadata={"http_method": method_name, "path": norm_path}
+                            )
+
+            # 3. main.<sym>(*args, **kwargs) -> Callable invocation on module main
+            elif isinstance(node.func.value, ast.Name) and node.func.value.id in ("main", "app"):
+                sym = node.func.attr
+                if sym not in ("app", "main"):
+                    self._record_symbol_call(sym, node)
+
+            # 4. Method invocation: obj.<method>(*args, **kwargs) where obj is not main/client/math etc.
+            elif isinstance(node.func.value, (ast.Name, ast.Attribute, ast.Call)):
+                method_name = node.func.attr
+                if not method_name.startswith("__") and method_name not in ("status_code", "json", "text", "content"):
+                    self._record_method_call(method_name, node)
+
+        # 5. Direct call on imported symbol: e.g. Matrix(data) or add_numbers(1, 2)
+        elif isinstance(node.func, ast.Name) and node.func.id in self.imported_from_main:
+            sym = node.func.id
+            self._record_symbol_call(sym, node)
+
+        # 6. hasattr(main, 'sym')
+        elif isinstance(node.func, ast.Name) and node.func.id == "hasattr":
+            if len(node.args) >= 2 and isinstance(node.args[0], ast.Name) and node.args[0].id in ("main", "app"):
+                if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+                    sym = node.args[1].value
+                    if sym not in ("app", "main") and sym not in self.obligations:
+                        self.obligations[sym] = CanonicalObligation(
+                            obligation_id=f"OBL-CALL-{sym}",
+                            authority=ObligationAuthority.FROZEN_ORACLE.value,
+                            provenance=ObligationProvenance.ORACLE_FACT.value,
+                            obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
+                            invocation_kind=InvocationKind.UNKNOWN.value,
+                            caller=self.current_function or "",
+                            callee=sym,
+                            public_identity=sym,
+                            inputs={},
+                            outputs={},
+                            positional_arguments=0,
+                            keyword_arguments=[],
+                            argument_count=0,
+                            argument_names=[],
+                            epistemic_status=EpistemicStatus.UNKNOWN.value,
+                            observable_behavior=f"Symbol '{sym}' verified via hasattr inspection on authoritative module",
+                            acceptance_evidence=f"hasattr(main, '{sym}')",
+                            source_reference=f"{self.file_name}:{node.lineno}",
+                            metadata={"symbol_type": "hasattr"}
+                        )
+
+        self.generic_visit(node)
+
+    def _record_symbol_call(self, sym: str, node: ast.Call):
+        num_pos = len(node.args)
+        kw_names = [kw.arg for kw in node.keywords if kw.arg]
+        total_args = num_pos + len(kw_names)
+        arg_str = f" with {num_pos} positional argument(s)" if num_pos else ""
+        if kw_names:
+            arg_str += f", keywords: {kw_names}"
+
+        inv_kind = InvocationKind.CONSTRUCTOR.value if sym in self.proven_class_symbols else InvocationKind.CALL.value
+        ob_kind = ObligationKind.DATA_MODEL.value if sym in self.proven_class_symbols else ObligationKind.CALLABLE_INTERFACE.value
+
+        existing = self.obligations.get(sym)
+        if existing:
+            self.obligations[sym] = replace(
+                existing,
+                obligation_kind=ob_kind if existing.obligation_kind == ObligationKind.UNKNOWN.value else existing.obligation_kind,
+                invocation_kind=inv_kind,
+                caller=self.current_function or existing.caller,
+                callee=sym,
+                positional_arguments=max(existing.positional_arguments, num_pos),
+                keyword_arguments=list(set(existing.keyword_arguments + kw_names)),
+                argument_count=max(existing.argument_count, total_args),
+                argument_names=list(set(existing.argument_names + kw_names)),
+                epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
+                acceptance_evidence=f"{sym}(...)",
+                inputs={"positional_args": num_pos, "keyword_args": kw_names, "call_type": "callable"} if (num_pos or kw_names) else dict(existing.inputs, call_type="callable"),
+                metadata={"symbol_type": "callable_invocation"}
+            )
+        else:
+            self.obligations[sym] = CanonicalObligation(
+                obligation_id=f"OBL-CALL-{sym}",
+                authority=ObligationAuthority.FROZEN_ORACLE.value,
+                provenance=ObligationProvenance.ORACLE_FACT.value,
+                obligation_kind=ob_kind,
+                invocation_kind=inv_kind,
+                caller=self.current_function or "",
+                callee=sym,
+                public_identity=sym,
+                inputs={"positional_args": num_pos, "keyword_args": kw_names, "call_type": "callable"},
+                outputs={},
+                positional_arguments=num_pos,
+                keyword_arguments=kw_names,
+                argument_count=total_args,
+                argument_names=kw_names,
+                epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
+                acceptance_evidence=f"{sym}(...)",
+                source_reference=f"{self.file_name}:{node.lineno}",
+                metadata={"symbol_type": "callable_invocation"}
+            )
+
+    def _record_method_call(self, method_name: str, node: ast.Call):
+        num_pos = len(node.args)
+        kw_names = [kw.arg for kw in node.keywords if kw.arg]
+        total_args = num_pos + len(kw_names)
+        m_key = f"METHOD:{method_name}"
+        if m_key not in self.obligations:
+            self.obligations[m_key] = CanonicalObligation(
+                obligation_id=f"OBL-METHOD-{method_name}",
+                authority=ObligationAuthority.FROZEN_ORACLE.value,
+                provenance=ObligationProvenance.ORACLE_FACT.value,
+                obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
+                invocation_kind=InvocationKind.METHOD.value,
+                caller=self.current_function or "",
+                callee=method_name,
+                public_identity=method_name,
+                inputs={"positional_args": num_pos, "keyword_args": kw_names} if (num_pos or kw_names) else {},
+                outputs={},
+                positional_arguments=num_pos,
+                keyword_arguments=kw_names,
+                argument_count=total_args,
+                argument_names=kw_names,
+                epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                observable_behavior=f"Method '{method_name}' invoked on object instance",
+                acceptance_evidence=f"obj.{method_name}(...)",
+                source_reference=f"{self.file_name}:{node.lineno}",
+                metadata={"symbol_type": "method_invocation"}
+            )
+
+
 class PythonAstOracleAdapter(BaseOracleTestAdapter):
     """
     Adapter ekstraksi AST untuk test suite Python (pytest / unittest).
@@ -420,10 +738,6 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
         return file_name.endswith(".py") and (file_name.startswith("test_") or file_name.endswith("_test.py"))
 
     def extract_obligations(self, file_name: str, content: str) -> List[CanonicalObligation]:
-        obligations: List[CanonicalObligation] = []
-        seen_identities: Set[str] = set()
-
-        # Pre-scan functions to capture expected status codes per endpoint
         func_status_map: Dict[Tuple[str, str], int] = {}
         try:
             tree_scan = ast.parse(content, filename=file_name)
@@ -480,209 +794,47 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
         except Exception:
             pass
 
-        # 1. AST-based parsing
+        visitor = PythonOracleAstVisitor(file_name, func_status_map)
         try:
             tree = ast.parse(content, filename=file_name)
-            for node in ast.walk(tree):
-                # A. from main import X, Y (Callable or Model imports)
-                if isinstance(node, ast.ImportFrom):
-                    if node.module in ("main", "app"):
-                        for alias in node.names:
-                            sym = alias.name
-                            if sym not in ("app", "main") and sym not in seen_identities:
-                                seen_identities.add(sym)
-                                is_model = sym[0].isupper() if sym else False
-                                kind = ObligationKind.DATA_MODEL.value if is_model else ObligationKind.CALLABLE_INTERFACE.value
-                                ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
-                                obligations.append(CanonicalObligation(
-                                    obligation_id=ob_id,
-                                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                                    obligation_kind=kind,
-                                    public_identity=sym,
-                                    inputs={},
-                                    outputs={},
-                                    observable_behavior=f"Symbol '{sym}' directly imported and tested from authoritative module",
-                                    acceptance_evidence=f"from {node.module} import {sym}",
-                                    source_reference=f"{file_name}:{node.lineno}",
-                                    metadata={"target_module": node.module, "symbol_type": "import"}
-                                ))
-
-                # B. Client interaction calls and direct main callable invocations
-                elif isinstance(node, ast.Call):
-                    # B1. client.<method>("/path", ...) (Interaction calls)
-                    if isinstance(node.func, ast.Attribute):
-                        method_name = node.func.attr.upper()
-                        if method_name in ("GET", "POST", "PUT", "DELETE", "PATCH"):
-                            is_client_call = False
-                            if isinstance(node.func.value, ast.Name) and "client" in node.func.value.id.lower():
-                                is_client_call = True
-                            elif isinstance(node.func.value, ast.Attribute) and "client" in node.func.value.attr.lower():
-                                is_client_call = True
-
-                            if is_client_call and node.args:
-                                first_arg = node.args[0]
-                                path_val = None
-                                if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
-                                    path_val = first_arg.value
-                                elif isinstance(first_arg, ast.JoinedStr):
-                                    parts = []
-                                    for p in first_arg.values:
-                                        if isinstance(p, ast.Constant):
-                                            parts.append(str(p.value))
-                                        else:
-                                            parts.append("{id}")
-                                    path_val = "".join(parts)
-
-                                if path_val and path_val.startswith("/"):
-                                    norm_path = normalize_route_path(path_val)
-                                    ep_key = f"HTTP:{method_name}:{norm_path}"
-                                    if ep_key not in seen_identities:
-                                        seen_identities.add(ep_key)
-                                        clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
-                                        ob_id = f"OBL-HTTP-{method_name}-{clean_id}"
-                                        exp_status = func_status_map.get((method_name, norm_path))
-                                        outputs = {"expected_status": exp_status} if exp_status else {}
-                                        status_info = f" (expected status: {exp_status})" if exp_status else ""
-                                        obligations.append(CanonicalObligation(
-                                            obligation_id=ob_id,
-                                            authority=ObligationAuthority.FROZEN_ORACLE.value,
-                                            provenance=ObligationProvenance.ORACLE_FACT.value,
-                                            obligation_kind=ObligationKind.INTERACTION.value,
-                                            public_identity=norm_path,
-                                            inputs={"http_method": method_name, "raw_path": path_val},
-                                            outputs=outputs,
-                                            observable_behavior=f"HTTP endpoint '{norm_path}' accepting {method_name} method{status_info}",
-                                            acceptance_evidence=f"client.{method_name.lower()}('{path_val}')",
-                                            source_reference=f"{file_name}:{node.lineno}",
-                                            metadata={"http_method": method_name, "path": norm_path}
-                                        ))
-
-                    # B2. main.<sym>(*args, **kwargs) (Direct callable invocations on module main)
-                    if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "main":
-                        sym = node.func.attr
-                        if sym not in ("app", "main"):
-                            num_pos = len(node.args)
-                            inputs = {"positional_args": num_pos, "call_type": "callable"} if num_pos else {"call_type": "callable"}
-                            if node.keywords:
-                                inputs["keyword_args"] = [kw.arg for kw in node.keywords if kw.arg]
-                            arg_str = f" with {num_pos} positional argument(s)" if num_pos else ""
-                            if sym not in seen_identities:
-                                seen_identities.add(sym)
-                                obligations.append(CanonicalObligation(
-                                    obligation_id=f"OBL-CALL-{sym}",
-                                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
-                                    public_identity=sym,
-                                    inputs=inputs,
-                                    outputs={},
-                                    observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
-                                    acceptance_evidence=f"main.{sym}(...)",
-                                    source_reference=f"{file_name}:{node.lineno}",
-                                    metadata={"symbol_type": "callable_invocation"}
-                                ))
-                            else:
-                                for idx, ob in enumerate(obligations):
-                                    if ob.public_identity == sym and ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value:
-                                        if not ob.inputs.get("call_type"):
-                                            merged_inputs = dict(ob.inputs)
-                                            merged_inputs.update(inputs)
-                                            new_meta = dict(ob.metadata)
-                                            new_meta["symbol_type"] = "callable_invocation"
-                                            obligations[idx] = replace(
-                                                ob,
-                                                inputs=merged_inputs,
-                                                observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
-                                                acceptance_evidence=f"main.{sym}(...)",
-                                                metadata=new_meta,
-                                            )
-                                        break
-
-                    # B3. hasattr(main, '<sym>') inspection
-                    elif isinstance(node.func, ast.Name) and node.func.id == "hasattr":
-                        if len(node.args) >= 2 and isinstance(node.args[0], ast.Name) and node.args[0].id == "main":
-                            if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
-                                sym = node.args[1].value
-                                if sym not in ("app", "main") and sym not in seen_identities:
-                                    seen_identities.add(sym)
-                                    obligations.append(CanonicalObligation(
-                                        obligation_id=f"OBL-CALL-{sym}",
-                                        authority=ObligationAuthority.FROZEN_ORACLE.value,
-                                        provenance=ObligationProvenance.ORACLE_FACT.value,
-                                        obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
-                                        public_identity=sym,
-                                        inputs={},
-                                        outputs={},
-                                        observable_behavior=f"Symbol '{sym}' verified via hasattr inspection on authoritative module",
-                                        acceptance_evidence=f"hasattr(main, '{sym}')",
-                                        source_reference=f"{file_name}:{node.lineno}",
-                                        metadata={"symbol_type": "hasattr"}
-                                    ))
+            visitor.visit(tree)
         except Exception:
             pass
 
-        # 2. Regex fallbacks for hasattr / getattr / client calls
-        for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
-            if sym not in ("app", "main") and sym not in seen_identities:
-                seen_identities.add(sym)
-                obligations.append(CanonicalObligation(
-                    obligation_id=f"OBL-CALL-{sym}",
-                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
-                    public_identity=sym,
-                    inputs={},
-                    outputs={},
-                    observable_behavior=f"Symbol '{sym}' verified via hasattr inspection",
-                    acceptance_evidence=f"hasattr(main, '{sym}')",
-                    source_reference=file_name,
-                    metadata={"symbol_type": "hasattr"}
-                ))
-
-        for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
-            if sym not in ("app", "main") and sym not in seen_identities:
-                seen_identities.add(sym)
-                obligations.append(CanonicalObligation(
-                    obligation_id=f"OBL-CALL-{sym}",
-                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
-                    public_identity=sym,
-                    inputs={},
-                    outputs={},
-                    observable_behavior=f"Symbol '{sym}' called directly on module 'main'",
-                    acceptance_evidence=f"main.{sym}",
-                    source_reference=file_name,
-                    metadata={"symbol_type": "attribute_call"}
-                ))
-
+        # Regex fallback for client calls if not already captured
         for method, ep in re.findall(r"client\.(get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content, re.IGNORECASE):
             m_upper = method.upper()
             norm_path = normalize_route_path(ep)
             ep_key = f"HTTP:{m_upper}:{norm_path}"
-            if ep_key not in seen_identities:
-                seen_identities.add(ep_key)
+            if ep_key not in visitor.obligations:
                 clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
                 ob_id = f"OBL-HTTP-{m_upper}-{clean_id}"
                 exp_status = func_status_map.get((m_upper, norm_path))
                 outputs = {"expected_status": exp_status} if exp_status else {}
                 status_info = f" (expected status: {exp_status})" if exp_status else ""
-                obligations.append(CanonicalObligation(
+                visitor.obligations[ep_key] = CanonicalObligation(
                     obligation_id=ob_id,
                     authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.INTERACTION.value,
+                    invocation_kind=InvocationKind.CALL.value,
+                    caller="",
+                    callee=norm_path,
                     public_identity=norm_path,
                     inputs={"http_method": m_upper, "raw_path": ep},
                     outputs=outputs,
+                    positional_arguments=1,
+                    keyword_arguments=[],
+                    argument_count=1,
+                    argument_names=[],
+                    epistemic_status=EpistemicStatus.PROVEN_FACT.value,
                     observable_behavior=f"HTTP endpoint '{norm_path}' accepting {m_upper} method{status_info}",
                     acceptance_evidence=f"client.{method.lower()}('{ep}')",
                     source_reference=file_name,
                     metadata={"http_method": m_upper, "path": norm_path}
-                ))
+                )
 
-        return obligations
+        return list(visitor.obligations.values())
 
 
 class DartAstOracleAdapter(BaseOracleTestAdapter):
@@ -710,87 +862,180 @@ class DartAstOracleAdapter(BaseOracleTestAdapter):
     def can_handle(self, file_name: str) -> bool:
         return file_name.endswith(".dart") and (file_name.endswith("_test.dart") or file_name.startswith("test_"))
 
+    def _parse_dart_call_args(self, args_str: str) -> Tuple[int, List[str]]:
+        """Parses Dart invocation arguments into positional count and keyword argument names."""
+        if not args_str or not args_str.strip():
+            return 0, []
+        tokens: List[str] = []
+        depth = 0
+        current: List[str] = []
+        for ch in args_str:
+            if ch in "({[":
+                depth += 1
+                current.append(ch)
+            elif ch in ")}]":
+                depth -= 1
+                current.append(ch)
+            elif ch == "," and depth == 0:
+                tokens.append("".join(current).strip())
+                current = []
+            else:
+                current.append(ch)
+        if current:
+            tokens.append("".join(current).strip())
+
+        pos_count = 0
+        kw_names: List[str] = []
+        for token in tokens:
+            if not token:
+                continue
+            m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:", token)
+            if m:
+                kw_names.append(m.group(1))
+            else:
+                pos_count += 1
+        return pos_count, kw_names
+
+    def _extract_dart_invocations(self, content: str) -> List[Tuple[str, str, int]]:
+        """Extracts (symbol, args_str, lineno) with balanced parentheses."""
+        results = []
+        for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
+            sym = m.group(1)
+            start = m.end()
+            depth = 1
+            i = start
+            while i < len(content) and depth > 0:
+                if content[i] == '(':
+                    depth += 1
+                elif content[i] == ')':
+                    depth -= 1
+                i += 1
+            if depth == 0:
+                args_str = content[start:i-1]
+                lineno = content.count("\n", 0, m.start()) + 1
+                results.append((sym, args_str, lineno))
+        return results
+
     def extract_obligations(self, file_name: str, content: str) -> List[CanonicalObligation]:
-        obligations: List[CanonicalObligation] = []
-        seen_identities: Set[str] = set()
+        obligations: Dict[str, CanonicalObligation] = {}
+
+        # Extract active test name for caller tracking
+        test_match = re.search(r"(?:testWidgets|test)\s*\(\s*['\"]([^'\"]+)['\"]", content)
+        caller_name = test_match.group(1) if test_match else ""
 
         # 1. Widget obligations via find.byType(WidgetName)
         for sym in re.findall(r"find\.byType\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
-            if sym not in self.DART_FRAMEWORK_TYPES and sym not in seen_identities:
-                seen_identities.add(sym)
+            if sym not in self.DART_FRAMEWORK_TYPES and sym not in obligations:
                 ob_id = f"OBL-WIDGET-{sym}"
-                obligations.append(CanonicalObligation(
+                obligations[sym] = CanonicalObligation(
                     obligation_id=ob_id,
                     authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.OBSERVABLE_RUNTIME.value,
+                    invocation_kind=InvocationKind.UNKNOWN.value,
+                    caller=caller_name,
+                    callee=sym,
                     public_identity=sym,
                     inputs={},
                     outputs={"return_type": "Widget"},
+                    positional_arguments=0,
+                    keyword_arguments=[],
+                    argument_count=0,
+                    argument_names=[],
+                    epistemic_status=EpistemicStatus.PROVEN_FACT.value,
                     observable_behavior=f"UI Widget '{sym}' located and verified via widget tester find.byType",
                     acceptance_evidence=f"find.byType({sym})",
                     source_reference=file_name,
                     metadata={"target_type": "widget"}
-                ))
+                )
 
-        # 2. Widget instantiations in test body: e.g. home: CardMetric(...)
-        for sym in re.findall(r"(?:body|child|home)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", content):
-            if sym not in self.DART_FRAMEWORK_TYPES and sym not in seen_identities:
-                seen_identities.add(sym)
-                ob_id = f"OBL-WIDGET-{sym}"
-                obligations.append(CanonicalObligation(
-                    obligation_id=ob_id,
-                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=ObligationKind.OBSERVABLE_RUNTIME.value,
-                    public_identity=sym,
-                    inputs={},
-                    outputs={"return_type": "Widget"},
+        # 2. Extract balanced invocations for widgets, models, and constructors
+        invocations = self._extract_dart_invocations(content)
+        for sym, args_str, lineno in invocations:
+            if sym in self.DART_FRAMEWORK_TYPES or sym.startswith("Test"):
+                continue
+
+            pos_count, kw_names = self._parse_dart_call_args(args_str)
+            total_args = pos_count + len(kw_names)
+
+            is_widget = sym in obligations and obligations[sym].obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value
+            if is_widget:
+                existing = obligations[sym]
+                obligations[sym] = replace(
+                    existing,
+                    invocation_kind=InvocationKind.CONSTRUCTOR.value,
+                    caller=caller_name or existing.caller,
+                    positional_arguments=pos_count,
+                    keyword_arguments=kw_names,
+                    argument_count=total_args,
+                    argument_names=kw_names,
                     observable_behavior=f"UI Widget '{sym}' mounted in test tree",
-                    acceptance_evidence=f"child/home: {sym}()",
-                    source_reference=file_name,
-                    metadata={"target_type": "widget"}
-                ))
+                    acceptance_evidence=f"{sym}({args_str.strip()})",
+                    source_reference=f"{file_name}:{lineno}",
+                )
+            elif sym[0].isupper():
+                existing = obligations.get(sym)
+                if existing:
+                    obligations[sym] = replace(
+                        existing,
+                        invocation_kind=InvocationKind.CONSTRUCTOR.value,
+                        positional_arguments=max(existing.positional_arguments, pos_count),
+                        keyword_arguments=list(set(existing.keyword_arguments + kw_names)),
+                        argument_count=max(existing.argument_count, total_args),
+                        argument_names=list(set(existing.argument_names + kw_names)),
+                        epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                    )
+                else:
+                    ob_id = f"OBL-MODEL-{sym}"
+                    obligations[sym] = CanonicalObligation(
+                        obligation_id=ob_id,
+                        authority=ObligationAuthority.FROZEN_ORACLE.value,
+                        provenance=ObligationProvenance.ORACLE_FACT.value,
+                        obligation_kind=ObligationKind.DATA_MODEL.value,
+                        invocation_kind=InvocationKind.CONSTRUCTOR.value,
+                        caller=caller_name,
+                        callee=sym,
+                        public_identity=sym,
+                        inputs={},
+                        outputs={},
+                        positional_arguments=pos_count,
+                        keyword_arguments=kw_names,
+                        argument_count=total_args,
+                        argument_names=kw_names,
+                        epistemic_status=EpistemicStatus.PROVEN_FACT.value,
+                        observable_behavior=f"Data model / entity '{sym}' instantiated with constructor parameters in acceptance test",
+                        acceptance_evidence=f"{sym}({args_str.strip()})",
+                        source_reference=f"{file_name}:{lineno}",
+                        metadata={"target_type": "model"}
+                    )
 
         # 3. Provider read / watch: e.g. container.read(metricDataProvider)
         for sym in re.findall(r"(?:container\.read|ref\.watch|ref\.read)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", content):
-            if sym not in self.DART_FRAMEWORK_TYPES and sym not in seen_identities:
-                seen_identities.add(sym)
+            if sym not in self.DART_FRAMEWORK_TYPES and sym not in obligations:
                 ob_id = f"OBL-PROVIDER-{sym}"
-                obligations.append(CanonicalObligation(
+                obligations[sym] = CanonicalObligation(
                     obligation_id=ob_id,
                     authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
+                    invocation_kind=InvocationKind.CALL.value,
+                    caller=caller_name,
+                    callee=sym,
                     public_identity=sym,
                     inputs={},
                     outputs={},
+                    positional_arguments=0,
+                    keyword_arguments=[],
+                    argument_count=0,
+                    argument_names=[],
+                    epistemic_status=EpistemicStatus.PROVEN_FACT.value,
                     observable_behavior=f"State Provider '{sym}' read/watched by acceptance test",
                     acceptance_evidence=f"container.read({sym})",
                     source_reference=file_name,
                     metadata={"target_type": "provider"}
-                ))
+                )
 
-        # 4. Data Model instantiation: e.g. MetricData(title: 'Revenue', ...)
-        for sym in re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", content):
-            if sym not in self.DART_FRAMEWORK_TYPES and sym not in seen_identities and not sym.startswith("Test"):
-                seen_identities.add(sym)
-                ob_id = f"OBL-MODEL-{sym}"
-                obligations.append(CanonicalObligation(
-                    obligation_id=ob_id,
-                    authority=ObligationAuthority.FROZEN_ORACLE.value,
-                    provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=ObligationKind.DATA_MODEL.value,
-                    public_identity=sym,
-                    inputs={},
-                    outputs={},
-                    observable_behavior=f"Data model / entity '{sym}' instantiated with constructor parameters in acceptance test",
-                    acceptance_evidence=f"{sym}(...)",
-                    source_reference=file_name,
-                    metadata={"target_type": "model"}
-                ))
-
-        return obligations
+        return list(obligations.values())
 
 
 # ===========================================================================
@@ -876,9 +1121,218 @@ def extract_canonical_oracle_obligations(
 # 8. Deterministic Obligation Coverage Checker (Semantics, Not Blind String Equality)
 # ===========================================================================
 
+def check_call_shape_compatibility(
+    ob: CanonicalObligation,
+    contract: Any,
+    blueprint: Optional[Any] = None
+) -> Tuple[str, str, Dict[str, Any]]:
+    """
+    Deterministic compatibility checker membandingkan:
+        ACCEPTANCE USAGE EVIDENCE (ob)
+                VS
+        PROPOSED PUBLIC CONTRACT & CODE SCAFFOLD
+
+    Mengembalikan: (status, reason, evidence_dict)
+    di mana status adalah: "COMPATIBLE", "INCOMPATIBLE", atau "UNDETERMINED".
+    TIDAK menghasilkan instruksi implementasi HOW.
+    """
+    ob_sym = ob.public_identity
+    ob_pos = ob.positional_arguments
+    ob_kw = ob.keyword_arguments or []
+
+    # If no specific call shape evidence exists (e.g. only imported or hasattr), return UNDETERMINED
+    if (ob_pos is None or ob_pos == 0) and not ob_kw and ob.invocation_kind in (InvocationKind.UNKNOWN.value, ""):
+        return CoverageStatus.UNDETERMINED, f"Insufficient observable invocation evidence for symbol '{ob_sym}'", {}
+
+    # Extract all code scaffolds available
+    scaffolds: List[str] = []
+    if blueprint:
+        if isinstance(blueprint, dict):
+            if "scaffold_code" in blueprint and isinstance(blueprint["scaffold_code"], str):
+                scaffolds.append(blueprint["scaffold_code"])
+            if "code_scaffold" in blueprint and isinstance(blueprint["code_scaffold"], str):
+                scaffolds.append(blueprint["code_scaffold"])
+            if "files" in blueprint and isinstance(blueprint["files"], dict):
+                for _, mod in blueprint["files"].items():
+                    if isinstance(mod, dict) and mod.get("code_scaffold"):
+                        scaffolds.append(mod["code_scaffold"])
+                    elif hasattr(mod, "code_scaffold") and mod.code_scaffold:
+                        scaffolds.append(mod.code_scaffold)
+        elif hasattr(blueprint, "files"):
+            for _, mod in blueprint.files.items():
+                if hasattr(mod, "code_scaffold") and mod.code_scaffold:
+                    scaffolds.append(mod.code_scaffold)
+
+    if isinstance(contract, dict):
+        if "code_scaffold" in contract and isinstance(contract["code_scaffold"], str):
+            scaffolds.append(contract["code_scaffold"])
+        if "scaffold_code" in contract and isinstance(contract["scaffold_code"], str):
+            scaffolds.append(contract["scaffold_code"])
+        if "scaffold" in contract and isinstance(contract["scaffold"], str):
+            scaffolds.append(contract["scaffold"])
+        if "files" in contract and isinstance(contract["files"], dict):
+            for _, mod in contract["files"].items():
+                if isinstance(mod, dict) and mod.get("code_scaffold"):
+                    scaffolds.append(mod["code_scaffold"])
+                elif isinstance(mod, str):
+                    scaffolds.append(mod)
+
+    # 1. Inspect Python AST scaffolds
+    for sc in scaffolds:
+        try:
+            tree = ast.parse(sc)
+        except Exception:
+            continue
+
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == ob_sym:
+                init_node = None
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+                        init_node = item
+                        break
+
+                if init_node is not None:
+                    params = [a.arg for a in init_node.args.args if a.arg != "self"]
+                    has_vararg = init_node.args.vararg is not None
+                    has_kwarg = init_node.args.kwarg is not None
+                    defaults_count = len(init_node.args.defaults)
+                    req_pos_count = len(params) - defaults_count
+                    max_pos_count = 9999 if has_vararg else len(params)
+                    kw_params = set([a.arg for a in init_node.args.kwonlyargs] + params)
+
+                    if ob_pos < req_pos_count:
+                        return (
+                            "INCOMPATIBLE",
+                            f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with {ob_pos} positional argument(s), but proposed constructor requires at least {req_pos_count}.",
+                            {"required_positional": ob_pos, "proposed_min_positional": req_pos_count}
+                        )
+                    if ob_pos > max_pos_count:
+                        return (
+                            "INCOMPATIBLE",
+                            f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with {ob_pos} positional argument(s), but proposed constructor accepts at most {max_pos_count}.",
+                            {"required_positional": ob_pos, "proposed_max_positional": max_pos_count}
+                        )
+                    if ob_kw and not has_kwarg:
+                        missing = [k for k in ob_kw if k not in kw_params]
+                        if missing:
+                            return (
+                                "INCOMPATIBLE",
+                                f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with keyword argument(s) {missing}, which are not accepted by proposed constructor.",
+                                {"required_keywords": ob_kw, "missing_keywords": missing}
+                            )
+                    return "COMPATIBLE", f"Constructor '{ob_sym}' call shape is compatible with acceptance usage.", {"required_pos": ob_pos}
+
+                else:
+                    # Class without custom __init__
+                    base_names = [b.id if isinstance(b, ast.Name) else b.attr if isinstance(b, ast.Attribute) else "" for b in node.bases]
+                    is_pydantic = any("BaseModel" in b for b in base_names)
+                    if is_pydantic:
+                        if ob_pos > 0:
+                            return (
+                                "INCOMPATIBLE",
+                                f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with {ob_pos} positional argument(s), but proposed constructor accepts 0 positional argument(s) (BaseModel keyword-only constructor without custom positional __init__).",
+                                {"required_positional": ob_pos, "proposed_positional": 0}
+                            )
+                        if ob_kw:
+                            fields = [stmt.target.id for stmt in node.body if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)]
+                            missing = [k for k in ob_kw if k not in fields]
+                            if missing:
+                                return (
+                                    "INCOMPATIBLE",
+                                    f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with keyword argument(s) {missing} not defined in model fields.",
+                                    {"required_keywords": ob_kw, "missing_keywords": missing}
+                                )
+                        return "COMPATIBLE", f"Pydantic model '{ob_sym}' keyword call shape is compatible.", {"required_pos": ob_pos}
+
+            elif isinstance(node, ast.FunctionDef) and node.name == ob_sym:
+                params = [a.arg for a in node.args.args]
+                has_vararg = node.args.vararg is not None
+                has_kwarg = node.args.kwarg is not None
+                defaults_count = len(node.args.defaults)
+                req_pos_count = len(params) - defaults_count
+                max_pos_count = 9999 if has_vararg else len(params)
+                kw_params = set([a.arg for a in node.args.kwonlyargs] + params)
+
+                if ob_pos < req_pos_count:
+                    return (
+                        "INCOMPATIBLE",
+                        f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with {ob_pos} positional argument(s), but proposed function requires at least {req_pos_count}.",
+                        {"required_positional": ob_pos, "proposed_min_positional": req_pos_count}
+                    )
+                if ob_pos > max_pos_count:
+                    return (
+                        "INCOMPATIBLE",
+                        f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with {ob_pos} positional argument(s), but proposed function accepts at most {max_pos_count}.",
+                        {"required_positional": ob_pos, "proposed_max_positional": max_pos_count}
+                    )
+                if ob_kw and not has_kwarg:
+                    missing = [k for k in ob_kw if k not in kw_params]
+                    if missing:
+                        return (
+                            "INCOMPATIBLE",
+                            f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' invoked with keyword argument(s) {missing}, which are not accepted by proposed function.",
+                            {"required_keywords": ob_kw, "missing_keywords": missing}
+                        )
+                return "COMPATIBLE", f"Function '{ob_sym}' call shape is compatible with acceptance usage.", {"required_pos": ob_pos}
+
+    # 2. Inspect Dart scaffolds
+    for sc in scaffolds:
+        if f"class {ob_sym}" in sc:
+            ctor_match = re.search(rf"\b{ob_sym}\s*\(([^)]*)\)", sc)
+            if ctor_match:
+                param_str = ctor_match.group(1)
+                is_named = "{" in param_str and "}" in param_str
+                if is_named:
+                    named_params = re.findall(r"this\.([A-Za-z0-9_]+)", param_str)
+                    if ob_pos > 0:
+                        return (
+                            "INCOMPATIBLE",
+                            f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' constructor accepts named arguments, but was invoked with {ob_pos} positional argument(s).",
+                            {"required_positional": ob_pos, "proposed_positional": 0}
+                        )
+                    if ob_kw:
+                        missing = [k for k in ob_kw if k not in named_params]
+                        if missing:
+                            return (
+                                "INCOMPATIBLE",
+                                f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' constructor missing named argument(s): {missing}.",
+                                {"required_keywords": ob_kw, "missing_keywords": missing}
+                            )
+                    return "COMPATIBLE", f"Dart constructor '{ob_sym}' named call shape is compatible.", {}
+                else:
+                    params = [p.strip() for p in param_str.split(",") if p.strip()]
+                    if ob_pos != len(params):
+                        return (
+                            "INCOMPATIBLE",
+                            f"CALL_SHAPE_INCOMPATIBILITY: Symbol '{ob_sym}' constructor expected {ob_pos} positional argument(s), but proposed constructor accepts {len(params)}.",
+                            {"required_positional": ob_pos, "proposed_positional": len(params)}
+                        )
+                    return "COMPATIBLE", f"Dart constructor '{ob_sym}' positional call shape is compatible.", {}
+
+    # 3. Check interface_contracts and data_models parameter metadata
+    declared_ifcs = contract.get("interface_contracts", []) if isinstance(contract, dict) else getattr(contract, "interface_contracts", []) or []
+    for ifc in declared_ifcs:
+        ident = ifc.get("identifier") if isinstance(ifc, dict) else getattr(ifc, "identifier", "")
+        if ident == ob_sym:
+            params = ifc.get("parameters", []) if isinstance(ifc, dict) else getattr(ifc, "parameters", [])
+            if params:
+                req_params = [p for p in params if (p.get("is_required", True) if isinstance(p, dict) else getattr(p, "is_required", True))]
+                if ob_pos > 0 and len(req_params) != ob_pos:
+                    return (
+                        "INCOMPATIBLE",
+                        f"CALL_SHAPE_INCOMPATIBILITY: Interface '{ob_sym}' requires {len(req_params)} parameter(s) in contract, but acceptance test invoked it with {ob_pos} argument(s).",
+                        {"required_positional": ob_pos, "proposed_positional": len(req_params)}
+                    )
+                return "COMPATIBLE", f"Interface contract '{ob_sym}' parameters compatible with invocation.", {}
+
+    return "UNDETERMINED", f"Insufficient structural evidence to prove call shape compatibility for '{ob_sym}'.", {}
+
+
 def check_obligation_coverage(
     obligations: List[CanonicalObligation],
-    contract: Any
+    contract: Any,
+    blueprint: Optional[Any] = None
 ) -> CoverageMatrix:
     """
     Memeriksa cakupan (*coverage*) obligasi Oracle terhadap deklarasi kontrak kanonikal.
@@ -1216,6 +1670,29 @@ def check_obligation_coverage(
                 missing_cnt += 1
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({identity})")
 
+    final_results: List[ObligationCoverageResult] = []
+    for r in results:
+        ob_pos = r.obligation.positional_arguments or 0
+        ob_kw = r.obligation.keyword_arguments or []
+        if r.status == CoverageStatus.COVERED and (ob_pos > 0 or len(ob_kw) > 0):
+            call_shape_status, call_shape_reason, _ = check_call_shape_compatibility(
+                r.obligation,
+                contract_dict,
+                blueprint=blueprint
+            )
+            if call_shape_status in (CoverageStatus.INCOMPATIBLE, "INCOMPATIBLE"):
+                r = ObligationCoverageResult(
+                    obligation=r.obligation,
+                    status=CoverageStatus.INCOMPATIBLE,
+                    matched_declaration_id=r.matched_declaration_id,
+                    reason=call_shape_reason,
+                    missing_aspects=[f"Call shape compatible with {r.obligation.positional_arguments} pos / {r.obligation.keyword_arguments} kw"]
+                )
+                covered_cnt -= 1
+                incompatible_cnt += 1
+                summary_reasons.append(f"INCOMPATIBLE: {r.obligation.obligation_id} ({r.obligation.public_identity}) - {call_shape_reason}")
+        final_results.append(r)
+
     is_fully = (
         len(obligations) > 0 and
         covered_cnt == len(obligations) and
@@ -1234,7 +1711,7 @@ def check_obligation_coverage(
         incompatible_count=incompatible_cnt,
         undetermined_count=undetermined_cnt,
         is_fully_covered=is_fully,
-        results=results,
+        results=final_results,
         summary_reasons=summary_reasons
     )
 
@@ -1285,5 +1762,48 @@ def format_authoritative_obligation_ledger(obligations: List[CanonicalObligation
         lines.append("")
 
     lines.append("=== END [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] ===")
+    return "\n".join(lines)
+
+
+# ===========================================================================
+# 10. Canonical Read-Only Acceptance Usage Evidence Formatter (Treatment #1.2)
+# ===========================================================================
+
+def format_acceptance_usage_evidence(obligations: List[CanonicalObligation]) -> str:
+    """
+    Memformat observable acceptance usage & call shape evidence menjadi section read-only
+    yang diinjeksikan ke konteks Architect (Treatment #1.2).
+    """
+    usage_obs = [ob for ob in obligations if ob.positional_arguments > 0 or ob.keyword_arguments or ob.caller]
+    if not usage_obs:
+        return ""
+
+    lines = [
+        "=== [ACCEPTANCE USAGE EVIDENCE] ===",
+        "Authority: FROZEN_ORACLE (Immutable Observable Usage Evidence — Read-Only)",
+        "Doktrin Kompatibilitas Pemanggilan (Treatment #1.2):",
+        "1. Acceptance tests membuktikan ekspektasi pemanggilan nyata (observable invocation WHAT).",
+        "2. Architect bebas menentukan HOW (classes, models, functions, internal decomposition).",
+        "3. Rancangan HOW Anda (tipe parameter, konstruktor, argumen posisional/keyword) WAJIB kompatibel",
+        "   dengan observable usage evidence di bawah ini.",
+        "4. Bagian ini memuat BUKTI pemanggilan nyata, BUKAN instruksi implementasi (zero solver).",
+        "",
+        "Daftar Bukti Pemanggilan & Bentuk Argumen:",
+    ]
+
+    for idx, ob in enumerate(usage_obs, 1):
+        lines.append(f"{idx}. Public Identity: {ob.public_identity}")
+        lines.append(f"   Invocation Kind: {ob.invocation_kind}")
+        lines.append(f"   Caller: {ob.caller or '(unspecified test)'}")
+        lines.append(f"   Callee: {ob.callee or ob.public_identity}")
+        lines.append(f"   Positional Arguments Count: {ob.positional_arguments}")
+        lines.append(f"   Keyword Arguments: {ob.keyword_arguments}")
+        lines.append(f"   Total Argument Count: {ob.argument_count}")
+        lines.append(f"   Epistemic Status: {ob.epistemic_status}")
+        lines.append(f"   Acceptance Evidence: {ob.acceptance_evidence}")
+        lines.append(f"   Source Reference: {ob.source_reference}")
+        lines.append("")
+
+    lines.append("=== END [ACCEPTANCE USAGE EVIDENCE] ===")
     return "\n".join(lines)
 

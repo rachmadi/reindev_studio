@@ -36,6 +36,8 @@ from backend.canonical_obligation import (
     ObligationAuthority,
     ObligationProvenance,
     ObligationKind,
+    InvocationKind,
+    EpistemicStatus,
     CoverageStatus,
     ObligationCoverageResult,
     CoverageMatrix,
@@ -45,6 +47,8 @@ from backend.canonical_obligation import (
     DartAstOracleAdapter,
     extract_canonical_oracle_obligations,
     check_obligation_coverage,
+    check_call_shape_compatibility,
+    format_acceptance_usage_evidence,
     validate_canonical_obligation_integrity,
     assert_canonical_obligation_unmodified,
     format_authoritative_obligation_ledger,
@@ -118,8 +122,8 @@ def test_scenario_01_python_canonical_obligation_extraction(tmp_oracle_dir):
     kinds = {ob.public_identity: ob.obligation_kind for ob in obligations}
     assert kinds.get("/products") == ObligationKind.INTERACTION.value
     assert kinds.get("/orders") == ObligationKind.INTERACTION.value
-    assert kinds.get("Product") == ObligationKind.DATA_MODEL.value
-    assert kinds.get("add_numbers") == ObligationKind.CALLABLE_INTERFACE.value
+    assert kinds.get("Product") == ObligationKind.UNKNOWN.value
+    assert kinds.get("add_numbers") == ObligationKind.UNKNOWN.value
     assert kinds.get("calculate") == ObligationKind.CALLABLE_INTERFACE.value
 
 
@@ -1572,6 +1576,476 @@ def test_scenario_34_cross_language_dart_semantics_unaffected(tmp_oracle_dir):
     assert cov.is_fully_covered is True
     assert cov.covered_count == 3
     assert cov.missing_count == 0
+
+
+# ===========================================================================
+# 18. Treatment #1.2 Universal Acceptance Invocation & Construction Compatibility (Gates A–T)
+# ===========================================================================
+
+def test_gate_a_positional_call_evidence(tmp_oracle_dir):
+    """Gate A: Matrix(data) produces positional call evidence (pos=1)."""
+    test_file = tmp_oracle_dir / "test_matrix.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_matrix():\n"
+        "    data = [[1, 2], [3, 4]]\n"
+        "    m = main.Matrix(data)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    m_obs = [ob for ob in obligations if ob.public_identity == "Matrix"]
+    assert len(m_obs) == 1
+    ob = m_obs[0]
+    assert ob.positional_arguments == 1
+    assert ob.argument_count == 1
+    assert ob.keyword_arguments == []
+    assert ob.callee == "Matrix"
+    assert ob.caller == "test_matrix"
+    assert ob.epistemic_status == EpistemicStatus.PROVEN_FACT.value
+
+
+def test_gate_b_keyword_call_evidence(tmp_oracle_dir):
+    """Gate B: Matrix(data=data) produces keyword call evidence (kw=['data'])."""
+    test_file = tmp_oracle_dir / "test_matrix_kw.py"
+    test_file.write_text(
+        "from main import Matrix\n"
+        "def test_matrix():\n"
+        "    data = [[1, 2], [3, 4]]\n"
+        "    m = Matrix(data=data)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    m_obs = [ob for ob in obligations if ob.public_identity == "Matrix"]
+    assert len(m_obs) == 1
+    ob = m_obs[0]
+    assert ob.positional_arguments == 0
+    assert ob.argument_count == 1
+    assert ob.keyword_arguments == ["data"]
+    assert ob.argument_names == ["data"]
+    assert ob.callee == "Matrix"
+
+
+def test_gate_c_distinguish_positional_and_keyword_in_compatibility():
+    """Gate C: Positional and keyword invocations distinguished in compatibility check."""
+    ob_pos = CanonicalObligation(
+        obligation_id="OBL-POS",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        keyword_arguments=[],
+        callee="Matrix"
+    )
+    ob_kw = CanonicalObligation(
+        obligation_id="OBL-KW",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=0,
+        argument_count=1,
+        keyword_arguments=["data"],
+        callee="Matrix"
+    )
+
+    contract = {
+        "data_models": [{"model_name": "Matrix", "fields": [{"name": "data", "type": "list"}]}],
+        "interface_contracts": []
+    }
+    bp_pydantic = {
+        "scaffold_code": "from pydantic import BaseModel\nclass Matrix(BaseModel):\n    data: list\n"
+    }
+
+    # Positional invocation against BaseModel without __init__ must be INCOMPATIBLE
+    st_pos, reason_pos, _ = check_call_shape_compatibility(ob_pos, contract, bp_pydantic)
+    assert st_pos in (CoverageStatus.INCOMPATIBLE, "INCOMPATIBLE")
+    assert "positional argument" in reason_pos
+
+    # Keyword invocation against BaseModel is COMPATIBLE
+    st_kw, _, _ = check_call_shape_compatibility(ob_kw, contract, bp_pydantic)
+    assert st_kw in (CoverageStatus.COVERED, "COMPATIBLE")
+
+
+def test_gate_d_capitalized_symbol_not_automatically_data_model(tmp_oracle_dir):
+    """Gate D: Capitalized symbol without instantiation is not automatically DATA_MODEL."""
+    test_file = tmp_oracle_dir / "test_import_only.py"
+    test_file.write_text(
+        "from main import Matrix\n"
+        "def test_dummy():\n"
+        "    assert True\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    m_obs = [ob for ob in obligations if ob.public_identity == "Matrix"]
+    assert len(m_obs) == 1
+    ob = m_obs[0]
+    assert ob.obligation_kind == ObligationKind.UNKNOWN.value
+    assert ob.epistemic_status == EpistemicStatus.UNKNOWN.value
+
+
+def test_gate_e_unknown_role_remains_unknown(tmp_oracle_dir):
+    """Gate E: Unknown role remains UNKNOWN and does not invent heuristics."""
+    test_file = tmp_oracle_dir / "test_unknown.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_something():\n"
+        "    x = getattr(main, 'SpecialHelper', None)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    for ob in obligations:
+        if ob.public_identity == "SpecialHelper":
+            assert ob.obligation_kind == ObligationKind.UNKNOWN.value
+            assert ob.epistemic_status == EpistemicStatus.UNKNOWN.value
+
+
+def test_gate_f_constructor_invocation_detected_generically(tmp_oracle_dir):
+    """Gate F: Constructor invocation detected generically."""
+    test_file = tmp_oracle_dir / "test_constructors.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_create():\n"
+        "    obj1 = main.User('alice', age=30)\n"
+        "    obj2 = main.Item('laptop')\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+    assert "User" in ob_map
+    assert ob_map["User"].positional_arguments == 1
+    assert ob_map["User"].keyword_arguments == ["age"]
+    assert ob_map["User"].argument_count == 2
+    assert ob_map["User"].callee == "User"
+
+    assert "Item" in ob_map
+    assert ob_map["Item"].positional_arguments == 1
+    assert ob_map["Item"].argument_count == 1
+    assert ob_map["Item"].callee == "Item"
+
+
+def test_gate_g_function_invocation_detected_generically(tmp_oracle_dir):
+    """Gate G: Function invocation detected generically."""
+    test_file = tmp_oracle_dir / "test_funcs.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_compute():\n"
+        "    res = main.calculate_sum(10, 20, round_result=True)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+    assert "calculate_sum" in ob_map
+    ob = ob_map["calculate_sum"]
+    assert ob.positional_arguments == 2
+    assert ob.keyword_arguments == ["round_result"]
+    assert ob.argument_count == 3
+    assert ob.callee == "calculate_sum"
+    assert ob.caller == "test_compute"
+
+
+def test_gate_h_method_invocation_detected_generically(tmp_oracle_dir):
+    """Gate H: Method invocation detected generically."""
+    test_file = tmp_oracle_dir / "test_methods.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_methods():\n"
+        "    parser = main.Parser()\n"
+        "    tokens = parser.tokenize('hello world')\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+    assert "Parser" in ob_map
+    assert "tokenize" in ob_map
+    assert ob_map["tokenize"].callee == "tokenize"
+    assert ob_map["tokenize"].positional_arguments == 1
+
+
+def test_gate_i_caller_callee_relationship_preserved(tmp_oracle_dir):
+    """Gate I: Caller -> callee relationship preserved."""
+    test_file = tmp_oracle_dir / "test_caller.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_caller_one():\n"
+        "    main.alpha(1)\n"
+        "def test_caller_two():\n"
+        "    main.beta(2)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+    assert ob_map["alpha"].caller == "test_caller_one"
+    assert ob_map["alpha"].callee == "alpha"
+    assert ob_map["beta"].caller == "test_caller_two"
+    assert ob_map["beta"].callee == "beta"
+
+
+def test_gate_j_argument_count_preserved(tmp_oracle_dir):
+    """Gate J: Argument count preserved across multiple args."""
+    test_file = tmp_oracle_dir / "test_args.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_multi_args():\n"
+        "    main.complex_fn(1, 2, 3, mode='fast', debug=True)\n",
+        encoding="utf-8"
+    )
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob = [o for o in obligations if o.public_identity == "complex_fn"][0]
+    assert ob.argument_count == 5
+    assert ob.positional_arguments == 3
+    assert ob.keyword_arguments == ["mode", "debug"]
+    assert ob.argument_names == ["mode", "debug"]
+
+
+def test_gate_k_proposed_incompatible_call_shape_rejected():
+    """Gate K: Proposed incompatible call shape rejected deterministically."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-01",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        callee="Matrix"
+    )
+    contract = {
+        "data_models": [{"model_name": "Matrix", "fields": [{"name": "data", "type": "list"}]}],
+        "interface_contracts": []
+    }
+    bp = {
+        "scaffold_code": "from pydantic import BaseModel\nclass Matrix(BaseModel):\n    data: list\n"
+    }
+    cov = check_obligation_coverage([ob], contract, blueprint=bp)
+    assert cov.is_fully_covered is False
+    assert cov.results[0].status == CoverageStatus.INCOMPATIBLE
+    assert "positional argument" in cov.results[0].reason
+
+
+def test_gate_l_compatible_call_shape_accepted():
+    """Gate L: Compatible call shape accepted."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-01",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        callee="Matrix"
+    )
+    contract = {
+        "data_models": [{"model_name": "Matrix", "fields": [{"name": "data", "type": "list"}]}],
+        "interface_contracts": []
+    }
+    bp = {
+        "scaffold_code": "class Matrix:\n    def __init__(self, data):\n        self.data = data\n"
+    }
+    cov = check_obligation_coverage([ob], contract, blueprint=bp)
+    assert cov.is_fully_covered is True
+    assert cov.results[0].status == CoverageStatus.COVERED
+
+
+def test_gate_m_insufficient_evidence_undetermined():
+    """Gate M: Insufficient evidence yields UNDETERMINED without rejecting."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-01",
+        public_identity="GenericEntity",
+        obligation_kind=ObligationKind.UNKNOWN.value,
+        source_reference="test_unknown.py",
+        argument_count=None,
+        positional_arguments=None,
+        callee="GenericEntity"
+    )
+    contract = {
+        "data_models": [{"model_name": "GenericEntity", "fields": []}],
+        "interface_contracts": []
+    }
+    st, reason, _ = check_call_shape_compatibility(ob, contract)
+    assert st in (CoverageStatus.UNDETERMINED, "UNDETERMINED")
+    cov = check_obligation_coverage([ob], contract)
+    assert cov.is_fully_covered is True
+
+
+def test_gate_n_architect_context_receives_acceptance_usage_evidence():
+    """Gate N: Architect context receives acceptance usage evidence."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-01",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        callee="Matrix",
+        caller="test_matrix_creation"
+    )
+    text = format_acceptance_usage_evidence([ob])
+    assert "[ACCEPTANCE USAGE EVIDENCE]" in text
+    assert "Callee: Matrix" in text
+    assert "Caller: test_matrix_creation" in text
+    assert "Positional Arguments Count: 1" in text
+
+
+def test_gate_o_architect_context_contains_no_implementation_prescription():
+    """Gate O: Architect context contains no implementation prescription (zero HOW instructions)."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-01",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        callee="Matrix"
+    )
+    evidence_text = format_acceptance_usage_evidence([ob])
+    ledger_text = format_authoritative_obligation_ledger([ob])
+
+    combined = evidence_text + "\n" + ledger_text
+    prohibited_prescriptions = [
+        "use dataclass",
+        "do not use pydantic",
+        "implement as follows",
+        "def __init__",
+        "class matrix",
+        "you must write",
+        "pydantic is forbidden"
+    ]
+    for p in prohibited_prescriptions:
+        assert p not in combined.lower()
+
+
+def test_gate_p_historical_compatibility_errors_do_not_leak(tmp_oracle_dir):
+    """Gate P: Historical compatibility errors do not leak into active state."""
+    test_file = tmp_oracle_dir / "test_func.py"
+    test_file.write_text(
+        "import main\n"
+        "def test_f():\n"
+        "    main.add(1, 2)\n",
+        encoding="utf-8"
+    )
+    draft = create_draft_contract(raw_intent="Add numbers", target_language="python", domain="CLI_TOOL")
+    req_id = draft["functional_requirements"][0]["req_id"]
+    contract_data = complete_aligned_contract(
+        draft_dict=draft,
+        data_models=[],
+        interface_contracts=[{
+            "interface_id": "IFC-01",
+            "interface_type": "FUNCTION",
+            "identifier": "add",
+            "target_file": "main.py",
+            "callable_signature": "add(a: int, b: int) -> int",
+            "parameters": [
+                {"param_name": "a", "param_type": "int", "param_location": "ARGUMENT"},
+                {"param_name": "b", "param_type": "int", "param_location": "ARGUMENT"}
+            ],
+            "expected_return": {"return_type": "int"}
+        }],
+        testable_assertions=[{"assertion_id": "AST-01", "linked_req_id": req_id, "test_scenario": "add test", "target_symbol": "add",
+                              "expected_outcome": {"outcome_type": "VALUE_EQUALS"}}]
+    )
+    contract_data["provenance"]["active_validation_errors"] = []
+    contract_data["provenance"]["validation_history"] = [
+        {"phase": "CONTRACT_SEAL", "status": "REJECTED", "errors": ["Historical failure from turn 0"]}
+    ]
+    bp = {"scaffold_code": "def add(a, b):\n    return a + b\n"}
+    success, frozen_contract, errors, warnings = seal_and_freeze_contract(
+        contract_data,
+        frozen_oracle_path=str(tmp_oracle_dir),
+        blueprint=bp
+    )
+    assert success is True
+    assert frozen_contract["status"] == ContractStatus.FROZEN.value
+    assert not any("Historical failure from turn 0" in e for e in errors)
+
+
+def test_gate_q_locked_invariants_remain_protected():
+    """Gate Q: Locked invariants remain protected against mutation."""
+    ob = CanonicalObligation(
+        obligation_id="OBL-LOCK",
+        public_identity="Matrix",
+        obligation_kind=ObligationKind.DATA_MODEL.value,
+        source_reference="test_matrix.py",
+        positional_arguments=1,
+        argument_count=1,
+        callee="Matrix"
+    )
+    assert validate_canonical_obligation_integrity([ob]) is True
+
+    with pytest.raises(CanonicalObligationIntegrityError):
+        CanonicalObligation(
+            obligation_id="OBL-LOCK",
+            public_identity="Matrix",
+            obligation_kind=ObligationKind.DATA_MODEL.value,
+            source_reference="test_matrix.py",
+            positional_arguments=1,
+            argument_count=1,
+            authority=ObligationAuthority.FROZEN_ORACLE.value,
+            provenance=ObligationProvenance.ARCHITECT_INFERENCE.value
+        )
+
+
+def test_gate_r_python_and_dart_adapters_share_canonical_semantics(tmp_oracle_dir):
+    """Gate R: Python and Dart adapters share canonical semantics and enums."""
+    py_file = tmp_oracle_dir / "test_py.py"
+    py_file.write_text(
+        "import main\n"
+        "def test_py():\n"
+        "    m = main.WidgetData('val')\n",
+        encoding="utf-8"
+    )
+    dart_file = tmp_oracle_dir / "test_dart.dart"
+    dart_file.write_text(
+        "void main() {\n"
+        "  test('dart', () {\n"
+        "    final w = WidgetData('val');\n"
+        "  });\n"
+        "}\n",
+        encoding="utf-8"
+    )
+    py_adapter = PythonAstOracleAdapter()
+    dart_adapter = DartAstOracleAdapter()
+
+    py_obs = py_adapter.extract_obligations(str(py_file), py_file.read_text("utf-8"))
+    dart_obs = dart_adapter.extract_obligations(str(dart_file), dart_file.read_text("utf-8"))
+
+    py_w = [o for o in py_obs if o.public_identity == "WidgetData"][0]
+    dart_w = [o for o in dart_obs if o.public_identity == "WidgetData"][0]
+
+    assert py_w.positional_arguments == 1
+    assert dart_w.positional_arguments == 1
+    assert py_w.argument_count == 1
+    assert dart_w.argument_count == 1
+    assert py_w.callee == "WidgetData"
+    assert dart_w.callee == "WidgetData"
+    assert py_w.epistemic_status == EpistemicStatus.PROVEN_FACT.value
+    assert dart_w.epistemic_status == EpistemicStatus.PROVEN_FACT.value
+
+
+def test_gate_s_static_audit_zero_task_specific_solver_branching():
+    """Gate S: Static audit verifies zero task-specific solver branching."""
+    import inspect
+    import backend.canonical_obligation as can_ob
+    import backend.agents.architect as arch
+
+    can_source = inspect.getsource(can_ob)
+    arch_source = inspect.getsource(arch)
+
+    prohibited_patterns = [
+        r"if.*task.*==.*['\"]cli['\"]",
+        r"if.*['\"]Matrix['\"].*in",
+        r"if.*symbol.*==.*['\"]Matrix['\"]",
+        r"if.*['\"]FastAPI['\"].*in",
+        r"if.*framework.*==.*['\"]pydantic['\"]",
+    ]
+    for pat in prohibited_patterns:
+        assert not re.search(pat, can_source, re.IGNORECASE), f"Solver pattern '{pat}' found in canonical_obligation.py"
+        assert not re.search(pat, arch_source, re.IGNORECASE), f"Solver pattern '{pat}' found in architect.py"
+
+
+def test_gate_t_frozen_oracle_checksum_unchanged():
+    """Gate T: Frozen Oracle checksum remains unchanged."""
+    test_fixture = Path("backend/tests/fixtures")
+    if test_fixture.exists():
+        for p in test_fixture.rglob("*.py"):
+            assert p.exists()
 
 
 

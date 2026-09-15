@@ -496,7 +496,8 @@ def extract_oracle_tested_symbols(frozen_oracle_path: str, target_lang: str = ""
 
 def check_pre_freeze_authority_compatibility(
     contract_obj: MachineReadableContract,
-    frozen_oracle_path: str
+    frozen_oracle_path: str,
+    blueprint: Optional[Dict[str, Any]] = None
 ) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
     """
     PRE-FREEZE AUTHORITY COMPATIBILITY GATE (Part 2 - Architect Contract Binding v2).
@@ -528,7 +529,7 @@ def check_pre_freeze_authority_compatibility(
     if not obligations:
         return True, [], []
 
-    cov_matrix = check_obligation_coverage(obligations, contract_obj)
+    cov_matrix = check_obligation_coverage(obligations, contract_obj, blueprint=blueprint)
 
     missing_obligations: List[Dict[str, Any]] = []
     error_messages: List[str] = []
@@ -671,7 +672,8 @@ def extract_proven_semantic_interfaces(
 def validate_contract_gate(
     contract_data: Any,
     frozen_oracle_path: Optional[str] = None,
-    task_text: Optional[str] = None
+    task_text: Optional[str] = None,
+    blueprint: Optional[Dict[str, Any]] = None
 ) -> Tuple[bool, List[str], List[str]]:
     """
     Memvalidasi dokumen kontrak secara deterministik melalui empat pilar pengujian:
@@ -914,7 +916,8 @@ def validate_contract_gate(
     if frozen_oracle_path:
         is_compat, err_msgs, missing_obs = check_pre_freeze_authority_compatibility(
             contract_obj,
-            frozen_oracle_path
+            frozen_oracle_path,
+            blueprint=blueprint
         )
         if not is_compat:
             structured_err = (
@@ -937,7 +940,8 @@ def validate_contract_gate(
 def seal_and_freeze_contract(
     contract_data: Any,
     frozen_oracle_path: Optional[str] = None,
-    task_text: Optional[str] = None
+    task_text: Optional[str] = None,
+    blueprint: Optional[Dict[str, Any]] = None
 ) -> Tuple[bool, Dict[str, Any], List[str], List[str]]:
     """
     Mengeksekusi transisi kritis ALIGNED -> FROZEN:
@@ -989,7 +993,8 @@ def seal_and_freeze_contract(
     is_valid, errors, warnings = validate_contract_gate(
         c_dict,
         frozen_oracle_path=frozen_oracle_path,
-        task_text=task_text
+        task_text=task_text,
+        blueprint=blueprint
     )
 
     # Periksa HANYA error pra-segel aktif pada kandidat saat ini (misal: JSON parse failure atau model mapping error pada turn aktif)
@@ -1011,7 +1016,7 @@ def seal_and_freeze_contract(
         try:
             obs = extract_canonical_oracle_obligations(frozen_oracle_path=frozen_oracle_path)
             if obs:
-                cov_mat = check_obligation_coverage(obs, c_dict)
+                cov_mat = check_obligation_coverage(obs, c_dict, blueprint=blueprint)
                 c_dict["coverage_matrix"] = cov_mat.to_dict()
                 if "provenance" not in c_dict or not isinstance(c_dict["provenance"], dict):
                     c_dict["provenance"] = {}
