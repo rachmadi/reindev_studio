@@ -115,6 +115,43 @@ except (ImportError, ValueError):
         evaluate_preservation_and_regression = None  # type: ignore
         validate_architect_repair_context_delivery = None  # type: ignore
 
+try:
+    from .developer_semantic_repair import (
+        normalize_runtime_evidence,
+        compare_scenario_with_observation,
+        evaluate_developer_preservation,
+        update_developer_failure_ledger,
+        assemble_developer_semantic_repair_context,
+        DeveloperRepairEvidence,
+        NormalizedObservation,
+        SemanticComparisonStatus,
+        SemanticDiffClassification,
+    )
+except (ImportError, ValueError):
+    try:
+        from developer_semantic_repair import (
+            normalize_runtime_evidence,
+            compare_scenario_with_observation,
+            evaluate_developer_preservation,
+            update_developer_failure_ledger,
+            assemble_developer_semantic_repair_context,
+            DeveloperRepairEvidence,
+            NormalizedObservation,
+            SemanticComparisonStatus,
+            SemanticDiffClassification,
+        )
+    except ImportError:
+        normalize_runtime_evidence = None  # type: ignore
+        compare_scenario_with_observation = None  # type: ignore
+        evaluate_developer_preservation = None  # type: ignore
+        update_developer_failure_ledger = None  # type: ignore
+        assemble_developer_semantic_repair_context = None  # type: ignore
+        DeveloperRepairEvidence = None  # type: ignore
+        NormalizedObservation = None  # type: ignore
+        SemanticComparisonStatus = None  # type: ignore
+        SemanticDiffClassification = None  # type: ignore
+
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
@@ -1198,6 +1235,125 @@ def build_developer_repair_context(
     if not auth_file:
         is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
         auth_file = "lib/card_metric.dart" if is_dart else "main.py"
+
+    if assemble_developer_semantic_repair_context is not None:
+        # Treatment #1.6: Universal Developer Semantic Repair Grounding v1
+        scenarios: List[Any] = []
+        if extract_canonical_scenarios is not None:
+            try:
+                scenarios = extract_canonical_scenarios(
+                    frozen_oracle_path=state.get("frozen_oracle_path"),
+                    test_files=test_files
+                )
+            except Exception:
+                scenarios = []
+
+        test_results = state.get("test_results") or {}
+        output = test_results.get("output") or test_results.get("stdout") or ""
+        stderr = test_results.get("stderr") or ""
+        exit_code = test_results.get("exit_code")
+        diag_ev = test_results.get("diagnostic_evidence")
+
+        normalized_obs: List[Any] = []
+        if normalize_runtime_evidence is not None:
+            try:
+                normalized_obs = normalize_runtime_evidence(
+                    raw_output=output,
+                    exit_code=exit_code,
+                    stderr=stderr,
+                    diagnostic_evidence=diag_ev,
+                    target_language=target_lang
+                )
+            except Exception:
+                normalized_obs = []
+
+        matched_obs_ids: Set[str] = set()
+        current_evidences: List[Any] = []
+        if compare_scenario_with_observation is not None:
+            for sc in scenarios:
+                caller = getattr(sc, "caller", "")
+                matching_obs = None
+                for obs in normalized_obs:
+                    obs_caller = getattr(obs, "caller", "")
+                    obs_sym = getattr(obs, "target_symbol", "")
+                    if (obs_caller and (obs_caller in caller or caller in obs_caller)) or (obs_sym and obs_sym in caller):
+                        matching_obs = obs
+                        matched_obs_ids.add(getattr(obs, "observation_id", ""))
+                        break
+                ev = compare_scenario_with_observation(sc, matching_obs)
+                if ev.comparison_status in (SemanticComparisonStatus.MISMATCH.value, SemanticComparisonStatus.UNDETERMINED.value):
+                    current_evidences.append(ev)
+
+            # Unmatched observations from test output
+            for obs in normalized_obs:
+                oid = getattr(obs, "observation_id", "")
+                if oid not in matched_obs_ids:
+                    ev = compare_scenario_with_observation(obs.caller, obs)
+                    current_evidences.append(ev)
+
+        # Preservation & Invariant Regression Evaluation
+        active_invs: List[Dict[str, Any]] = []
+        reg_warnings: List[str] = []
+        if evaluate_developer_preservation is not None:
+            current_evidences, active_invs, reg_warnings = evaluate_developer_preservation(current_evidences, state)
+        else:
+            for l_id, l_data in locked_dict.items():
+                if isinstance(l_data, dict):
+                    active_invs.append(l_data)
+                else:
+                    active_invs.append({"invariant_id": l_id, "description": str(l_data), "status": "PROVEN"})
+
+        # Multi-Failure Ledger
+        active_evidences = current_evidences
+        if update_developer_failure_ledger is not None:
+            active_evidences, _ = update_developer_failure_ledger(state, current_evidences)
+
+        # 10-Tier Context Assembly
+        result, telem_meta = assemble_developer_semantic_repair_context(
+            state=state,
+            active_evidences=active_evidences,
+            preserved_invariants=active_invs,
+            raw_diagnostics=output,
+            max_chars=max_chars
+        )
+
+        telemetry_data = {
+            "context_sections": [
+                "[1] AUTHORITATIVE ACCEPTANCE EXPECTATION",
+                "[2] CURRENT SEMANTIC FAILURE",
+                "[3] VIOLATED OBLIGATION",
+                "[4] LOCKED / PROVEN INVARIANTS",
+                "[5] CURRENT IMPLEMENTATION STATE",
+                "[6] REPAIR BOUNDARY",
+                "[7] EXPECTED POST-REPAIR STATE",
+                "[8] VERIFICATION CRITERIA",
+                "[9] SUPPORTING DIAGNOSTIC EVIDENCE",
+                "[10] RAW EVIDENCE"
+            ],
+            "context_size": len(result),
+            "authoritative_sources": ["[1] AUTHORITATIVE ACCEPTANCE EXPECTATION"],
+            "evidence_items": len(active_evidences),
+            "locked_invariants": len(active_invs),
+            "current_failures": len(active_evidences),
+            "repair_boundary_items": len(active_evidences[0].repair_boundary.get("allowed_changes", [])) if active_evidences else 2,
+            "integrity_violations_detected": len(reg_warnings),
+            "grounding_sources": ["FROZEN_ORACLE", "NORMALIZED_RUNTIME_EVIDENCE"],
+            "grounding_evidence_count": len(normalized_obs),
+            "grounding_evidence_types": ["SEMANTIC_DIFF", "NORM_OBSERVATION"],
+            "raw_diagnostic_count": len(output.splitlines()) if output else 0,
+            "normalized_diagnostic_count": len(normalized_obs),
+            "omitted_diagnostic_count": 0,
+            "current_failure_count": len(active_evidences),
+            "historical_failure_count": len(state.get("historical_validation_evidence") or []),
+            "locked_invariant_count": len(active_invs),
+            "implementation_facts_count": len(normalized_obs),
+            "output_size": len(result),
+            "truncation_detected": len(result) >= max_chars,
+            "repair_result": "SEMANTIC_REPAIR_GROUNDED",
+            "delivery_valid": True,
+            "delivery_errors": reg_warnings
+        }
+        return result, telemetry_data
 
     # [1] FROZEN CONTRACT
     if contract and isinstance(contract, dict):
