@@ -629,6 +629,37 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog arahan strategis Intent Architect.
   - `dokumentasi-pengembangan/commit_history.md`: Pencatatan komitmen tata kelola.
 
+---
+
+### Commit: e29550b — 2026-09-15
+- **Commit Hash:** `e29550b`
+- **Status:** TERVERIFIKASI PENUH (683 tests PASS, Pre-Flight Gates A–I PASS)
+- **Tipe:** `feat(treatment1_6)`
+- **Pesan Commit:** `feat(treatment1_6): implement universal developer semantic repair grounding v1`
+- **Waktu:** 2026-09-15 20:45 WIB
+- **Cakupan Perubahan:**
+  - `backend/developer_semantic_repair.py` (NEW): Generic runtime normalizer, open semantic diff taxonomy, deterministic semantic comparator, dan 10-tier Developer semantic repair context hierarchy.
+  - `backend/context_hardening.py`: Integrasi `assemble_developer_semantic_repair_context` ke pipeline perbaikan Developer.
+  - `backend/tests/test_developer_semantic_repair_grounding_v1.py` (NEW): 12 gate tests (Gate A–L) memverifikasi normalisasi runtime murni, open category, condition-only criteria, dan zero solver.
+
+---
+
+### Commit: 0cd380b — 2026-09-15
+- **Commit Hash:** `0cd380b`
+- **Status:** TERVERIFIKASI PENUH (Matriks 3x3 Selesai, 683 tests PASS, Oracle Intact)
+- **Tipe:** `docs(experiments)`
+- **Pesan Commit:** `docs(experiments): update documentation, replication logs, and evaluation reports for Treatment #1.6 (3x3)`
+- **Waktu:** 2026-09-15 22:21 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/treatment1_6_pilot_summary.json`: Summary Run 1 Pilot.
+  - `dokumentasi-pengembangan/experiments/treatment1_6_replication_summary.json`: Summary Run 2 Replikasi 1.
+  - `dokumentasi-pengembangan/experiments/treatment1_6_replication2_summary.json`: Summary Run 3 Replikasi 2.
+  - `dokumentasi-pengembangan/experiments/treatment1_6_pilot_evaluation_report.md`: Laporan evaluasi pilot 1x3.
+  - `dokumentasi-pengembangan/experiments/treatment1_6_full_replication_report.md`: Laporan komparasi forensik replikasi penuh 3x3.
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-113.
+  - `dokumentasi-pengembangan/validation_log.md`: Penambahan checkpoint validasi Treatment #1.6 (3x3).
+
+
 
 
 
