@@ -47,6 +47,8 @@ from backend.canonical_obligation import (
     check_obligation_coverage,
     validate_canonical_obligation_integrity,
     assert_canonical_obligation_unmodified,
+    format_authoritative_obligation_ledger,
+    normalize_route_path,
 )
 from backend.contract import (
     MachineReadableContract,
@@ -1290,5 +1292,186 @@ def test_scenario_27_flutter_metric_data_generic_representation():
     )
     contract_obj = MachineReadableContract(**cdict)
     assert contract_obj.data_models[0].model_name == "MetricData"
+
+
+def test_scenario_28_authoritative_ledger_format_and_nine_canonical_fields():
+    """
+    Scenario 28 (Treatment #1): Formatter produces authoritative read-only ledger
+    containing all 9 canonical fields and core architectural doctrine.
+    """
+    ob = CanonicalObligation(
+        obligation_id="OBL-HTTP-POST-products",
+        authority=ObligationAuthority.FROZEN_ORACLE.value,
+        provenance=ObligationProvenance.ORACLE_FACT.value,
+        obligation_kind=ObligationKind.INTERACTION.value,
+        public_identity="/products",
+        inputs={"http_method": "POST", "raw_path": "/products"},
+        outputs={"expected_status": 201},
+        observable_behavior="HTTP endpoint '/products' accepting POST method (expected status: 201)",
+        acceptance_evidence="client.post('/products')",
+        source_reference="test_main.py:10",
+        metadata={"http_method": "POST", "path": "/products"}
+    )
+
+    ledger = format_authoritative_obligation_ledger([ob])
+
+    # 1. Check doctrine & authority
+    assert "=== [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] ===" in ledger
+    assert "Authority: FROZEN_ORACLE" in ledger
+    assert "Oracle menentukan WHAT" in ledger
+    assert "Architect menentukan HOW" in ledger
+
+    # 2. Check 9 mandatory canonical fields
+    assert "Obligation ID: OBL-HTTP-POST-products" in ledger
+    assert "Authority: FROZEN_ORACLE" in ledger
+    assert "Kind: INTERACTION" in ledger
+    assert "Public Identity: /products" in ledger
+    assert "Inputs: {'http_method': 'POST', 'raw_path': '/products'}" in ledger
+    assert "Outputs: {'expected_status': 201}" in ledger
+    assert "Observable Behavior: HTTP endpoint '/products' accepting POST method (expected status: 201)" in ledger
+    assert "Acceptance Evidence: client.post('/products')" in ledger
+    assert "Source Reference: test_main.py:10" in ledger
+
+
+def test_scenario_29_distinct_public_identities_collection_vs_resource_item():
+    """
+    Scenario 29 (Treatment #1): Preserves distinct public identities.
+    /products (collection) and /products/{id} (resource item) must be separate.
+    """
+    ob_coll = CanonicalObligation(
+        obligation_id="OBL-HTTP-GET-products",
+        authority=ObligationAuthority.FROZEN_ORACLE.value,
+        provenance=ObligationProvenance.ORACLE_FACT.value,
+        obligation_kind=ObligationKind.INTERACTION.value,
+        public_identity="/products",
+        inputs={"http_method": "GET"},
+        source_reference="test_api.py:1"
+    )
+    ob_item = CanonicalObligation(
+        obligation_id="OBL-HTTP-GET-products_id",
+        authority=ObligationAuthority.FROZEN_ORACLE.value,
+        provenance=ObligationProvenance.ORACLE_FACT.value,
+        obligation_kind=ObligationKind.INTERACTION.value,
+        public_identity="/products/{id}",
+        inputs={"http_method": "GET"},
+        source_reference="test_api.py:10"
+    )
+
+    # Case A: Architect only declares collection endpoint /products (without path parameter)
+    contract_coll_only = [
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "list_products", "route": "/products", "http_method": "GET"}
+    ]
+    res_a = check_obligation_coverage([ob_coll, ob_item], contract_coll_only)
+    assert res_a.covered_count == 1
+    assert res_a.missing_count == 1
+    assert res_a.is_fully_covered is False
+
+    # Case B: Architect declares BOTH collection and resource item
+    contract_both = [
+        {"interface_id": "IFC-01", "interface_type": "HTTP_ENDPOINT", "identifier": "list_products", "route": "/products", "http_method": "GET"},
+        {"interface_id": "IFC-02", "interface_type": "HTTP_ENDPOINT", "identifier": "get_product", "route": "/products/{product_id}", "http_method": "GET"}
+    ]
+    res_b = check_obligation_coverage([ob_coll, ob_item], contract_both)
+    assert res_b.covered_count == 2
+    assert res_b.missing_count == 0
+    assert res_b.is_fully_covered is True
+
+
+def test_scenario_30_fastapi_oracle_status_code_extraction_accuracy():
+    """
+    Scenario 30 (Treatment #1): FastApi oracle obligations extraction extracts
+    exact HTTP status codes without heuristic contamination.
+    """
+    frozen_path = Path("dokumentasi-pengembangan/experiments/frozen_oracle/fastapi_t1")
+    if not frozen_path.exists():
+        pytest.skip("Frozen oracle directory not found in local workspace")
+
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(frozen_path))
+    assert len(obligations) == 4
+
+    ob_map = {ob.obligation_id: ob for ob in obligations}
+    assert "OBL-HTTP-POST-products" in ob_map
+    assert ob_map["OBL-HTTP-POST-products"].outputs.get("expected_status") == 201
+
+    assert "OBL-HTTP-GET-products" in ob_map
+    assert ob_map["OBL-HTTP-GET-products"].outputs.get("expected_status") == 200
+
+    assert "OBL-HTTP-GET-products_id" in ob_map
+    assert ob_map["OBL-HTTP-GET-products_id"].outputs.get("expected_status") == 200
+
+    assert "OBL-HTTP-DELETE-products_id" in ob_map
+    assert ob_map["OBL-HTTP-DELETE-products_id"].outputs.get("expected_status") == 204
+
+
+def test_scenario_31_architect_prompt_authoritative_ledger_and_pre_seal_check_4(monkeypatch):
+    """
+    Scenario 31 (Treatment #1): Architect prompt receives [AUTHORITATIVE ACCEPTANCE OBLIGATIONS]
+    ledger and includes Check #4 in PRE-SEAL SELF-REVIEW.
+    """
+    captured_messages = []
+
+    class DummyLLM:
+        def invoke(self, messages):
+            captured_messages.extend(messages)
+            dummy_resp = MagicMock()
+            dummy_resp.content = (
+                "=== BLUEPRINT JSON ===\n"
+                "{\n"
+                '  "authoritative_target_file": "main.py",\n'
+                '  "file_tree": ["main.py"],\n'
+                '  "architecture_summary": "Test architecture",\n'
+                '  "files": {"main.py": {"module_role": "Main", "imports": [], "code_scaffold": "pass"}},\n'
+                '  "interface_contracts": [],\n'
+                '  "data_models": []\n'
+                "}\n"
+                "=== END BLUEPRINT JSON ==="
+            )
+            return dummy_resp
+
+    from backend.agents import architect
+    monkeypatch.setattr(architect, "get_llm", lambda *a, **kw: DummyLLM())
+
+    frozen_path = "dokumentasi-pengembangan/experiments/frozen_oracle/fastapi_t1"
+    state = {
+        "task": "Build FastAPI product inventory API",
+        "specifications": "PM specs for product inventory",
+        "target_language": "python",
+        "frozen_oracle_path": frozen_path,
+        "provider": "ollama"
+    }
+
+    result = architect_agent(state)
+    assert result is not None
+
+    human_msg = next((m.content for m in captured_messages if hasattr(m, "content") and "PRE-SEAL SELF-REVIEW" in m.content), "")
+    assert "=== [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] ===" in human_msg
+    assert "Authority: FROZEN_ORACLE" in human_msg
+    assert "/products" in human_msg
+    assert "/products/{id}" in human_msg
+    assert "4. Acceptance Obligations Coverage:" in human_msg
+
+
+def test_scenario_32_cli_and_flutter_obligations_preserved():
+    """
+    Scenario 32 (Treatment #1): CLI and Flutter obligation extractions remain
+    identical and uncorrupted by Treatment #1 changes.
+    """
+    cli_path = Path("dokumentasi-pengembangan/experiments/frozen_oracle/cli_t1")
+    flutter_path = Path("dokumentasi-pengembangan/experiments/frozen_oracle/flutter_t1")
+    if not cli_path.exists() or not flutter_path.exists():
+        pytest.skip("Frozen oracle directories not found")
+
+    cli_obs = extract_canonical_oracle_obligations(frozen_oracle_path=str(cli_path))
+    cli_ids = {ob.public_identity for ob in cli_obs}
+    assert "Matrix" in cli_ids
+    assert "add_matrices" in cli_ids
+    assert "subtract_matrices" in cli_ids
+    assert "multiply_matrices" in cli_ids
+
+    flutter_obs = extract_canonical_oracle_obligations(frozen_oracle_path=str(flutter_path))
+    flutter_ids = {ob.public_identity for ob in flutter_obs}
+    assert "CardMetric" in flutter_ids
+    assert "MetricData" in flutter_ids
+
 
 

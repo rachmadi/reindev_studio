@@ -45,7 +45,8 @@ class CanonicalObligationIntegrityError(Exception):
 # ===========================================================================
 
 class ObligationAuthority(str, Enum):
-    ORACLE = "ORACLE"
+    ORACLE = "FROZEN_ORACLE"
+    FROZEN_ORACLE = "FROZEN_ORACLE"
     PM = "PM"
     ARCHITECT = "ARCHITECT"
 
@@ -84,7 +85,7 @@ class CanonicalObligation:
     Mendefinisikan WHAT yang wajib dipenuhi oleh kontrak publik tanpa mendikte HOW.
     """
     obligation_id: str
-    authority: str = ObligationAuthority.ORACLE.value
+    authority: str = ObligationAuthority.FROZEN_ORACLE.value
     provenance: str = ObligationProvenance.ORACLE_FACT.value
     obligation_kind: str = ObligationKind.CALLABLE_INTERFACE.value
     public_identity: str = ""
@@ -96,11 +97,11 @@ class CanonicalObligation:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        # Penegakan Invariant: Otoritas ORACLE WAJIB ber-provenance ORACLE_FACT
-        if self.authority == ObligationAuthority.ORACLE.value:
+        # Penegakan Invariant: Otoritas ORACLE / FROZEN_ORACLE WAJIB ber-provenance ORACLE_FACT
+        if self.authority in (ObligationAuthority.ORACLE.value, ObligationAuthority.FROZEN_ORACLE.value, "ORACLE", "FROZEN_ORACLE"):
             if self.provenance != ObligationProvenance.ORACLE_FACT.value:
                 raise CanonicalObligationIntegrityError(
-                    f"Violation of Canonical Obligation Integrity: Authority ORACLE "
+                    f"Violation of Canonical Obligation Integrity: Authority {self.authority} "
                     f"must have provenance ORACLE_FACT, got '{self.provenance}' on {self.obligation_id}"
                 )
         if not self.obligation_id:
@@ -165,6 +166,37 @@ class CanonicalObligation:
         )
 
 
+def normalize_route_path(path: str) -> str:
+    """
+    Menormalkan path HTTP untuk mempertahankan distinct public identities:
+    - Menghilangkan query string dan trailing slash (kecuali root '/')
+    - Memetakan segmen parameter '{...}' atau literal numeric id menjadi '{id}'
+    - Contoh:
+        '/products' -> '/products'
+        '/products/' -> '/products'
+        '/products/{id}' -> '/products/{id}'
+        '/products/{prod_id}' -> '/products/{id}'
+        '/products/999999' -> '/products/{id}'
+        '/' -> '/'
+    """
+    if not path:
+        return "/"
+    path = path.split("?")[0].strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    parts = [p for p in path.split("/") if p]
+    if not parts:
+        return "/"
+
+    norm_parts = []
+    for p in parts:
+        if (p.startswith("{") and p.endswith("}")) or p.isdigit():
+            norm_parts.append("{id}")
+        else:
+            norm_parts.append(p)
+    return "/" + "/".join(norm_parts)
+
+
 @dataclass
 class CanonicalInterfaceDeclaration:
     """
@@ -191,10 +223,12 @@ def normalize_interface_declaration(raw_ifc: Any) -> Optional[CanonicalInterface
             raw_ifc = raw_ifc.model_dump()
         elif hasattr(raw_ifc, "to_dict"):
             raw_ifc = raw_ifc.to_dict()
+        elif isinstance(raw_ifc, str):
+            raw_ifc = {"identifier": raw_ifc.strip(), "interface_id": raw_ifc.strip()}
         else:
             return None
 
-    ident = str(raw_ifc.get("identifier", "")).strip()
+    ident = str(raw_ifc.get("identifier") or raw_ifc.get("name") or raw_ifc.get("interface_id") or "").strip()
     itype = str(raw_ifc.get("interface_type", "")).upper().strip()
     target_file = str(raw_ifc.get("target_file", "")).strip()
 
@@ -203,10 +237,10 @@ def normalize_interface_declaration(raw_ifc: Any) -> Optional[CanonicalInterface
     canonical_m = str(raw_m).upper().strip() if raw_m else None
 
     # Canonical route:
-    raw_route = raw_ifc.get("route") or raw_ifc.get("path")
+    raw_route = raw_ifc.get("route") or raw_ifc.get("path") or raw_ifc.get("endpoint")
     if not raw_route and (itype == "HTTP_ENDPOINT" or ident.startswith("/")):
         raw_route = ident
-    canonical_r = str(raw_route).strip() if raw_route else None
+    canonical_r = normalize_route_path(str(raw_route)) if raw_route else None
 
     return CanonicalInterfaceDeclaration(
         identifier=ident,
@@ -226,14 +260,14 @@ def normalize_interface_declaration(raw_ifc: Any) -> Optional[CanonicalInterface
 def validate_canonical_obligation_integrity(obligations: List[CanonicalObligation]) -> bool:
     """
     Memverifikasi rantai integritas seluruh CanonicalObligation:
-    - Provenance WAJIB ORACLE_FACT untuk authority ORACLE
+    - Provenance WAJIB ORACLE_FACT untuk authority ORACLE / FROZEN_ORACLE
     - Tidak boleh kosong jika Acceptance Oracle ada
     - Memiliki source_reference valid
     """
     for ob in obligations:
-        if ob.authority == ObligationAuthority.ORACLE.value and ob.provenance != ObligationProvenance.ORACLE_FACT.value:
+        if ob.authority in (ObligationAuthority.ORACLE.value, ObligationAuthority.FROZEN_ORACLE.value, "ORACLE", "FROZEN_ORACLE") and ob.provenance != ObligationProvenance.ORACLE_FACT.value:
             raise CanonicalObligationIntegrityError(
-                f"Tainted obligation detected: {ob.obligation_id} claims authority ORACLE but has provenance {ob.provenance}"
+                f"Tainted obligation detected: {ob.obligation_id} claims authority {ob.authority} but has provenance {ob.provenance}"
             )
         if not ob.source_reference:
             raise CanonicalObligationIntegrityError(
@@ -389,6 +423,63 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
         obligations: List[CanonicalObligation] = []
         seen_identities: Set[str] = set()
 
+        # Pre-scan functions to capture expected status codes per endpoint
+        func_status_map: Dict[Tuple[str, str], int] = {}
+        try:
+            tree_scan = ast.parse(content, filename=file_name)
+            for fn in tree_scan.body:
+                if not isinstance(fn, ast.FunctionDef):
+                    continue
+                local_vars: Dict[str, Tuple[str, str]] = {}
+                for stmt in fn.body:
+                    if isinstance(stmt, ast.Assign):
+                        if isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
+                            m = stmt.value.func.attr.upper()
+                            if m in ("GET", "POST", "PUT", "DELETE", "PATCH") and stmt.value.args:
+                                arg0 = stmt.value.args[0]
+                                url = None
+                                if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                                    url = arg0.value
+                                elif isinstance(arg0, ast.JoinedStr):
+                                    parts = [str(p.value) if isinstance(p, ast.Constant) else "{id}" for p in arg0.values]
+                                    url = "".join(parts)
+                                if url and url.startswith("/"):
+                                    norm_u = normalize_route_path(url)
+                                    for t in stmt.targets:
+                                        if isinstance(t, ast.Name):
+                                            local_vars[t.id] = (m, norm_u)
+                    elif isinstance(stmt, ast.Assert) and isinstance(stmt.test, ast.Compare):
+                        left = stmt.test.left
+                        code = None
+                        for op, comp in zip(stmt.test.ops, stmt.test.comparators):
+                            if isinstance(op, ast.Eq) and isinstance(comp, ast.Constant) and isinstance(comp.value, int):
+                                code = comp.value
+                                break
+                        if code is not None and isinstance(left, ast.Attribute) and left.attr == "status_code":
+                            target_endpoint = None
+                            if isinstance(left.value, ast.Name) and left.value.id in local_vars:
+                                target_endpoint = local_vars[left.value.id]
+                            elif isinstance(left.value, ast.Call) and isinstance(left.value.func, ast.Attribute):
+                                m_direct = left.value.func.attr.upper()
+                                if m_direct in ("GET", "POST", "PUT", "DELETE", "PATCH") and left.value.args:
+                                    arg0_d = left.value.args[0]
+                                    u_direct = None
+                                    if isinstance(arg0_d, ast.Constant) and isinstance(arg0_d.value, str):
+                                        u_direct = arg0_d.value
+                                    elif isinstance(arg0_d, ast.JoinedStr):
+                                        parts_d = [str(p.value) if isinstance(p, ast.Constant) else "{id}" for p in arg0_d.values]
+                                        u_direct = "".join(parts_d)
+                                    if u_direct and u_direct.startswith("/"):
+                                        target_endpoint = (m_direct, normalize_route_path(u_direct))
+                            if target_endpoint:
+                                curr = func_status_map.get(target_endpoint)
+                                if curr is None or (curr >= 400 and code < 400):
+                                    func_status_map[target_endpoint] = code
+                                elif code < 400 and curr < 400:
+                                    func_status_map[target_endpoint] = code
+        except Exception:
+            pass
+
         # 1. AST-based parsing
         try:
             tree = ast.parse(content, filename=file_name)
@@ -405,7 +496,7 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                                 ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
                                 obligations.append(CanonicalObligation(
                                     obligation_id=ob_id,
-                                    authority=ObligationAuthority.ORACLE.value,
+                                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                                     provenance=ObligationProvenance.ORACLE_FACT.value,
                                     obligation_kind=kind,
                                     public_identity=sym,
@@ -443,23 +534,24 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                                     path_val = "".join(parts)
 
                                 if path_val and path_val.startswith("/"):
-                                    norm_path = re.sub(r"/\{[^}]+\}", "", path_val).rstrip("/")
-                                    if not norm_path:
-                                        norm_path = "/"
+                                    norm_path = normalize_route_path(path_val)
                                     ep_key = f"HTTP:{method_name}:{norm_path}"
                                     if ep_key not in seen_identities:
                                         seen_identities.add(ep_key)
-                                        clean_id = norm_path.strip("/").replace("/", "_") or "root"
+                                        clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
                                         ob_id = f"OBL-HTTP-{method_name}-{clean_id}"
+                                        exp_status = func_status_map.get((method_name, norm_path))
+                                        outputs = {"expected_status": exp_status} if exp_status else {}
+                                        status_info = f" (expected status: {exp_status})" if exp_status else ""
                                         obligations.append(CanonicalObligation(
                                             obligation_id=ob_id,
-                                            authority=ObligationAuthority.ORACLE.value,
+                                            authority=ObligationAuthority.FROZEN_ORACLE.value,
                                             provenance=ObligationProvenance.ORACLE_FACT.value,
                                             obligation_kind=ObligationKind.INTERACTION.value,
                                             public_identity=norm_path,
                                             inputs={"http_method": method_name, "raw_path": path_val},
-                                            outputs={},
-                                            observable_behavior=f"HTTP endpoint '{norm_path}' accepting {method_name} method",
+                                            outputs=outputs,
+                                            observable_behavior=f"HTTP endpoint '{norm_path}' accepting {method_name} method{status_info}",
                                             acceptance_evidence=f"client.{method_name.lower()}('{path_val}')",
                                             source_reference=f"{file_name}:{node.lineno}",
                                             metadata={"http_method": method_name, "path": norm_path}
@@ -476,7 +568,7 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=kind,
                     public_identity=sym,
@@ -496,7 +588,7 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=kind,
                     public_identity=sym,
@@ -510,23 +602,24 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
 
         for method, ep in re.findall(r"client\.(get|post|put|delete|patch)\(\s*f?[\"'](/[^\"'\s?#]+)[\"']", content, re.IGNORECASE):
             m_upper = method.upper()
-            norm_path = re.sub(r"/\{[^}]+\}", "", ep).rstrip("/")
-            if not norm_path:
-                norm_path = "/"
+            norm_path = normalize_route_path(ep)
             ep_key = f"HTTP:{m_upper}:{norm_path}"
             if ep_key not in seen_identities:
                 seen_identities.add(ep_key)
-                clean_id = norm_path.strip("/").replace("/", "_") or "root"
+                clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
                 ob_id = f"OBL-HTTP-{m_upper}-{clean_id}"
+                exp_status = func_status_map.get((m_upper, norm_path))
+                outputs = {"expected_status": exp_status} if exp_status else {}
+                status_info = f" (expected status: {exp_status})" if exp_status else ""
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.INTERACTION.value,
                     public_identity=norm_path,
                     inputs={"http_method": m_upper, "raw_path": ep},
-                    outputs={},
-                    observable_behavior=f"HTTP endpoint '{norm_path}' accepting {m_upper} method",
+                    outputs=outputs,
+                    observable_behavior=f"HTTP endpoint '{norm_path}' accepting {m_upper} method{status_info}",
                     acceptance_evidence=f"client.{method.lower()}('{ep}')",
                     source_reference=file_name,
                     metadata={"http_method": m_upper, "path": norm_path}
@@ -571,7 +664,7 @@ class DartAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-WIDGET-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.OBSERVABLE_RUNTIME.value,
                     public_identity=sym,
@@ -590,7 +683,7 @@ class DartAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-WIDGET-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.OBSERVABLE_RUNTIME.value,
                     public_identity=sym,
@@ -609,7 +702,7 @@ class DartAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-PROVIDER-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
                     public_identity=sym,
@@ -628,7 +721,7 @@ class DartAstOracleAdapter(BaseOracleTestAdapter):
                 ob_id = f"OBL-MODEL-{sym}"
                 obligations.append(CanonicalObligation(
                     obligation_id=ob_id,
-                    authority=ObligationAuthority.ORACLE.value,
+                    authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
                     obligation_kind=ObligationKind.DATA_MODEL.value,
                     public_identity=sym,
@@ -664,12 +757,28 @@ def extract_canonical_oracle_obligations(
     test_contents: List[Tuple[str, str]] = []
     seen_fnames: Set[str] = set()
 
-    # 1. Dari in-memory test_files dictionary (jika ada)
+    # 1. Dari in-memory test_files dictionary atau list (jika ada)
     if test_files:
-        for fname, content in test_files.items():
-            if content and fname not in seen_fnames:
-                test_contents.append((fname, content))
-                seen_fnames.add(fname)
+        if isinstance(test_files, dict):
+            for fname, content in test_files.items():
+                if content and fname not in seen_fnames:
+                    test_contents.append((fname, content))
+                    seen_fnames.add(fname)
+        elif isinstance(test_files, list):
+            for item in test_files:
+                if isinstance(item, tuple) and len(item) == 2:
+                    fname, content = item
+                    if content and fname not in seen_fnames:
+                        test_contents.append((fname, content))
+                        seen_fnames.add(fname)
+                elif isinstance(item, str) and item not in seen_fnames:
+                    p = Path(item)
+                    if p.exists() and p.is_file():
+                        try:
+                            test_contents.append((p.name, p.read_text(encoding="utf-8")))
+                            seen_fnames.add(p.name)
+                        except Exception:
+                            pass
 
     # 2. Dari directory frozen_oracle_path di filesystem
     if frozen_oracle_path:
@@ -736,6 +845,8 @@ def check_obligation_coverage(
         contract_dict = contract.to_dict()
     elif hasattr(contract, "model_dump"):
         contract_dict = contract.model_dump()
+    elif isinstance(contract, list):
+        contract_dict = {"interface_contracts": contract}
 
     declared_interfaces = contract_dict.get("interface_contracts") or []
     declared_models = contract_dict.get("data_models") or []
@@ -756,10 +867,8 @@ def check_obligation_coverage(
         canonical_interfaces.append(c_ifc)
 
         if c_ifc.canonical_route:
-            base_path = re.sub(r"/\{[^}]+\}", "", c_ifc.canonical_route).rstrip("/")
-            if not base_path:
-                base_path = "/"
-            http_endpoints.setdefault(base_path, []).append(c_ifc)
+            norm_r = normalize_route_path(c_ifc.canonical_route)
+            http_endpoints.setdefault(norm_r, []).append(c_ifc)
 
         symbol_interfaces.setdefault(c_ifc.identifier, []).append(c_ifc)
         if "." in c_ifc.identifier:
@@ -792,7 +901,7 @@ def check_obligation_coverage(
 
     for ob in obligations:
         # Provenance verification: HANYA ORACLE_FACT yang diverifikasi sebagai acceptance obligation
-        if ob.authority != ObligationAuthority.ORACLE.value or ob.provenance != ObligationProvenance.ORACLE_FACT.value:
+        if ob.authority not in (ObligationAuthority.ORACLE.value, ObligationAuthority.FROZEN_ORACLE.value, "ORACLE", "FROZEN_ORACLE") or ob.provenance != ObligationProvenance.ORACLE_FACT.value:
             res = ObligationCoverageResult(
                 obligation=ob,
                 status=CoverageStatus.UNDETERMINED,
@@ -802,28 +911,43 @@ def check_obligation_coverage(
             undetermined_cnt += 1
             continue
 
-        # A. INTERACTION OBLIGATION (e.g. HTTP POST /products)
+        # A. INTERACTION OBLIGATION (e.g. HTTP POST /products or GET /products/{id})
         if ob.obligation_kind == ObligationKind.INTERACTION.value:
-            req_path = ob.public_identity
+            req_path = normalize_route_path(ob.public_identity)
             req_method = ob.inputs.get("http_method", "").upper().strip() if ob.inputs else ""
 
-            # Pembuktian Kompatibilitas Semantik:
-            # Cocok jika:
-            # 1. Path endpoint cocok secara langsung atau melalui declared route mapping
-            # 2. Atau jika fungsi interface mendeklarasikan route parameter yang selaras
-            matched_ifcs: List[CanonicalInterfaceDeclaration] = []
-            for ep_path, ifc_list in http_endpoints.items():
-                if ep_path == req_path or ep_path.rstrip("/") == req_path.rstrip("/"):
-                    matched_ifcs.extend(ifc_list)
-                elif req_path.startswith(ep_path) or ep_path.startswith(req_path):
-                    matched_ifcs.extend(ifc_list)
+            # Pembuktian Kompatibilitas Semantik (Distinct Public Identities):
+            # 1. Exact match pada normalized route path (misal /products vs /products, /products/{id} vs /products/{id})
+            matched_ifcs: List[CanonicalInterfaceDeclaration] = list(http_endpoints.get(req_path, []))
+
+            # 2. Semantic match: jika obligation adalah parameterized endpoint (/users/{id}) dan interface dideklarasikan pada base route (/users) dengan PATH parameter
+            if not matched_ifcs and "{id}" in req_path:
+                base_req = req_path.replace("/{id}", "").rstrip("/")
+                for candidate in http_endpoints.get(base_req, []):
+                    has_path_param = any(
+                        (isinstance(p, dict) and p.get("param_location") == "PATH") or
+                        (hasattr(p, "param_location") and getattr(p, "param_location") == "PATH")
+                        for p in candidate.parameters
+                    )
+                    if has_path_param:
+                        matched_ifcs.append(candidate)
 
             if not matched_ifcs:
-                # Cek apakah ada antarmuka yang membuktikan mapping semantik ke path ini
+                # Cek apakah ada antarmuka dengan canonical_route yang cocok
                 for sym_name, ifc_list in symbol_interfaces.items():
                     for c_ifc in ifc_list:
-                        if c_ifc.canonical_route and (c_ifc.canonical_route == req_path or req_path.startswith(c_ifc.canonical_route)):
-                            matched_ifcs.append(c_ifc)
+                        if c_ifc.canonical_route:
+                            norm_c = normalize_route_path(c_ifc.canonical_route)
+                            if norm_c == req_path:
+                                matched_ifcs.append(c_ifc)
+                            elif "{id}" in req_path and norm_c.rstrip("/") == req_path.replace("/{id}", "").rstrip("/"):
+                                has_path_param = any(
+                                    (isinstance(p, dict) and p.get("param_location") == "PATH") or
+                                    (hasattr(p, "param_location") and getattr(p, "param_location") == "PATH")
+                                    for p in c_ifc.parameters
+                                )
+                                if has_path_param:
+                                    matched_ifcs.append(c_ifc)
 
             if not matched_ifcs:
                 clean_name = req_path.strip("/").replace("/", "_")
@@ -1056,3 +1180,53 @@ def check_obligation_coverage(
         results=results,
         summary_reasons=summary_reasons
     )
+
+
+# ===========================================================================
+# 9. Canonical Read-Only Obligation Ledger Formatter
+# ===========================================================================
+
+def format_authoritative_obligation_ledger(obligations: List[CanonicalObligation]) -> str:
+    """
+    Memformat seluruh Canonical Acceptance Obligations menjadi ledger teks kanonikal
+    yang terstruktur, informatif, dan murni READ-ONLY untuk diinjeksikan ke konteks Architect.
+
+    DOKTRIN & BATASAN KERAS:
+    - Otoritas: FROZEN_ORACLE (Acceptance Authority).
+    - Menjelaskan WHAT (apa yang diuji dan wajib dipenuhi oleh kontrak publik).
+    - DILARANG memberikan HOW (solusi, kode implementasi, atau aturan task-specific).
+    - Memuat minimal 9 field: obligation_id, authority, source_reference,
+      obligation_kind, public_identity, inputs, outputs, observable_behavior, acceptance_evidence.
+    """
+    if not obligations:
+        return ""
+
+    lines = [
+        "=== [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] ===",
+        "Authority: FROZEN_ORACLE (Immutable Acceptance Authority — Read-Only)",
+        "Doktrin Arsitektur:",
+        "1. Oracle menentukan WHAT (apa yang diuji dan wajib dipenuhi).",
+        "2. Architect menentukan HOW (desain arsitektur, pemisahan modul, dan struktur kode).",
+        "3. Seluruh obligasi publik berikut WAJIB terwakili dalam `interface_contracts` atau `data_models`",
+        "   sebelum kontrak arsitektur diizinkan mencapai status FROZEN.",
+        "",
+        "Ledger Obligasi Penerimaan Orakel:",
+    ]
+
+    for idx, ob in enumerate(obligations, 1):
+        lines.append(f"{idx}. Obligation ID: {ob.obligation_id}")
+        lines.append(f"   Authority: {ob.authority}")
+        lines.append(f"   Kind: {ob.obligation_kind}")
+        lines.append(f"   Public Identity: {ob.public_identity}")
+        if ob.inputs:
+            lines.append(f"   Inputs: {ob.inputs}")
+        if ob.outputs:
+            lines.append(f"   Outputs: {ob.outputs}")
+        lines.append(f"   Observable Behavior: {ob.observable_behavior}")
+        lines.append(f"   Acceptance Evidence: {ob.acceptance_evidence}")
+        lines.append(f"   Source Reference: {ob.source_reference}")
+        lines.append("")
+
+    lines.append("=== END [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] ===")
+    return "\n".join(lines)
+

@@ -25,6 +25,10 @@ try:
     from ..tracer import get_tracer
     from ..environment_grounding import generate_fact_card_for_architect
     from ..architect_validator import validate_architect_blueprint
+    from ..canonical_obligation import (
+        extract_canonical_oracle_obligations,
+        format_authoritative_obligation_ledger
+    )
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -52,6 +56,14 @@ except (ImportError, ValueError):
         from architect_validator import validate_architect_blueprint
     except ImportError:
         def validate_architect_blueprint(*args, **kwargs): return True, []
+    try:
+        from canonical_obligation import (
+            extract_canonical_oracle_obligations,
+            format_authoritative_obligation_ledger
+        )
+    except ImportError:
+        def extract_canonical_oracle_obligations(*args, **kwargs): return []
+        def format_authoritative_obligation_ledger(*args, **kwargs): return ""
 try:
     from ..blueprint_schema import (
         ArchitecturalBlueprint,
@@ -349,13 +361,29 @@ def architect_agent(state: SquadState) -> dict:
         arch_fact_card = ""
     env_section = f"\n{arch_fact_card}\n" if arch_fact_card else ""
 
+    # Acceptance Oracle Obligations Ledger (Read-Only Authoritative WHAT)
+    oracle_ledger_section = ""
+    try:
+        f_oracle_path = state.get("frozen_oracle_path")
+        t_files = state.get("test_files")
+        oracle_obs = extract_canonical_oracle_obligations(
+            frozen_oracle_path=f_oracle_path,
+            test_files=t_files
+        )
+        if oracle_obs:
+            ledger_text = format_authoritative_obligation_ledger(oracle_obs)
+            if ledger_text:
+                oracle_ledger_section = f"\n{ledger_text}\n"
+    except Exception:
+        oracle_ledger_section = ""
+
     prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
 
 {structure_rule}
 {env_section}
 Deskripsi Tugas Pengguna:
 {user_task}
-{v0_section}
+{v0_section}{oracle_ledger_section}
 Spesifikasi Product Manager:
 {specs}{feedback_section}
 
@@ -369,6 +397,7 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 1. Specification -> Coverage: Apakah seluruh requirement dari spesifikasi sudah terwakili tanpa ada yang terlewat?
 2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
 3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
+4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models`?
 Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
 
     messages = [
@@ -401,8 +430,13 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
             ifid = f"IFC-{idx:02d}"
             if not d.get("interface_id"):
                 d["interface_id"] = ifid
+            if not d.get("http_method") and d.get("method"):
+                d["http_method"] = d.get("method")
             if not d.get("interface_type"):
-                d["interface_type"] = "WIDGET" if is_dart else "FUNCTION"
+                if d.get("route") or (d.get("http_method") and str(d.get("http_method")).upper() in ("GET", "POST", "PUT", "DELETE", "PATCH")):
+                    d["interface_type"] = "HTTP_ENDPOINT"
+                else:
+                    d["interface_type"] = "WIDGET" if is_dart else "FUNCTION"
             ifaces.append(d)
             ident = d.get("identifier", "target")
             assertions.append({
