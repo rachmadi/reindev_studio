@@ -645,6 +645,14 @@ def build_architect_decision_context(
                 rx_id = getattr(rx, "prescription_id", "?")
                 req_chg = getattr(rx, "required_change", "")
                 ev_text += f"  [{rx_id}] {req_chg}\n"
+
+        contract_errors = state.get("contract_validation_errors", []) or []
+        scenario_errors = [str(e) for e in contract_errors if "SCENARIO_SCAFFOLD_INCOMPATIBILITY" in str(e)]
+        if scenario_errors:
+            ev_text += "\n[BEHAVIORAL COMPATIBILITY EVIDENCE — SCAFFOLD vs ACCEPTANCE SCENARIOS]\n"
+            for se in scenario_errors:
+                ev_text += f"  {se}\n"
+
         if ev_text:
             sections["evidence_violations"] = (
                 "[9] EVIDENCE/VIOLATIONS (from Python validator — DETERMINISTIC)\n"

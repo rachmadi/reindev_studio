@@ -41,6 +41,12 @@ try:
         evaluate_behavioral_observations,
         format_scenarios_for_architect,
         format_behavioral_mismatches_for_developer,
+        ScaffoldCompatibilityStatus,
+        ScaffoldCallableFact,
+        ScaffoldScenarioCompatibilityItem,
+        ScaffoldScenarioMatrix,
+        evaluate_scaffold_scenario_compatibility,
+        format_scaffold_compatibility_for_architect,
     )
 except (ImportError, ValueError):
     try:
@@ -54,6 +60,12 @@ except (ImportError, ValueError):
             evaluate_behavioral_observations,
             format_scenarios_for_architect,
             format_behavioral_mismatches_for_developer,
+            ScaffoldCompatibilityStatus,
+            ScaffoldCallableFact,
+            ScaffoldScenarioCompatibilityItem,
+            ScaffoldScenarioMatrix,
+            evaluate_scaffold_scenario_compatibility,
+            format_scaffold_compatibility_for_architect,
         )
     except ImportError:
         pass

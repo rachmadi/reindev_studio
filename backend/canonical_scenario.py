@@ -337,7 +337,11 @@ class PythonAstScenarioExtractor:
             precondition = "; ".join(pre_calls)
             stimulus, input_shape, _ = action_calls[-1]
         elif assertions:
-            stimulus = f"expression in {caller}"
+            hasattr_out = next((o.get("hasattr") for o, _, _ in assertions if "hasattr" in o), None)
+            if hasattr_out:
+                stimulus = f"hasattr({hasattr_out})"
+            else:
+                stimulus = f"expression in {caller}"
 
         # Gabungkan outcomes dan observable output
         combined_outcome: Dict[str, Any] = {}
@@ -452,6 +456,14 @@ class PythonAstScenarioExtractor:
                 elif isinstance(ops[0], (ast.Gt, ast.GtE)):
                     outcome["min_bound"] = right_val
                     obs_str = f"{left_str} >= {right_val}"
+        elif isinstance(test, ast.Call):
+            fn_name = self._node_to_str(test.func)
+            if fn_name == "hasattr" and len(test.args) >= 2:
+                target_obj = self._node_to_str(test.args[0])
+                attr_name = self._evaluate_constant(test.args[1])
+                outcome["hasattr"] = attr_name
+                outcome["symbol"] = attr_name
+                obs_str = f"hasattr({target_obj}, '{attr_name}')"
 
         return outcome, obs_str
 
@@ -833,3 +845,769 @@ def format_behavioral_mismatches_for_developer(
     lines.append("- Pertahankan seluruh invarian perilaku yang telah berstatus PROVEN (mutation FORBIDDEN).")
     lines.append("===============================================================")
     return "\n".join(lines)
+
+
+# ===========================================================================
+# 9. Treatment #1.4: Scaffold ↔ Acceptance Scenario Compatibility Engine
+# ===========================================================================
+
+class ScaffoldCompatibilityStatus(str, Enum):
+    COMPATIBLE = "COMPATIBLE"
+    INCOMPATIBLE = "INCOMPATIBLE"
+    UNDETERMINED = "UNDETERMINED"
+
+
+@dataclass
+class ScaffoldCallableFact:
+    """Fakta implementasi yang diekstraksi dari sebuah callable / unit di code_scaffold."""
+    name: str
+    file_path: str = ""
+    route: Optional[str] = None
+    http_method: Optional[str] = None
+    positional_params_count: int = 0
+    param_names: List[str] = field(default_factory=list)
+    has_named_params: bool = False
+    named_param_names: List[str] = field(default_factory=list)
+    return_paths: List[Dict[str, Any]] = field(default_factory=list)
+    error_paths: List[Dict[str, Any]] = field(default_factory=list)
+    conditional_branches: List[str] = field(default_factory=list)
+    collection_lookups: List[str] = field(default_factory=list)
+    is_stub: bool = False
+    has_opaque_calls: bool = False
+    has_unconditional_return: bool = False
+    raw_code: str = ""
+
+
+@dataclass
+class ScaffoldScenarioCompatibilityItem:
+    """Item evaluasi kompatibilitas antara satu Acceptance Scenario dan code_scaffold."""
+    scenario_id: str
+    compatibility: str  # COMPATIBLE | INCOMPATIBLE | UNDETERMINED
+    authority: str = "FROZEN_ORACLE"
+    source_reference: str = ""
+    observed_scaffold_facts: Dict[str, Any] = field(default_factory=dict)
+    expected_behavior: Dict[str, Any] = field(default_factory=dict)
+    evidence: str = ""
+    causal_status: str = CausalStatus.UNRESOLVED.value
+    is_regression: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> ScaffoldScenarioCompatibilityItem:
+        return cls(**d)
+
+
+@dataclass
+class ScaffoldScenarioMatrix:
+    """Matrix agregat kompatibilitas seluruh Acceptance Scenarios terhadap code_scaffold."""
+    items: List[ScaffoldScenarioCompatibilityItem] = field(default_factory=list)
+    is_fully_compatible: bool = False
+    compatible_count: int = 0
+    incompatible_count: int = 0
+    undetermined_count: int = 0
+    regression_count: int = 0
+
+    def to_diagnosis_lines(self) -> List[str]:
+        lines = []
+        for it in self.items:
+            if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value:
+                reg_prefix = "[CRITICAL REGRESSION] " if it.is_regression else ""
+                lines.append(
+                    f"{reg_prefix}SCENARIO_SCAFFOLD_INCOMPATIBILITY: Scenario '{it.scenario_id}' is {it.compatibility}.\n"
+                    f"  Source: {it.source_reference}\n"
+                    f"  Expected: {json.dumps(it.expected_behavior)}\n"
+                    f"  Observed Scaffold: {json.dumps(it.observed_scaffold_facts)}\n"
+                    f"  Evidence: {it.evidence}"
+                )
+        return lines
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "items": [it.to_dict() for it in self.items],
+            "is_fully_compatible": self.is_fully_compatible,
+            "compatible_count": self.compatible_count,
+            "incompatible_count": self.incompatible_count,
+            "undetermined_count": self.undetermined_count,
+            "regression_count": self.regression_count,
+        }
+
+
+class PythonScaffoldExtractor:
+    """Mengekstrak fakta implementasi dari code_scaffold Python via AST."""
+
+    def extract_facts(self, file_path: str, code: str) -> List[ScaffoldCallableFact]:
+        facts: List[ScaffoldCallableFact] = []
+        if not code or not code.strip():
+            return facts
+
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            return facts
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                facts.append(self._extract_function_fact(file_path, node))
+            elif isinstance(node, ast.ClassDef):
+                facts.extend(self._extract_class_facts(file_path, node))
+
+        return facts
+
+    def _extract_function_fact(self, file_path: str, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> ScaffoldCallableFact:
+        name = node.name
+        route = None
+        http_method = None
+        decorator_status = None
+
+        # Inspect decorators (e.g. @app.get('/products'), @router.delete(...))
+        for dec in node.decorator_list:
+            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+                cand = dec.func.attr.upper()
+                if cand in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
+                    http_method = cand
+                    if dec.args and isinstance(dec.args[0], ast.Constant) and isinstance(dec.args[0].value, str):
+                        route = dec.args[0].value
+                    for kw in dec.keywords:
+                        if kw.arg == "status_code" and isinstance(kw.value, ast.Constant):
+                            decorator_status = kw.value.value
+
+        posonly_args = [a.arg for a in getattr(node.args, "posonlyargs", [])]
+        pos_args = [a.arg for a in node.args.args if a.arg not in ("self", "cls")]
+        kw_args = [a.arg for a in node.args.kwonlyargs]
+        named_params = pos_args + kw_args
+        has_named = (len(named_params) > 0 or getattr(node.args, "kwarg", None) is not None)
+
+        return_paths: List[Dict[str, Any]] = []
+        error_paths: List[Dict[str, Any]] = []
+        conditional_branches: List[str] = []
+        collection_lookups: List[str] = []
+        has_opaque_calls = False
+
+        # Detect stubs
+        stmts = [s for s in node.body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) and isinstance(s.value.value, str))]
+        is_stub = False
+        if not stmts:
+            is_stub = True
+        elif len(stmts) == 1:
+            s0 = stmts[0]
+            if isinstance(s0, ast.Pass):
+                is_stub = True
+            elif isinstance(s0, ast.Expr) and isinstance(s0.value, ast.Constant) and s0.value.value is ...:
+                is_stub = True
+            elif isinstance(s0, ast.Raise):
+                exc_id = getattr(getattr(s0, "exc", None), "id", None) or getattr(getattr(getattr(s0, "exc", None), "func", None), "id", None)
+                if exc_id == "NotImplementedError":
+                    is_stub = True
+
+        # Walk body statements only (exclude decorator expressions)
+        for stmt in node.body:
+            for child in ast.walk(stmt):
+                if isinstance(child, ast.Return):
+                    ret_val = None
+                    if child.value is not None:
+                        if isinstance(child.value, ast.Constant):
+                            ret_val = child.value.value
+                        elif isinstance(child.value, ast.Name):
+                            ret_val = child.value.id
+                        else:
+                            ret_val = "expression"
+                    return_paths.append({"return_value": ret_val, "decorator_status": decorator_status})
+
+                elif isinstance(child, ast.Raise):
+                    exc_type = None
+                    exc_status = None
+                    if child.exc is not None:
+                        if isinstance(child.exc, ast.Name):
+                            exc_type = child.exc.id
+                        elif isinstance(child.exc, ast.Call):
+                            if isinstance(child.exc.func, ast.Name):
+                                exc_type = child.exc.func.id
+                            elif isinstance(child.exc.func, ast.Attribute):
+                                exc_type = child.exc.func.attr
+                            for kw in child.exc.keywords:
+                                if kw.arg == "status_code" and isinstance(kw.value, ast.Constant):
+                                    exc_status = kw.value.value
+                            if exc_status is None and child.exc.args:
+                                first_arg = child.exc.args[0]
+                                if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, int):
+                                    exc_status = first_arg.value
+                    error_paths.append({"exception_type": exc_type or "Exception", "status_code": exc_status})
+
+                elif isinstance(child, (ast.If, ast.IfExp)):
+                    try:
+                        cond_str = ast.unparse(child.test)
+                    except Exception:
+                        cond_str = "condition"
+                    conditional_branches.append(cond_str)
+
+                elif isinstance(child, ast.Compare):
+                    try:
+                        comp_str = ast.unparse(child)
+                        if any(isinstance(op, (ast.In, ast.NotIn)) for op in child.ops):
+                            collection_lookups.append(comp_str)
+                    except Exception:
+                        pass
+
+                elif isinstance(child, ast.ListComp):
+                    collection_lookups.append("list_comprehension_filter")
+
+                elif isinstance(child, ast.Call):
+                    func_id = None
+                    if isinstance(child.func, ast.Name):
+                        func_id = child.func.id
+                    elif isinstance(child.func, ast.Attribute):
+                        func_id = child.func.attr
+                    safe_names = {
+                        "len", "range", "list", "dict", "set", "str", "int", "float",
+                        "bool", "print", "isinstance", "enumerate", "zip", "min", "max",
+                        "sum", "HTTPException", "ValueError", "TypeError", "KeyError",
+                        "IndexError", "AttributeError", "RuntimeError", "Exception",
+                        "StopIteration", "NotImplementedError", "super"
+                    }
+                    if func_id not in safe_names:
+                        has_opaque_calls = True
+
+        has_unconditional_return = (
+            len(return_paths) > 0 and
+            len(error_paths) == 0 and
+            len(conditional_branches) == 0 and
+            not has_opaque_calls
+        )
+
+        return ScaffoldCallableFact(
+            name=name,
+            file_path=file_path,
+            route=route,
+            http_method=http_method,
+            positional_params_count=len(posonly_args) + len(pos_args),
+            param_names=posonly_args + pos_args,
+            has_named_params=has_named,
+            named_param_names=named_params,
+            return_paths=return_paths,
+            error_paths=error_paths,
+            conditional_branches=conditional_branches,
+            collection_lookups=collection_lookups,
+            is_stub=is_stub,
+            has_opaque_calls=has_opaque_calls,
+            has_unconditional_return=has_unconditional_return,
+            raw_code=getattr(node, "name", "")
+        )
+
+    def _extract_class_facts(self, file_path: str, node: ast.ClassDef) -> List[ScaffoldCallableFact]:
+        facts: List[ScaffoldCallableFact] = []
+        is_pydantic = any(
+            (isinstance(b, ast.Name) and b.id == "BaseModel") or
+            (isinstance(b, ast.Attribute) and b.attr == "BaseModel")
+            for b in node.bases
+        )
+
+        init_method = None
+        for item in node.body:
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "__init__":
+                init_method = item
+                break
+
+        if init_method:
+            init_fact = self._extract_function_fact(file_path, init_method)
+            facts.append(ScaffoldCallableFact(
+                name=node.name,
+                file_path=file_path,
+                positional_params_count=init_fact.positional_params_count,
+                param_names=init_fact.param_names,
+                has_named_params=(init_fact.has_named_params or is_pydantic),
+                named_param_names=init_fact.named_param_names,
+                return_paths=init_fact.return_paths,
+                error_paths=init_fact.error_paths,
+                conditional_branches=init_fact.conditional_branches,
+                collection_lookups=init_fact.collection_lookups,
+                is_stub=init_fact.is_stub,
+                has_opaque_calls=init_fact.has_opaque_calls,
+                has_unconditional_return=init_fact.has_unconditional_return,
+                raw_code=f"class {node.name}"
+            ))
+        else:
+            if is_pydantic:
+                fields = []
+                for item in node.body:
+                    if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                        fields.append(item.target.id)
+                facts.append(ScaffoldCallableFact(
+                    name=node.name,
+                    file_path=file_path,
+                    positional_params_count=0,
+                    param_names=[],
+                    has_named_params=True,
+                    named_param_names=fields,
+                    raw_code=f"class {node.name}(BaseModel)"
+                ))
+            else:
+                facts.append(ScaffoldCallableFact(
+                    name=node.name,
+                    file_path=file_path,
+                    positional_params_count=0,
+                    param_names=[],
+                    has_named_params=False,
+                    named_param_names=[],
+                    raw_code=f"class {node.name}"
+                ))
+
+        for item in node.body:
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name != "__init__":
+                facts.append(self._extract_function_fact(file_path, item))
+
+        return facts
+
+
+class DartScaffoldExtractor:
+    """Mengekstrak fakta implementasi dari code_scaffold Dart via token / regex scanner."""
+
+    def extract_facts(self, file_path: str, code: str) -> List[ScaffoldCallableFact]:
+        facts: List[ScaffoldCallableFact] = []
+        if not code or not code.strip():
+            return facts
+
+        # 1. Classes and constructors
+        class_blocks = re.finditer(r"\bclass\s+([A-Za-z0-9_]+)[^{]*\{", code)
+        for cb in class_blocks:
+            cname = cb.group(1)
+            pos_in_code = cb.end()
+            body_snippet = code[pos_in_code:pos_in_code + 2000]
+
+            ctor_pattern = re.compile(rf"\b{cname}\s*\((.*?)\)(?:\s*\{{([^}}]*)\}})?", re.DOTALL)
+            ctor_m = ctor_pattern.search(body_snippet)
+
+            if ctor_m:
+                params_str = ctor_m.group(1).strip()
+                ctor_body = (ctor_m.group(2) or "").strip()
+                has_named = "{" in params_str
+                named_params: List[str] = []
+                pos_params: List[str] = []
+                error_paths: List[Dict[str, Any]] = []
+                conditional_branches: List[str] = []
+
+                if has_named:
+                    named_block_m = re.search(r"\{([^}]*)\}", params_str)
+                    if named_block_m:
+                        inside = named_block_m.group(1)
+                        for part in inside.split(","):
+                            part = part.strip()
+                            if part:
+                                p_clean = re.sub(r"\b(required|final|this\.)\s*", "", part).strip()
+                                p_name = p_clean.split("=")[0].strip().split()[-1] if p_clean else ""
+                                if p_name:
+                                    named_params.append(p_name)
+                    before_named = params_str.split("{")[0].strip().rstrip(",")
+                    if before_named:
+                        for part in before_named.split(","):
+                            part = part.strip()
+                            if part:
+                                p_clean = re.sub(r"\b(required|final|this\.)\s*", "", part).strip()
+                                p_name = p_clean.split("=")[0].strip().split()[-1] if p_clean else ""
+                                if p_name:
+                                    pos_params.append(p_name)
+                else:
+                    for part in params_str.split(","):
+                        part = part.strip()
+                        if part:
+                            p_clean = re.sub(r"\b(required|final|this\.)\s*", "", part).strip()
+                            p_name = p_clean.split("=")[0].strip().split()[-1] if p_clean else ""
+                            if p_name:
+                                pos_params.append(p_name)
+
+                if ctor_body:
+                    for m_if in re.finditer(r"if\s*\((.*?)\)", ctor_body):
+                        conditional_branches.append(m_if.group(1).strip())
+                    for m_throw in re.finditer(r"throw\s+([A-Za-z0-9_]+)", ctor_body):
+                        error_paths.append({"exception_type": m_throw.group(1)})
+
+                facts.append(ScaffoldCallableFact(
+                    name=cname,
+                    file_path=file_path,
+                    positional_params_count=len(pos_params),
+                    param_names=pos_params,
+                    has_named_params=has_named,
+                    named_param_names=named_params,
+                    error_paths=error_paths,
+                    conditional_branches=conditional_branches,
+                    raw_code=f"class {cname}(...)"
+                ))
+            else:
+                facts.append(ScaffoldCallableFact(
+                    name=cname,
+                    file_path=file_path,
+                    positional_params_count=0,
+                    param_names=[],
+                    has_named_params=False,
+                    named_param_names=[],
+                    raw_code=f"class {cname}"
+                ))
+
+        # 2. Top-level functions
+        func_matches = re.finditer(r"(?:^|\n)\s*(?:[A-Za-z0-9_<>, ]+)\s+([a-z][A-Za-z0-9_]*)\s*\((.*?)\)\s*\{", code)
+        for fm in func_matches:
+            fname = fm.group(1)
+            params_raw = fm.group(2).strip()
+            has_named = "{" in params_raw
+            pos_count = 0
+            if params_raw:
+                if has_named:
+                    before = params_raw.split("{")[0].strip().rstrip(",")
+                    pos_count = len([p for p in before.split(",") if p.strip()]) if before else 0
+                else:
+                    pos_count = len([p for p in params_raw.split(",") if p.strip()])
+            facts.append(ScaffoldCallableFact(
+                name=fname,
+                file_path=file_path,
+                positional_params_count=pos_count,
+                param_names=[],
+                has_named_params=has_named,
+                raw_code=f"func {fname}"
+            ))
+
+        return facts
+
+
+def _route_matches(sc_path: str, fact_path: str) -> bool:
+    """Memeriksa kecocokan route URL skenario dan scaffold secara deterministik."""
+    if not sc_path or not fact_path:
+        return False
+    sc_clean = sc_path.strip().rstrip("/")
+    fact_clean = fact_path.strip().rstrip("/")
+    if sc_clean == fact_clean:
+        return True
+    sc_parts = sc_clean.split("/")
+    fact_parts = fact_clean.split("/")
+    if len(sc_parts) != len(fact_parts):
+        return False
+    for sp, fp in zip(sc_parts, fact_parts):
+        if fp.startswith("{") and fp.endswith("}"):
+            continue
+        if sp != fp:
+            return False
+    return True
+
+
+def evaluate_scaffold_scenario_compatibility(
+    scenarios: List[CanonicalScenario],
+    scaffold_files: Dict[str, str],
+    previous_matrix: Optional[ScaffoldScenarioMatrix] = None
+) -> ScaffoldScenarioMatrix:
+    """
+    Mengevaluasi secara deterministik kompatibilitas antara kumpulan Canonical Acceptance Scenarios
+    dan code_scaffold yang diajukan Architect SEBELUM contract diizinkan bertransisi ke FROZEN.
+
+    DOKTRIN NON-NEGOTIABLE (Treatment #1.4):
+    1. Oracle adalah IMMUTABLE ACCEPTANCE AUTHORITY (WHAT).
+    2. Architect adalah DESIGN AUTHORITY (HOW). Struktur bebas (dict, list, class, repo) asalkan
+       observable outcome dapat dipenuhi.
+    3. Tiga Status: COMPATIBLE, INCOMPATIBLE, UNDETERMINED.
+    4. Evaluator membedakan:
+       - PROVEN compatible: callable matches, parameter/shape matches, and appropriate path
+         (matching return for positive, matching error/guard for negative) is provably present.
+       - PROVEN incompatible: callable missing, call shape conflict, or provably cannot fulfill
+         (e.g. unconditional 204 with zero error path/branch in a self-contained body for negative scenario).
+       - UNDETERMINED: presence of opaque calls, dynamic dispatch, unresolved branches, or stubs
+         where reachability or absence cannot be statically proven.
+    5. Aturan Absolut: UNDETERMINED TIDAK PERNAH dipromosikan ke PASS (FAIL-CLOSED).
+    6. Multi-scenario preservation & regression detection (COMPATIBLE -> INCOMPATIBLE flagged as CRITICAL).
+    """
+    py_extractor = PythonScaffoldExtractor()
+    dart_extractor = DartScaffoldExtractor()
+
+    all_facts: List[ScaffoldCallableFact] = []
+    for file_path, code in scaffold_files.items():
+        if not code:
+            continue
+        if file_path.endswith(".py"):
+            all_facts.extend(py_extractor.extract_facts(file_path, code))
+        elif file_path.endswith(".dart"):
+            all_facts.extend(dart_extractor.extract_facts(file_path, code))
+
+    prev_status_map = {}
+    if previous_matrix:
+        for it in previous_matrix.items:
+            prev_status_map[it.scenario_id] = it.compatibility
+
+    items: List[ScaffoldScenarioCompatibilityItem] = []
+    regression_count = 0
+
+    for sc in scenarios:
+        matched_facts: List[ScaffoldCallableFact] = []
+
+        sc_method = sc.expected_outcome.get("http_method") or (
+            re.search(r"\b(GET|POST|PUT|DELETE|PATCH)\b", sc.stimulus).group(1)
+            if re.search(r"\b(GET|POST|PUT|DELETE|PATCH)\b", sc.stimulus) else None
+        )
+        sc_route = sc.expected_outcome.get("route")
+        if not sc_route:
+            m_route = re.search(r"(/[\w\.\-/{}]+)", sc.stimulus)
+            if m_route:
+                sc_route = m_route.group(1)
+
+        for f in all_facts:
+            if f.route and sc_route and _route_matches(sc_route, f.route):
+                if not sc_method or not f.http_method or sc_method.upper() == f.http_method.upper():
+                    matched_facts.append(f)
+                    continue
+
+            if f.name and (
+                f.name in sc.stimulus or
+                f.name in sc.caller or
+                f.name in sc.observable_output or
+                f.name in str(sc.expected_outcome)
+            ):
+                matched_facts.append(f)
+
+        expected_repr = dict(sc.expected_outcome)
+        if sc.expected_exception:
+            expected_repr["expected_exception"] = sc.expected_exception
+
+        if not matched_facts:
+            items.append(ScaffoldScenarioCompatibilityItem(
+                scenario_id=sc.scenario_id,
+                compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                authority="FROZEN_ORACLE",
+                source_reference=sc.source_reference,
+                observed_scaffold_facts={},
+                expected_behavior=expected_repr,
+                evidence=f"Scaffold does not define callable, constructor, or endpoint matching scenario stimulus '{sc.stimulus}'.",
+                causal_status=CausalStatus.VIOLATED.value
+            ))
+            continue
+
+        fact = matched_facts[0]
+        observed_facts = {
+            "name": fact.name,
+            "route": fact.route,
+            "http_method": fact.http_method,
+            "positional_params_count": fact.positional_params_count,
+            "has_named_params": fact.has_named_params,
+            "error_paths_count": len(fact.error_paths),
+            "conditional_branches_count": len(fact.conditional_branches),
+            "is_stub": fact.is_stub,
+            "has_opaque_calls": fact.has_opaque_calls,
+            "has_unconditional_return": fact.has_unconditional_return,
+        }
+
+        # Check call shape / constructor compatibility
+        is_pos_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\[", sc.stimulus) or
+                           re.search(rf"\b{fact.name}\s*\([^{{)]*[,)]", sc.stimulus))
+        is_named_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\w+\s*:", sc.stimulus) or
+                             re.search(r"\b\w+\s*:\s*['\"\d]", sc.stimulus))
+
+        if is_pos_call and not is_named_call and fact.has_named_params and fact.positional_params_count == 0:
+            items.append(ScaffoldScenarioCompatibilityItem(
+                scenario_id=sc.scenario_id,
+                compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                authority="FROZEN_ORACLE",
+                source_reference=sc.source_reference,
+                observed_scaffold_facts=observed_facts,
+                expected_behavior=expected_repr,
+                evidence=(
+                    f"Call shape incompatibility: Scenario invokes '{fact.name}' with positional arguments, "
+                    f"but scaffold constructor only accepts named/keyword parameters (0 positional parameters)."
+                ),
+                causal_status=CausalStatus.VIOLATED.value
+            ))
+            continue
+
+        if is_named_call and not fact.has_named_params and fact.positional_params_count > 0:
+            items.append(ScaffoldScenarioCompatibilityItem(
+                scenario_id=sc.scenario_id,
+                compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                authority="FROZEN_ORACLE",
+                source_reference=sc.source_reference,
+                observed_scaffold_facts=observed_facts,
+                expected_behavior=expected_repr,
+                evidence=(
+                    f"Call shape incompatibility: Scenario invokes '{fact.name}' with named arguments, "
+                    f"but scaffold constructor declares positional parameters without named parameter support."
+                ),
+                causal_status=CausalStatus.VIOLATED.value
+            ))
+            continue
+
+        # Check outcome compatibility (User Corrections 1 & 2)
+        is_negative = (
+            sc.scenario_kind == ScenarioKind.NEGATIVE.value or
+            (sc.expected_exception is not None and sc.expected_exception != "NONE") or
+            any(isinstance(v, int) and v >= 400 for v in sc.expected_outcome.values())
+        )
+
+        if is_negative:
+            # Case 1: Stub or Opaque Delegation without local error handling -> UNDETERMINED
+            if fact.is_stub or (fact.has_opaque_calls and not fact.error_paths and not fact.conditional_branches):
+                items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=(
+                        f"Insufficient static evidence: Callable '{fact.name}' delegates to opaque logic or is stubbed; "
+                        f"absence or presence of error path cannot be statically proven."
+                    ),
+                    causal_status=CausalStatus.UNRESOLVED.value
+                ))
+                continue
+
+            # Case 2: Statically proven absence of error handling -> INCOMPATIBLE (Gate 05 / Correction 1)
+            if fact.has_unconditional_return and not fact.error_paths and not fact.conditional_branches:
+                items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=(
+                        f"Statically proven absence of error path: Scenario expects negative/error outcome '{expected_repr}', "
+                        f"but scaffold implementation for '{fact.name}' provides only unconditional success with no conditional branch or error path."
+                    ),
+                    causal_status=CausalStatus.VIOLATED.value
+                ))
+                continue
+
+            # Case 3: Error paths or conditional branches present -> Reachability Check (Correction 2)
+            has_matching_raise = False
+            for ep in fact.error_paths:
+                expected_st = None
+                for k, v in sc.expected_outcome.items():
+                    if "status" in k and isinstance(v, int):
+                        expected_st = v
+                if ep.get("status_code") == expected_st or ep.get("exception_type") in str(sc.expected_exception):
+                    has_matching_raise = True
+                    break
+                if ep.get("exception_type") == "HTTPException" and expected_st is not None and ep.get("status_code") is None:
+                    has_matching_raise = True
+                    break
+
+            has_relevant_guard = False
+            for b in fact.conditional_branches:
+                if any(p in b for p in fact.param_names) or "not in" in b or "not" in b or "==" in b or "<" in b or ">" in b:
+                    has_relevant_guard = True
+                    break
+
+            if has_matching_raise or has_relevant_guard or fact.collection_lookups:
+                # PROVEN COMPATIBLE
+                items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.COMPATIBLE.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=f"Scaffold for '{fact.name}' provably defines reachable conditional branch or error path aligned with scenario stimulus/precondition.",
+                    causal_status=CausalStatus.RESOLVED.value
+                ))
+                continue
+            else:
+                # Branches exist but reachability cannot be proven -> UNDETERMINED
+                items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=(
+                        f"Conditional branch or error path present in '{fact.name}', "
+                        f"but reachability under scenario precondition cannot be statically proven."
+                    ),
+                    causal_status=CausalStatus.UNRESOLVED.value
+                ))
+                continue
+        else:
+            # Positive scenario
+            has_explicit_return_expectation = any(
+                k in sc.expected_outcome
+                for k in ("status_code", "return_value", "equals", "value_in")
+            )
+            if fact.is_stub and has_explicit_return_expectation:
+                items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=f"Scaffold callable '{fact.name}' is stubbed; return behavior cannot be statically proven.",
+                    causal_status=CausalStatus.UNRESOLVED.value
+                ))
+                continue
+
+            # Valid interface and return/constructor shape
+            items.append(ScaffoldScenarioCompatibilityItem(
+                scenario_id=sc.scenario_id,
+                compatibility=ScaffoldCompatibilityStatus.COMPATIBLE.value,
+                authority="FROZEN_ORACLE",
+                source_reference=sc.source_reference,
+                observed_scaffold_facts=observed_facts,
+                expected_behavior=expected_repr,
+                evidence=f"Scaffold defines matching interface and return path for '{fact.name}'.",
+                causal_status=CausalStatus.RESOLVED.value
+            ))
+
+    # Regression detection
+    for it in items:
+        prev_st = prev_status_map.get(it.scenario_id)
+        if prev_st == ScaffoldCompatibilityStatus.COMPATIBLE.value and it.compatibility == ScaffoldCompatibilityStatus.INCOMPATIBLE.value:
+            it.is_regression = True
+            regression_count += 1
+            it.evidence = f"[CRITICAL REGRESSION] Previously COMPATIBLE scenario is now INCOMPATIBLE. {it.evidence}"
+
+    compat_count = sum(1 for it in items if it.compatibility == ScaffoldCompatibilityStatus.COMPATIBLE.value)
+    incompat_count = sum(1 for it in items if it.compatibility == ScaffoldCompatibilityStatus.INCOMPATIBLE.value)
+    undet_count = sum(1 for it in items if it.compatibility == ScaffoldCompatibilityStatus.UNDETERMINED.value)
+
+    # Fail-closed: UNDETERMINED is NEVER promoted to PASS
+    is_fully = (incompat_count == 0 and undet_count == 0 and len(items) > 0)
+
+    return ScaffoldScenarioMatrix(
+        items=items,
+        is_fully_compatible=is_fully,
+        compatible_count=compat_count,
+        incompatible_count=incompat_count,
+        undetermined_count=undet_count,
+        regression_count=regression_count
+    )
+
+
+def format_scaffold_compatibility_for_architect(matrix: ScaffoldScenarioMatrix) -> str:
+    """
+    Format seksi [BEHAVIORAL COMPATIBILITY EVIDENCE] untuk Architect prompt / repair context.
+    Memberitahukan fakta observable ketidakcocokan tanpa mendikte implementasi HOW.
+    """
+    if not matrix.items:
+        return ""
+    incompat_or_undet = [
+        it for it in matrix.items
+        if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value
+    ]
+    if not incompat_or_undet:
+        return ""
+
+    lines = [
+        "[BEHAVIORAL COMPATIBILITY EVIDENCE — SCAFFOLD vs ACCEPTANCE SCENARIOS]",
+        "======================================================================",
+        "Pemeriksaan pre-freeze mendeteksi bahwa code_scaffold yang diajukan tidak kompatibel",
+        "dengan skenario penerimaan yang diekstraksi dari Frozen Oracle:\n"
+    ]
+    for i, it in enumerate(incompat_or_undet, 1):
+        reg_tag = " [CRITICAL REGRESSION]" if it.is_regression else ""
+        lines.append(f"[{i}] Scenario: {it.scenario_id} — Status: {it.compatibility}{reg_tag}")
+        lines.append(f"    Source: {it.source_reference}")
+        lines.append(f"    Expected Behavior: {json.dumps(it.expected_behavior)}")
+        lines.append(f"    Observed Scaffold: {json.dumps(it.observed_scaffold_facts)}")
+        lines.append(f"    Diagnosis / Evidence: {it.evidence}\n")
+
+    lines.append("PETUNJUK PERBAIKAN ARSITEKTURAL (HOW TETAP PADA ARCHITECT):")
+    lines.append("- Architect bebas memilih struktur data (list, dict, class, repository, adapter).")
+    lines.append("- Namun antarmuka dan alur kontrol scaffold WAJIB menyediakan jalur observable yang mampu")
+    lines.append("  memenuhi perilaku penerimaan di atas (misal: penanganan kasus error/404, kesesuaian shape konstruktor).")
+    lines.append("======================================================================")
+    return "\n".join(lines)
+

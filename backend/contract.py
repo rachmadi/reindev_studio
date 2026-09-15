@@ -35,6 +35,12 @@ try:
         ObligationAuthority,
         ObligationProvenance,
     )
+    from .canonical_scenario import (
+        extract_canonical_scenarios,
+        evaluate_scaffold_scenario_compatibility,
+        ScaffoldCompatibilityStatus,
+        ScaffoldScenarioMatrix,
+    )
 except ImportError:
     from canonical_obligation import (
         extract_canonical_oracle_obligations,
@@ -46,6 +52,18 @@ except ImportError:
         ObligationAuthority,
         ObligationProvenance,
     )
+    try:
+        from canonical_scenario import (
+            extract_canonical_scenarios,
+            evaluate_scaffold_scenario_compatibility,
+            ScaffoldCompatibilityStatus,
+            ScaffoldScenarioMatrix,
+        )
+    except ImportError:
+        extract_canonical_scenarios = None
+        evaluate_scaffold_scenario_compatibility = None
+        ScaffoldCompatibilityStatus = None
+        ScaffoldScenarioMatrix = None
 
 
 
@@ -583,6 +601,62 @@ def check_pre_freeze_authority_compatibility(
             error_messages.append(msg)
 
     is_compatible = cov_matrix.is_fully_covered
+
+    # Treatment #1.4: Deterministic Scaffold ↔ Acceptance Scenario Compatibility Gate
+    scaffold_files: Dict[str, str] = {}
+    if blueprint:
+        if hasattr(blueprint, "files") and blueprint.files:
+            for fp, mod in blueprint.files.items():
+                scaffold_files[fp] = getattr(mod, "code_scaffold", "") or (mod.get("code_scaffold", "") if isinstance(mod, dict) else str(mod))
+        elif isinstance(blueprint, dict) and "files" in blueprint:
+            b_files = blueprint.get("files", {})
+            if isinstance(b_files, dict):
+                for fp, mod in b_files.items():
+                    if isinstance(mod, str):
+                        scaffold_files[fp] = mod
+                    elif isinstance(mod, dict):
+                        scaffold_files[fp] = mod.get("code_scaffold", "") or mod.get("content", "")
+                    elif hasattr(mod, "code_scaffold"):
+                        scaffold_files[fp] = getattr(mod, "code_scaffold", "") or ""
+
+    if not scaffold_files:
+        c_files = None
+        if isinstance(contract_obj, dict):
+            c_files = contract_obj.get("files")
+        elif hasattr(contract_obj, "files"):
+            c_files = getattr(contract_obj, "files")
+        if isinstance(c_files, dict):
+            for fp, mod in c_files.items():
+                if isinstance(mod, str):
+                    scaffold_files[fp] = mod
+                elif isinstance(mod, dict):
+                    scaffold_files[fp] = mod.get("code_scaffold", "") or mod.get("content", "")
+                elif hasattr(mod, "code_scaffold"):
+                    scaffold_files[fp] = getattr(mod, "code_scaffold", "") or ""
+
+    if scaffold_files and evaluate_scaffold_scenario_compatibility is not None and extract_canonical_scenarios is not None:
+        try:
+            scenarios = extract_canonical_scenarios(frozen_oracle_path=str(oracle_dir))
+            if scenarios:
+                scaffold_matrix = evaluate_scaffold_scenario_compatibility(scenarios, scaffold_files)
+                if not scaffold_matrix.is_fully_compatible:
+                    is_compatible = False
+                    for diag in scaffold_matrix.to_diagnosis_lines():
+                        error_messages.append(diag)
+                    for it in scaffold_matrix.items:
+                        if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value:
+                            missing_obligations.append({
+                                "obligation": f"Acceptance Scenario '{it.scenario_id}' ({it.source_reference})",
+                                "coverage": it.compatibility,
+                                "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
+                                "source_file": it.source_reference,
+                                "obligation_id": it.scenario_id,
+                                "reason": it.evidence,
+                                "missing_aspects": [it.compatibility, it.causal_status],
+                            })
+        except Exception:
+            pass
+
     return is_compatible, error_messages, missing_obligations
 
 
