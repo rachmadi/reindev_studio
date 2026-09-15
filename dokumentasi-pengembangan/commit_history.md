@@ -616,6 +616,20 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/durasi_per_fitur.md`: Penambahan pencatatan waktu Sesi 4 (2.70 jam).
   - `dokumentasi-pengembangan/waktu_estimasi_vs_realisasi.md`: Pemutakhiran Grand Total kumulatif waktu realisasi proyek menjadi 63.90 jam (3.834,0 menit).
 
+---
+
+### Commit: PENDING (D-112 Governance & Experiment Branch Setup)
+- **Commit Hash:** PENDING
+- **Status:** TERVERIFIKASI PENUH (Branch `experiment/fastapi-recovery` dibuat dari HEAD True LKG `c491982`, branch `recovery-pre-locked-ornith-1430` dibekukan sebagai True LKG Control, `main` tidak disentuh)
+- **Tipe:** `docs(governance)`
+- **Pesan Commit:** `docs(governance): record D-112 frozen baseline control and setup experiment/fastapi-recovery branch`
+- **Waktu:** 2026-09-15 09:20 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-112 (Pembekuan branch baseline & isolasi eksperimen).
+  - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog arahan strategis Intent Architect.
+  - `dokumentasi-pengembangan/commit_history.md`: Pencatatan komitmen tata kelola.
+
+
 
 
 
