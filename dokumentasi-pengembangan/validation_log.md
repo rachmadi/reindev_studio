@@ -1198,16 +1198,23 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
 | **Freezing Rate** | **1 / 3 (33.3%)** | **2 / 3 (66.7%)** | **Peningkatan 2× Lipat (Doubling) Tingkat Kontrak Beku pada Ornith 9B.** |
 
 ### 3. Status Validation Gate (Intent Architect)
-- **Status Validasi:** ⏳ **VALIDATION PENDING (HASIL EMPIRIS RETEST 1X3 SELESAI — MENUNGGU EVALUASI & PUTUSAN STRATEGIS INTENT ARCHITECT)**
+- **Status Validasi:** ⏳ **VALIDATION PENDING (TRUE LKG RESTORED & PROVEN — MENUNGGU EVALUASI & PUTUSAN STRATEGIS INTENT ARCHITECT)**
 - **Catatan Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)** — Iterasi 6 belum berakhir karena belum mendapatkan status validasi PASS dari Intent Architect. Waktu realisasi iterasi 6 masih terus berjalan.
+- **Ringkasan Bukti Empiris Checkpoint True LKG (2026-09-15 09:00 WIB):**
+  - `fastapi_t1` (`pv_pilot_fastapi_t1_rep1_20260915_084424`): FAIL (Contract Status: REJECTED, 0 loops, 233.6s, Oracle Intact)
+  - `cli_t1` (`pv_pilot_cli_t1_rep1_20260915_084818`): **PASS 5/5** (Iterasi 0, Reviewer APPROVED, 259.3s, Oracle Intact)
+  - `flutter_t1` (`pv_pilot_flutter_t1_rep1_20260915_085237`): **PASS 2/2** (Iterasi 2, Reviewer APPROVED, 349.3s, Oracle Intact)
+  - **Gross Pass Rate**: **2 / 3 (66.7%)**
+  - **Integritas Acceptance Oracle**: 100% Byte-for-byte MATCH pada seluruh 3 task.
+  - **Regression Suite**: 572 passed, 1 warning (100% PASS). Pre-Flight Gates A–I: ALL PASS.
 - **Dokumentasi Terkait:**
-  - `dokumentasi-pengembangan/experiments/laporan_forensik_komparasi_mendalam_qwen7b_vs_ornith9b.md` (Laporan Investigasi & Audit Forensik Mendalam 6 Run 2 Model)
+  - `dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary.json` (Summary Resmi Pilot 1x3 True LKG)
+  - `dokumentasi-pengembangan/experiments/laporan_forensik_komparasi_mendalam_qwen7b_vs_ornith9b.md`
   - `dokumentasi-pengembangan/experiments/laporan_evaluasi_komparasi_1x3_ornith9b_vs_qwen25.md`
   - `dokumentasi-pengembangan/experiments/laporan_evaluasi_retest_1x3_qwen25_coder7b.md`
-  - `dokumentasi-pengembangan/experiments/pilot_retest_1x3_qwen2.5_coder_7b.json`
-  - `dokumentasi-pengembangan/experiments/pilot_retest_1x3_ornith9b_post_lifecycle_repair.json`
-- **Waktu Pencatatan Checkpoint:** 2026-09-14 19:35 WIB
+- **Waktu Pencatatan Checkpoint:** 2026-09-15 09:00 WIB
 - **Validator Otoritas:** Muhammad Rachmadi (Intent Architect)
+
 
 
 

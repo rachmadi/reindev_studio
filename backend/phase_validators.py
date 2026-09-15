@@ -300,6 +300,82 @@ def validate_dart_syntax_structural(code: str) -> Tuple[bool, List[str]]:
     return (len(errors) == 0, errors)
 
 
+def detect_generation_truncation(code: str, file_path: str = "") -> Tuple[bool, Optional[str]]:
+    """
+    Pemeriksaan deterministik untuk mendeteksi kode yang terpotong / tidak tuntas (abrupt EOF)
+    akibat keterbatasan output token LLM atau kegagalan generasi.
+    Generic lintas bahasa (Python, Dart, TypeScript, dll).
+    """
+    if not code or not code.strip():
+        return False, None
+
+    stripped = code.strip()
+    lines = [ln.strip() for ln in stripped.splitlines() if ln.strip()]
+    if not lines:
+        return False, None
+
+    last_line = lines[-1]
+
+    # 1. Triple-quoted string unclosed
+    if code.count('"""') % 2 != 0:
+        return True, "Unterminated triple-quoted string ('\"\"\"') at EOF"
+    if code.count("'''") % 2 != 0:
+        return True, "Unterminated triple-quoted string (''''') at EOF"
+
+    # 2. Delimiter imbalance
+    cleaned_lines = []
+    for ln in lines:
+        ln_strip = ln.strip()
+        if ln_strip.startswith("#") or ln_strip.startswith("//"):
+            continue
+        cleaned_lines.append(ln)
+    clean_code = "\n".join(cleaned_lines)
+
+    open_parens = clean_code.count("(")
+    close_parens = clean_code.count(")")
+    open_brackets = clean_code.count("[")
+    close_brackets = clean_code.count("]")
+    open_braces = clean_code.count("{")
+    close_braces = clean_code.count("}")
+
+    if open_parens > close_parens:
+        return True, f"Unclosed parenthesis at EOF: {open_parens} '(' vs {close_parens} ')'"
+    if open_brackets > close_brackets:
+        return True, f"Unclosed bracket at EOF: {open_brackets} '[' vs {close_brackets} ']'"
+    if open_braces > close_braces:
+        return True, f"Unclosed brace at EOF: {open_braces} '{{' vs {close_braces} '}}'"
+
+    # 3. Dangling decorator at EOF
+    if last_line.startswith("@"):
+        return True, f"Dangling decorator at EOF without target definition: '{last_line}'"
+
+    # 4. Abrupt incomplete statement endings
+    dangling_tokens = (
+        "self._", "self.", "return", "yield", "await",
+        "=", "+", "-", "*", "/", "%",
+        ",", "->", "=>",
+    )
+    for dt in dangling_tokens:
+        if last_line.endswith(dt) and last_line != "pass":
+            if dt == "," and (last_line.startswith("import ") or last_line.startswith("from ")):
+                return True, f"Incomplete import statement ending with comma at EOF: '{last_line}'"
+            elif dt in ("self._", "self.", "return", "yield", "await", "->", "=>"):
+                return True, f"Abrupt truncated statement ending with '{dt}' at EOF: '{last_line}'"
+            elif dt in ("=", "+", "-", "*", "/") and not (last_line.endswith("==") or last_line.endswith("+=") or last_line.endswith("-=")):
+                return True, f"Dangling binary operator '{dt}' at EOF: '{last_line}'"
+
+    # 5. Language-specific AST / structural confirmation
+    if file_path.endswith(".py") or (not file_path and not ("void main" in code or "Widget" in code)):
+        try:
+            ast.parse(code)
+        except SyntaxError as se:
+            se_msg = str(se.msg).lower()
+            if any(k in se_msg for k in ("unexpected eof", "unterminated", "was never closed")):
+                return True, f"SyntaxError indicating truncated generation: {se.msg} (line {se.lineno})"
+
+    return False, None
+
+
 # ==============================================================================
 # B0: V0 Requirement Interpreter & Constructibility Gate Validator (Phase-End)
 # ==============================================================================
@@ -1083,6 +1159,7 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
     criteria = [
         "code_files_present",
         "authoritative_target_file_compliance",
+        "generation_truncation_safety",
         "ast_syntax_validity",
         "symbol_resolvability",
         "contract_symbols_conformance",
@@ -1143,8 +1220,27 @@ def validate_developer_phase(state: SquadState) -> ValidatorContract:
             "location": auth_file
         })
 
-    # 3. Syntax Validity & Symbol Resolvability
+    # 3. Truncation Safety, Syntax Validity & Symbol Resolvability
     for fname, content in code_files.items():
+        is_trunc, trunc_msg = detect_generation_truncation(content, fname)
+        evidence.append({
+            "item": f"generation_truncation_{fname}",
+            "evidence_class": "DETERMINISTIC",
+            "observed": trunc_msg or "COMPLETED_UNTRUNCATED",
+            "expected": "COMPLETED_UNTRUNCATED",
+            "status": "INVALID" if is_trunc else "VALID"
+        })
+        if is_trunc:
+            violations.append({
+                "criterion": "generation_truncation_safety",
+                "severity": "CRITICAL",
+                "message": f"GENERATION_TRUNCATION_DETECTED: Berkas '{fname}' terpotong sebelum selesai ({trunc_msg}).",
+                "location": fname,
+                "observed_state": f"GENERATION_TRUNCATION_DETECTED: {trunc_msg}",
+                "expected_state": "Complete, syntactically closed artifact without abrupt EOF truncation",
+                "suggested_action": "Hasilkan kode lengkap hingga tuntas tanpa terpotong di akhir berkas."
+            })
+
         if not is_dart and fname.endswith(".py"):
             try:
                 tree = ast.parse(content, filename=fname)

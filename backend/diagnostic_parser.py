@@ -30,6 +30,25 @@ except (ImportError, ValueError):
         def get_tracer(run_id: Optional[str] = None):
             return None
 
+try:
+    from .canonical_evidence import (
+        CanonicalImplementationEvidence,
+        ImplementationEvidenceType,
+        deduplicate_evidence,
+    )
+except (ImportError, ValueError):
+    try:
+        from canonical_evidence import (
+            CanonicalImplementationEvidence,
+            ImplementationEvidenceType,
+            deduplicate_evidence,
+        )
+    except ImportError:
+        CanonicalImplementationEvidence = None
+        ImplementationEvidenceType = None
+        deduplicate_evidence = lambda l: l
+
+
 
 # ===========================================================================
 # 1. Failure Taxonomy & Priority Hierarchy
@@ -112,10 +131,15 @@ class DiagnosticEvidence:
     primary_failure_category: str = "unknown"
     failing_tests: List[FailingTest] = field(default_factory=list)
     environment_warnings: List[str] = field(default_factory=list)
+    canonical_evidence: List[Any] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["failing_tests"] = [t.to_dict() for t in self.failing_tests]
+        d["canonical_evidence"] = [
+            e.to_dict() if hasattr(e, "to_dict") else e
+            for e in self.canonical_evidence
+        ]
         return d
 
     @classmethod
@@ -124,6 +148,17 @@ class DiagnosticEvidence:
             FailingTest.from_dict(t) if isinstance(t, dict) else t
             for t in data.get("failing_tests", [])
         ]
+        raw_canonical = data.get("canonical_evidence", [])
+        canonical_items = []
+        if CanonicalImplementationEvidence is not None:
+            for item in raw_canonical:
+                if isinstance(item, dict):
+                    canonical_items.append(CanonicalImplementationEvidence.from_dict(item))
+                else:
+                    canonical_items.append(item)
+        else:
+            canonical_items = list(raw_canonical)
+
         return cls(
             execution_status=data.get("execution_status", "failed"),
             framework=data.get("framework", "pytest"),
@@ -136,8 +171,10 @@ class DiagnosticEvidence:
             summary_line=data.get("summary_line"),
             primary_failure_category=data.get("primary_failure_category", "unknown"),
             failing_tests=failing_tests,
-            environment_warnings=list(data.get("environment_warnings", []))
+            environment_warnings=list(data.get("environment_warnings", [])),
+            canonical_evidence=canonical_items
         )
+
 
 
 # ===========================================================================
@@ -293,6 +330,8 @@ def parse_pytest_output(
             err_file = normalize_file_path(match.group(1))
             # Cari pesan exception di sekitar error collecting
             exc_match = RE_PYTEST_EXCEPTION.search(cleaned_text)
+            if not exc_match:
+                exc_match = re.search(r"^\s*([A-Za-z]\w*(?:Error|Exception))(?::\s*(.*))?$", cleaned_text, re.MULTILINE)
             if exc_match:
                 exc_type = exc_match.group(1)
                 exc_msg = exc_match.group(2) or ""
@@ -327,6 +366,25 @@ def parse_pytest_output(
                 confidence=0.9
             ))
 
+        canonical_items: List[Any] = []
+        if CanonicalImplementationEvidence is not None:
+            for ft in failing_tests:
+                ev_type = "IMPORT_RESOLUTION_ERROR" if "import" in ft.failure_type else "COMPILATION_ERROR"
+                ev_id = CanonicalImplementationEvidence.make_id("pytest_collection", ev_type, ft.test_file, ft.test_line)
+                canonical_items.append(CanonicalImplementationEvidence(
+                    evidence_id=ev_id,
+                    evidence_type=ev_type,
+                    source="pytest_collection",
+                    file_reference=ft.test_file,
+                    line_reference=ft.test_line,
+                    diagnostic_message=ft.message,
+                    compatibility_status="INCOMPATIBLE",
+                    provenance="COMPILER",
+                    confidence=ft.confidence,
+                    caller_site=ft.test_file,
+                    causal_status="PROVEN"
+                ))
+
         return DiagnosticEvidence(
             execution_status="error",
             framework="pytest",
@@ -339,8 +397,10 @@ def parse_pytest_output(
             summary_line=summary_line,
             primary_failure_category=failing_tests[0].failure_type if failing_tests else "collection_test_discovery_error",
             failing_tests=failing_tests,
-            environment_warnings=warnings
+            environment_warnings=warnings,
+            canonical_evidence=canonical_items
         )
+
 
     # 3. Ekstrak daftar tes yang gagal dari 'short test summary info'
     short_summary_failures: Dict[str, Tuple[str, str]] = {}  # {test_name: (test_file, message)}
@@ -510,6 +570,65 @@ def parse_pytest_output(
             confidence=0.0
         ))
 
+    canonical_items: List[Any] = []
+    if CanonicalImplementationEvidence is not None:
+        for ft in failing_tests:
+            ev_type = "BEHAVIORAL_ASSERTION"
+            compat = "INCOMPATIBLE"
+            msg_lower = (ft.message or "").lower()
+            tb_lower = (ft.traceback_excerpt or "").lower()
+            combined = f"{msg_lower} {tb_lower}"
+
+            if "takes" in combined and "positional argument" in combined:
+                if "__init__" in combined or "model" in combined or "constructor" in combined:
+                    ev_type = "CONSTRUCTOR_MISMATCH"
+                else:
+                    ev_type = "SIGNATURE_MISMATCH"
+            elif "no attribute" in combined or "not defined" in combined:
+                ev_type = "SYMBOL_NOT_FOUND"
+                compat = "NOT_FOUND"
+            elif "no module named" in combined or "cannot import name" in combined:
+                ev_type = "IMPORT_RESOLUTION_FAILURE"
+                compat = "NOT_FOUND"
+            elif "422" in combined or "validation error" in combined or "unprocessable" in combined:
+                ev_type = "SCHEMA_VALIDATION_ERROR"
+            elif "typeerror" in combined:
+                ev_type = "TYPE_INCOMPATIBILITY"
+            elif ft.failure_type == "compilation_error" or "syntaxerror" in combined:
+                ev_type = "COMPILATION_ERROR"
+            elif ft.failure_type == "assertion_failure":
+                ev_type = "BEHAVIORAL_ASSERTION"
+            else:
+                ev_type = "RUNTIME_EXCEPTION"
+
+            sym = ft.source_symbol
+            if not sym:
+                m_sym = re.search(r"(?:attribute|name|function|class|symbol)\s*['\"]([^'\"]+)['\"]", ft.message or "")
+                if m_sym:
+                    sym = m_sym.group(1)
+
+            ref_file = ft.source_file or ft.test_file or "unknown"
+            ref_line = ft.source_line or ft.test_line
+            ev_id = CanonicalImplementationEvidence.make_id("pytest", ev_type, ref_file, ref_line, sym)
+
+            canonical_items.append(CanonicalImplementationEvidence(
+                evidence_id=ev_id,
+                evidence_type=ev_type,
+                source="pytest",
+                file_reference=ref_file,
+                line_reference=ref_line,
+                symbol_reference=sym,
+                observed=ft.actual or ft.message[:150],
+                expected=ft.expected or "Valid execution without exception",
+                compatibility_status=compat,
+                diagnostic_message=ft.message,
+                provenance="RUNTIME",
+                confidence=ft.confidence,
+                caller_site=f"{ft.test_file}:{ft.test_line}" if ft.test_line else None,
+                callee_site=f"{ft.source_file}:{ft.source_line}" if ft.source_line else None,
+                causal_status="PROVEN" if ft.source_file else "UNKNOWN"
+            ))
+
     return DiagnosticEvidence(
         execution_status=execution_status,
         framework="pytest",
@@ -522,7 +641,8 @@ def parse_pytest_output(
         summary_line=summary_line,
         primary_failure_category=primary_category,
         failing_tests=failing_tests,
-        environment_warnings=warnings
+        environment_warnings=warnings,
+        canonical_evidence=canonical_items
     )
 
 
@@ -791,6 +911,9 @@ def parse_dart_output(
                         bracket_diags.extend(diags)
 
         failing_tests: List[FailingTest] = []
+        canonical_items: List[Any] = []
+        default_test_file = list(test_files.keys())[0] if test_files else "test_file.dart"
+
         for match in compilation_errors:
             f_path = normalize_file_path(match.group(1))
             line_no = int(match.group(2))
@@ -798,7 +921,7 @@ def parse_dart_output(
             err_msg = match.group(4).strip()
 
             is_test = is_test_file_path(f_path)
-            tfile = f_path if is_test else "test/widget_test.dart"
+            tfile = f_path if is_test else default_test_file
             tline = line_no if is_test else None
             sfile = f_path if not is_test else None
             sline = line_no if not is_test else None
@@ -815,6 +938,20 @@ def parse_dart_output(
             source_l = sline
             hint = None
 
+            # Ekstrak simbol dan klasifikasi kanonikal
+            ev_type = "COMPILATION_ERROR"
+            ev_sym = None
+            if "member not found:" in err_msg.lower():
+                ev_type = "SYMBOL_NOT_FOUND"
+                m_sym = re.search(r"member not found:\s*'([^']+)'", err_msg, re.IGNORECASE)
+                if m_sym:
+                    ev_sym = m_sym.group(1)
+            elif "no named parameter" in err_msg.lower():
+                ev_type = "CONSTRUCTOR_MISMATCH"
+                m_param = re.search(r"no named parameter with the name\s*'([^']+)'", err_msg, re.IGNORECASE)
+                if m_param:
+                    ev_sym = m_param.group(1)
+
             # Jika ada bracket diagnostic yang cocok dengan file sumber
             matching_diag = None
             if bracket_diags and sfile:
@@ -824,26 +961,49 @@ def parse_dart_output(
                         break
 
             if matching_diag:
-                # Prioritaskan root cause line dari bracket diagnostic daripada cascade line
                 source_l = matching_diag.line
                 msg += f"\n\n{matching_diag.format_diagnostic_block()}"
                 hint = HINT_DART_BRACKET_CASCADE
             elif is_delimiter_related:
                 hint = HINT_DART_BRACKET_CASCADE
 
+            t_name_desc = f"compilation_{ev_type.lower()}" if ev_sym is None else f"compilation_{ev_sym}"
             ft = FailingTest(
-                test_name="compilation_check",
+                test_name=t_name_desc,
                 test_file=tfile,
                 test_line=tline,
                 failure_type="compilation_error",
                 message=msg,
                 source_file=sfile,
                 source_line=source_l,
+                source_symbol=ev_sym,
                 traceback_excerpt=f"{f_path}:{line_no}:{col_no}: Error: {err_msg}",
                 confidence=1.0,
                 semantic_hint=hint
             )
             failing_tests.append(ft)
+
+            if CanonicalImplementationEvidence is not None:
+                ev_id = CanonicalImplementationEvidence.make_id(
+                    "dart_compiler", ev_type, f_path, line_no, ev_sym
+                )
+                canonical_items.append(CanonicalImplementationEvidence(
+                    evidence_id=ev_id,
+                    evidence_type=ev_type,
+                    source="dart_compiler",
+                    file_reference=f_path,
+                    line_reference=line_no,
+                    symbol_reference=ev_sym,
+                    observed=err_msg,
+                    expected="Valid symbol and matching constructor parameter in SDK/declaration",
+                    compatibility_status="INCOMPATIBLE" if ev_type != "SYMBOL_NOT_FOUND" else "NOT_FOUND",
+                    diagnostic_message=err_msg,
+                    provenance="COMPILER",
+                    confidence=1.0,
+                    caller_site=f"{f_path}:{line_no}:{col_no}" if is_test else None,
+                    callee_site=f"{f_path}:{line_no}:{col_no}" if not is_test else None,
+                    causal_status="PROVEN"
+                ))
 
         return DiagnosticEvidence(
             execution_status="error",
@@ -857,8 +1017,10 @@ def parse_dart_output(
             summary_line="Compilation failed before test execution",
             primary_failure_category="compilation_error",
             failing_tests=failing_tests,
-            environment_warnings=warnings
+            environment_warnings=warnings,
+            canonical_evidence=canonical_items
         )
+
 
     # 2. Deteksi Assertion & Runtime Exceptions pada Flutter Test
     passed_count = 0
@@ -875,6 +1037,8 @@ def parse_dart_output(
 
     failing_tests: List[FailingTest] = []
 
+    default_test_file = list(test_files.keys())[0] if test_files else "test/widget_test.dart"
+
     # Cek Expected vs Actual
     ea_matches = list(RE_DART_EXPECTED_ACTUAL.finditer(cleaned_text))
     for i, match in enumerate(ea_matches):
@@ -889,7 +1053,7 @@ def parse_dart_output(
 
         failing_tests.append(FailingTest(
             test_name=tname,
-            test_file="test/widget_test.dart",
+            test_file=default_test_file,
             failure_type="assertion_failure",
             message=msg,
             expected=expected_raw,
@@ -903,7 +1067,7 @@ def parse_dart_output(
             tname = th.group(1).strip()
             failing_tests.append(FailingTest(
                 test_name=tname,
-                test_file="test/widget_test.dart",
+                test_file=default_test_file,
                 failure_type="runtime_exception",
                 message=f"Test failed: {tname}",
                 confidence=0.8
@@ -920,11 +1084,35 @@ def parse_dart_output(
     if execution_status == "failed" and not failing_tests:
         failing_tests.append(FailingTest(
             test_name="dart_test_execution",
-            test_file="test/widget_test.dart",
+            test_file=default_test_file,
             failure_type="unknown",
             message=f"Dart test execution failed with exit code {exit_code}",
             confidence=0.0
         ))
+
+    canonical_items: List[Any] = []
+    if CanonicalImplementationEvidence is not None:
+        for ft in failing_tests:
+            ev_type = "BEHAVIORAL_ASSERTION" if ft.failure_type == "assertion_failure" else "RUNTIME_EXCEPTION"
+            ev_id = CanonicalImplementationEvidence.make_id(
+                "flutter_test", ev_type, ft.test_file, ft.test_line, ft.source_symbol
+            )
+            canonical_items.append(CanonicalImplementationEvidence(
+                evidence_id=ev_id,
+                evidence_type=ev_type,
+                source="flutter_test",
+                file_reference=ft.test_file,
+                line_reference=ft.test_line,
+                symbol_reference=ft.source_symbol,
+                observed=ft.actual or ft.message,
+                expected=ft.expected,
+                compatibility_status="INCOMPATIBLE",
+                diagnostic_message=ft.message,
+                provenance="RUNTIME",
+                confidence=ft.confidence,
+                caller_site=f"{ft.test_file}:{ft.test_line}" if ft.test_line else None,
+                causal_status="CORRELATED"
+            ))
 
     return DiagnosticEvidence(
         execution_status=execution_status,
@@ -938,7 +1126,8 @@ def parse_dart_output(
         summary_line=f"+{passed_count} -{failed_count}",
         primary_failure_category=primary_category,
         failing_tests=failing_tests,
-        environment_warnings=warnings
+        environment_warnings=warnings,
+        canonical_evidence=canonical_items
     )
 
 
@@ -1072,10 +1261,14 @@ def infer_semantic_hint(test: FailingTest) -> Optional[str]:
 # 8. Multi-Failure Top-3 Prioritization & Targeted Feedback Builder
 # ===========================================================================
 
-def prioritize_failures(failing_tests: List[FailingTest]) -> Tuple[List[FailingTest], List[FailingTest]]:
+def prioritize_failures(
+    failing_tests: List[FailingTest],
+    max_selected: int = 3
+) -> Tuple[List[FailingTest], List[FailingTest]]:
     """
-    Mengurutkan kegagalan berdasarkan hierarki taksonomi keparahan dan
-    memisahkan menjadi Top-3 Prioritas serta sisa kegagalan yang diringkas.
+    Mengurutkan kegagalan berdasarkan hierarki taksonomi keparahan,
+    mencegah 'error starvation' dengan memastikan kategori/simbol independen
+    terwakili secara beragam, dan memisahkan menjadi selected prioritas serta sisa omitted.
     """
     if not failing_tests:
         return [], []
@@ -1085,9 +1278,30 @@ def prioritize_failures(failing_tests: List[FailingTest]) -> Tuple[List[FailingT
         key=lambda t: TAXONOMY_PRIORITY.get(t.failure_type, 99)
     )
 
-    top_3 = sorted_tests[:3]
-    omitted = sorted_tests[3:]
-    return top_3, omitted
+    selected: List[FailingTest] = []
+    omitted: List[FailingTest] = []
+    seen_signatures = set()
+
+    # Pass 1: Select distinct (failure_type, source_symbol or source_file, key_message)
+    for t in sorted_tests:
+        sig_msg = (t.message or "")[:60].strip()
+        sig = (t.failure_type, t.source_symbol or t.source_file or "", sig_msg)
+        if sig not in seen_signatures:
+            seen_signatures.add(sig)
+            if len(selected) < max_selected:
+                selected.append(t)
+            else:
+                omitted.append(t)
+        else:
+            omitted.append(t)
+
+    # Pass 2: If we still have slots under max_selected and omitted has items, fill remaining
+    if len(selected) < max_selected and omitted:
+        remaining_slots = max_selected - len(selected)
+        selected.extend(omitted[:remaining_slots])
+        omitted = omitted[remaining_slots:]
+
+    return selected, omitted
 
 
 def map_evidence_to_contract(
@@ -1520,6 +1734,24 @@ def build_targeted_feedback(
             f"+ {len(omitted)} pengujian lainnya gagal dengan pola serupa. "
             f"Selesaikan 3 masalah prioritas di atas terlebih dahulu."
         )
+
+    # Canonical Implementation Evidence (Layer 1 & 3)
+    if evidence.canonical_evidence:
+        lines.append("")
+        lines.append("[CANONICAL IMPLEMENTATION EVIDENCE - DETERMINISTIC REALITY]")
+        lines.append("Fakta berikut diverifikasi oleh tooling/compiler/runtime lingkungan aktif:")
+        for cev in evidence.canonical_evidence:
+            if hasattr(cev, "format_compact"):
+                lines.append(f"  {cev.format_compact()}")
+            elif isinstance(cev, dict):
+                try:
+                    from .canonical_evidence import CanonicalImplementationEvidence
+                    obj = CanonicalImplementationEvidence.from_dict(cev)
+                    lines.append(f"  {obj.format_compact()}")
+                except Exception:
+                    lines.append(f"  • {cev}")
+            else:
+                lines.append(f"  • {cev}")
 
     # Improved Repentance Guidance (P0-1 & D10)
     if use_repentance and evidence.execution_status != "passed":

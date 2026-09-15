@@ -49,6 +49,18 @@ except (ImportError, ValueError):
         extract_canonical_oracle_obligations = None  # type: ignore
         ObligationKind = None  # type: ignore
 
+try:
+    from .canonical_evidence import CanonicalImplementationEvidence, deduplicate_evidence
+    from .implementation_grounding import ImplementationGroundingEngine
+except (ImportError, ValueError):
+    try:
+        from canonical_evidence import CanonicalImplementationEvidence, deduplicate_evidence
+        from implementation_grounding import ImplementationGroundingEngine
+    except ImportError:
+        CanonicalImplementationEvidence = None  # type: ignore
+        deduplicate_evidence = None  # type: ignore
+        ImplementationGroundingEngine = None  # type: ignore
+
 
 # ===========================================================================
 # 1. Semantic Context Compressor
@@ -192,6 +204,18 @@ class ContextTelemetry:
     routing_result: str = ""
     run_id: str = ""
     iteration: int = 0
+    grounding_sources: List[str] = field(default_factory=list)
+    grounding_evidence_count: int = 0
+    grounding_evidence_types: List[str] = field(default_factory=list)
+    raw_diagnostic_count: int = 0
+    normalized_diagnostic_count: int = 0
+    omitted_diagnostic_count: int = 0
+    current_failure_count: int = 0
+    historical_failure_count: int = 0
+    locked_invariant_count: int = 0
+    implementation_facts_count: int = 0
+    truncation_detected: bool = False
+    repair_result: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -924,6 +948,66 @@ def build_developer_repair_context(
         + vc_text
     )
 
+    # [IMPLEMENTATION GROUNDING — DETERMINISTIC REALITY]
+    combined_grounding_facts: List[Any] = []
+    if ImplementationGroundingEngine is not None:
+        try:
+            harvested = ImplementationGroundingEngine.harvest_implementation_grounding(
+                target_language=target_lang,
+                code_files=code_files,
+                test_files=test_files
+            )
+            if harvested:
+                combined_grounding_facts.extend(harvested)
+        except Exception:
+            pass
+
+    # Tambahkan canonical evidence dari pkg atau test_results jika ada
+    if pkg is not None and getattr(pkg, "implementation_evidence", None):
+        for ie in pkg.implementation_evidence:
+            if isinstance(ie, dict) and CanonicalImplementationEvidence is not None:
+                try:
+                    combined_grounding_facts.append(CanonicalImplementationEvidence.from_dict(ie))
+                except Exception:
+                    pass
+            else:
+                combined_grounding_facts.append(ie)
+
+    test_results_dict = state.get("test_results") or {}
+    diag_ev = test_results_dict.get("diagnostic_evidence")
+    if isinstance(diag_ev, dict) and "canonical_evidence" in diag_ev:
+        for ce in diag_ev["canonical_evidence"]:
+            if isinstance(ce, dict) and CanonicalImplementationEvidence is not None:
+                try:
+                    combined_grounding_facts.append(CanonicalImplementationEvidence.from_dict(ce))
+                except Exception:
+                    pass
+            else:
+                combined_grounding_facts.append(ce)
+
+    if deduplicate_evidence is not None and combined_grounding_facts:
+        combined_grounding_facts = deduplicate_evidence(combined_grounding_facts)
+
+    if combined_grounding_facts:
+        impl_lines = []
+        for fact in combined_grounding_facts:
+            f_str = fact.format_compact() if hasattr(fact, "format_compact") else str(fact)
+            impl_lines.append(f"  {f_str}")
+            # If compiler/grounding evidence conflicts with LLM prior knowledge, context explicitly asserts reality
+            c_status = getattr(fact, "compatibility_status", "UNKNOWN")
+            sym = getattr(fact, "symbol_reference", None) or "Symbol"
+            if c_status in ("INCOMPATIBLE", "NOT_FOUND"):
+                impl_lines.append(
+                    f"    -> [AUTHORITY ASSERTION]: {sym} is {c_status} in active environment. "
+                    f"Deterministic tooling overrides LLM parametric knowledge."
+                )
+        sections["authority_implementation_grounding"] = (
+            "[IMPLEMENTATION GROUNDING — DETERMINISTIC REALITY]\n"
+            "==================================================\n"
+            "REALITAS IMPLEMENTASI DIBUKTIKAN SECARA DETERMINISTIK OLEH ENVIRONMENT/TOOLING:\n"
+            + "\n".join(impl_lines)
+        )
+
     # Part 3: Context Integrity & Task Isolation Audit
     integrity_violations: List[str] = []
     if ContextIntegrityAuditor is not None:
@@ -951,6 +1035,19 @@ def build_developer_repair_context(
             getattr(getattr(pkg, "repair_boundary", None), "allowed_changes", []) or []
         ) if pkg else 0,
         "integrity_violations_detected": len(integrity_violations),
+        "grounding_sources": list(set(getattr(f, "source", "unknown") for f in combined_grounding_facts)),
+        "grounding_evidence_count": len(combined_grounding_facts),
+        "grounding_evidence_types": list(set(getattr(f, "evidence_type", "unknown") for f in combined_grounding_facts)),
+        "raw_diagnostic_count": len(diag_lines) if "diag_lines" in locals() and diag_lines else 0,
+        "normalized_diagnostic_count": len(getattr(pkg, "violations", []) or []) if pkg else 0,
+        "omitted_diagnostic_count": 0,
+        "current_failure_count": len(getattr(pkg, "violations", []) or []) if pkg else 0,
+        "historical_failure_count": sum(l_data.get("regression_count", 0) for l_data in locked_dict.values()) if isinstance(locked_dict, dict) else 0,
+        "locked_invariant_count": len(locked_dict),
+        "implementation_facts_count": len(combined_grounding_facts),
+        "output_size": 0,
+        "truncation_detected": False,
+        "repair_result": "",
     }
 
     return result, telemetry_data

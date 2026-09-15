@@ -225,6 +225,7 @@ class ContextualEvidencePackage:
     evidence: List[Dict[str, Any]]          # Raw observed vs expected items
     remaining_budget: int = 0              # Sisa anggaran repair yang tersedia
     actionable_prescriptions: List[ActionableRepairPrescription] = field(default_factory=list)
+    implementation_evidence: List[Any] = field(default_factory=list)
 
     @classmethod
     def make_id(cls, run_id: str, validator: str, iteration: int) -> str:
@@ -264,6 +265,7 @@ class ContextualEvidencePackage:
             "evidence": self.evidence,
             "remaining_budget": self.remaining_budget,
             "actionable_prescriptions": [rx.to_dict() for rx in getattr(self, "actionable_prescriptions", [])],
+            "implementation_evidence": [ie.to_dict() if hasattr(ie, "to_dict") else ie for ie in getattr(self, "implementation_evidence", [])],
         }
 
     def to_json(self, indent: int = 2) -> str:
@@ -367,6 +369,7 @@ class ContextualEvidencePackage:
                 )
                 for rx in data.get("actionable_prescriptions", [])
             ],
+            implementation_evidence=data.get("implementation_evidence", []),
         )
 
     @classmethod
@@ -519,6 +522,22 @@ def _build_repair_directive_lines(
             lines.append(f"  EXPECTED POST-REPAIR STATE: {rx.expected_post_repair_state}")
             lines.append(f"  VERIFICATION EVIDENCE: {rx.verification_evidence}")
 
+    # 4B. Implementation Grounding Evidence (deterministic reality facts)
+    impl_ev = getattr(pkg, "implementation_evidence", [])
+    if impl_ev:
+        lines.append(f"\n[4B. IMPLEMENTATION GROUNDING EVIDENCE — DETERMINISTIC REALITY ({len(impl_ev)} facts verified)]")
+        for ev in impl_ev:
+            if hasattr(ev, "format_compact"):
+                lines.append(f"  {ev.format_compact()}")
+            elif isinstance(ev, dict):
+                try:
+                    from .canonical_evidence import CanonicalImplementationEvidence
+                    lines.append(f"  {CanonicalImplementationEvidence.from_dict(ev).format_compact()}")
+                except Exception:
+                    lines.append(f"  • {ev}")
+            else:
+                lines.append(f"  • {ev}")
+
     # 5. Preserved Invariants (invariant - behavioral locks & regression watch)
     regressed_invariants = [inv for inv in pkg.preserved_invariants if getattr(inv, "status", "") == "REGRESSED"]
     locked_invariants = [inv for inv in pkg.preserved_invariants if getattr(inv, "status", "") != "REGRESSED"]
@@ -633,6 +652,11 @@ def render_repair_directive(pkg: ContextualEvidencePackage, max_chars: int = _MA
     _sep = "=" * 80
     suffix = "\n...(dipotong untuk efisiensi konteks)\n" + _sep
     return text[:max_chars - len(suffix)] + suffix
+
+
+class ContextualEvidenceRenderer:
+    """Helper wrapper untuk rendering ContextualEvidencePackage ke prompt."""
+    render_for_prompt = staticmethod(render_repair_directive)
 
 
 # ===========================================================================
