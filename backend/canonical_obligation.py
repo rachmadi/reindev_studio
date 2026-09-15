@@ -25,7 +25,7 @@ from __future__ import annotations
 import ast
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -508,8 +508,9 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                                     metadata={"target_module": node.module, "symbol_type": "import"}
                                 ))
 
-                # B. client.<method>("/path", ...) (Interaction calls)
+                # B. Client interaction calls and direct main callable invocations
                 elif isinstance(node, ast.Call):
+                    # B1. client.<method>("/path", ...) (Interaction calls)
                     if isinstance(node.func, ast.Attribute):
                         method_name = node.func.attr.upper()
                         if method_name in ("GET", "POST", "PUT", "DELETE", "PATCH"):
@@ -556,6 +557,68 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
                                             source_reference=f"{file_name}:{node.lineno}",
                                             metadata={"http_method": method_name, "path": norm_path}
                                         ))
+
+                    # B2. main.<sym>(*args, **kwargs) (Direct callable invocations on module main)
+                    if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == "main":
+                        sym = node.func.attr
+                        if sym not in ("app", "main"):
+                            num_pos = len(node.args)
+                            inputs = {"positional_args": num_pos, "call_type": "callable"} if num_pos else {"call_type": "callable"}
+                            if node.keywords:
+                                inputs["keyword_args"] = [kw.arg for kw in node.keywords if kw.arg]
+                            arg_str = f" with {num_pos} positional argument(s)" if num_pos else ""
+                            if sym not in seen_identities:
+                                seen_identities.add(sym)
+                                obligations.append(CanonicalObligation(
+                                    obligation_id=f"OBL-CALL-{sym}",
+                                    authority=ObligationAuthority.FROZEN_ORACLE.value,
+                                    provenance=ObligationProvenance.ORACLE_FACT.value,
+                                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
+                                    public_identity=sym,
+                                    inputs=inputs,
+                                    outputs={},
+                                    observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
+                                    acceptance_evidence=f"main.{sym}(...)",
+                                    source_reference=f"{file_name}:{node.lineno}",
+                                    metadata={"symbol_type": "callable_invocation"}
+                                ))
+                            else:
+                                for idx, ob in enumerate(obligations):
+                                    if ob.public_identity == sym and ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value:
+                                        if not ob.inputs.get("call_type"):
+                                            merged_inputs = dict(ob.inputs)
+                                            merged_inputs.update(inputs)
+                                            new_meta = dict(ob.metadata)
+                                            new_meta["symbol_type"] = "callable_invocation"
+                                            obligations[idx] = replace(
+                                                ob,
+                                                inputs=merged_inputs,
+                                                observable_behavior=f"Symbol '{sym}' invoked as callable{arg_str}",
+                                                acceptance_evidence=f"main.{sym}(...)",
+                                                metadata=new_meta,
+                                            )
+                                        break
+
+                    # B3. hasattr(main, '<sym>') inspection
+                    elif isinstance(node.func, ast.Name) and node.func.id == "hasattr":
+                        if len(node.args) >= 2 and isinstance(node.args[0], ast.Name) and node.args[0].id == "main":
+                            if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+                                sym = node.args[1].value
+                                if sym not in ("app", "main") and sym not in seen_identities:
+                                    seen_identities.add(sym)
+                                    obligations.append(CanonicalObligation(
+                                        obligation_id=f"OBL-CALL-{sym}",
+                                        authority=ObligationAuthority.FROZEN_ORACLE.value,
+                                        provenance=ObligationProvenance.ORACLE_FACT.value,
+                                        obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
+                                        public_identity=sym,
+                                        inputs={},
+                                        outputs={},
+                                        observable_behavior=f"Symbol '{sym}' verified via hasattr inspection on authoritative module",
+                                        acceptance_evidence=f"hasattr(main, '{sym}')",
+                                        source_reference=f"{file_name}:{node.lineno}",
+                                        metadata={"symbol_type": "hasattr"}
+                                    ))
         except Exception:
             pass
 
@@ -563,14 +626,11 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
         for sym in re.findall(r"hasattr\s*\(\s*main\s*,\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", content):
             if sym not in ("app", "main") and sym not in seen_identities:
                 seen_identities.add(sym)
-                is_model = sym[0].isupper()
-                kind = ObligationKind.DATA_MODEL.value if is_model else ObligationKind.CALLABLE_INTERFACE.value
-                ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
                 obligations.append(CanonicalObligation(
-                    obligation_id=ob_id,
+                    obligation_id=f"OBL-CALL-{sym}",
                     authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=kind,
+                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
                     public_identity=sym,
                     inputs={},
                     outputs={},
@@ -583,14 +643,11 @@ class PythonAstOracleAdapter(BaseOracleTestAdapter):
         for sym in re.findall(r"main\.([A-Za-z_][A-Za-z0-9_]*)", content):
             if sym not in ("app", "main") and sym not in seen_identities:
                 seen_identities.add(sym)
-                is_model = sym[0].isupper()
-                kind = ObligationKind.DATA_MODEL.value if is_model else ObligationKind.CALLABLE_INTERFACE.value
-                ob_id = f"OBL-{'MODEL' if is_model else 'CALL'}-{sym}"
                 obligations.append(CanonicalObligation(
-                    obligation_id=ob_id,
+                    obligation_id=f"OBL-CALL-{sym}",
                     authority=ObligationAuthority.FROZEN_ORACLE.value,
                     provenance=ObligationProvenance.ORACLE_FACT.value,
-                    obligation_kind=kind,
+                    obligation_kind=ObligationKind.CALLABLE_INTERFACE.value,
                     public_identity=sym,
                     inputs={},
                     outputs={},

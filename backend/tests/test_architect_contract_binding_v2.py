@@ -1474,4 +1474,105 @@ def test_scenario_32_cli_and_flutter_obligations_preserved():
     assert "MetricData" in flutter_ids
 
 
+def test_scenario_33_python_oop_class_callable_not_forced_to_data_model(tmp_oracle_dir):
+    """
+    Scenario 33 (Treatment #1.1 Cross-Language Generalization Gate):
+    Python OOP class/callable symbols (like Matrix) tested via hasattr and constructor invocation
+    are classified as CALLABLE_INTERFACE (not forced to DATA_MODEL).
+    Their invocation shape (positional args count) is preserved as canonical evidence.
+    """
+    test_file = tmp_oracle_dir / "test_matrix.py"
+    test_file.write_text(
+        "import main\n\n"
+        "def test_matrix_ops():\n"
+        "    assert hasattr(main, 'Matrix')\n"
+        "    m = main.Matrix([[1, 2], [3, 4]])\n"
+        "    assert hasattr(main, 'add_matrices')\n"
+        "    assert main.add_matrices(m, m) is not None\n",
+        encoding="utf-8"
+    )
+
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+
+    assert "Matrix" in ob_map
+    matrix_ob = ob_map["Matrix"]
+    assert matrix_ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value
+    assert matrix_ob.inputs.get("call_type") == "callable"
+    assert matrix_ob.inputs.get("positional_args") == 1
+    assert "1 positional argument" in matrix_ob.observable_behavior
+
+    assert "add_matrices" in ob_map
+    add_ob = ob_map["add_matrices"]
+    assert add_ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value
+    assert add_ob.inputs.get("positional_args") == 2
+
+    # Verification of coverage with interface contracts (OOP class / function)
+    contract = {
+        "interface_contracts": [
+            {"interface_id": "IFC-01", "interface_type": "CLASS", "identifier": "Matrix", "target_file": "main.py"},
+            {"interface_id": "IFC-02", "interface_type": "FUNCTION", "identifier": "add_matrices", "target_file": "main.py"}
+        ],
+        "data_models": []
+    }
+    cov = check_obligation_coverage(obligations, contract)
+    assert cov.is_fully_covered is True
+    assert cov.covered_count == 2
+    assert cov.missing_count == 0
+
+
+def test_scenario_34_cross_language_dart_semantics_unaffected(tmp_oracle_dir):
+    """
+    Scenario 34 (Treatment #1.1 Cross-Language Generalization Gate):
+    Dart adapter semantics are 100% unaffected by Python AST adapter refinements.
+    Widget obligations, provider obligations, and data model obligations preserve
+    their distinct kinds, types, and evidence shapes.
+    """
+    test_file = tmp_oracle_dir / "metric_widget_test.dart"
+    test_file.write_text(
+        "import 'package:flutter_test/flutter_test.dart';\n\n"
+        "void main() {\n"
+        "  testWidgets('renders metric card', (tester) async {\n"
+        "    final model = MetricData(title: 'Revenue', amount: 100);\n"
+        "    await tester.pumpWidget(MaterialApp(home: Scaffold(body: CardMetric(data: model))));\n"
+        "    expect(find.byType(CardMetric), findsOneWidget);\n"
+        "    final prov = container.read(metricDataProvider);\n"
+        "  });\n"
+        "}\n",
+        encoding="utf-8"
+    )
+
+    obligations = extract_canonical_oracle_obligations(frozen_oracle_path=str(tmp_oracle_dir))
+    ob_map = {ob.public_identity: ob for ob in obligations}
+
+    # Widget
+    assert "CardMetric" in ob_map
+    assert ob_map["CardMetric"].obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value
+    assert ob_map["CardMetric"].outputs.get("return_type") == "Widget"
+
+    # Provider
+    assert "metricDataProvider" in ob_map
+    assert ob_map["metricDataProvider"].obligation_kind == ObligationKind.CALLABLE_INTERFACE.value
+
+    # Data model
+    assert "MetricData" in ob_map
+    assert ob_map["MetricData"].obligation_kind == ObligationKind.DATA_MODEL.value
+
+    # Dart contract coverage verification
+    contract = {
+        "interface_contracts": [
+            {"interface_id": "IFC-W01", "interface_type": "WIDGET", "identifier": "CardMetric", "target_file": "card_metric.dart"},
+            {"interface_id": "IFC-P01", "interface_type": "PROVIDER", "identifier": "metricDataProvider", "target_file": "provider.dart"}
+        ],
+        "data_models": [
+            {"model_name": "MetricData", "fields": [{"name": "title", "type": "String"}]}
+        ]
+    }
+    cov = check_obligation_coverage(obligations, contract)
+    assert cov.is_fully_covered is True
+    assert cov.covered_count == 3
+    assert cov.missing_count == 0
+
+
+
 
