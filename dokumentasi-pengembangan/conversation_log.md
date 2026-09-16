@@ -2442,3 +2442,23 @@ Lakukan sintesis empiris menyeluruh terhadap evolusi ReinDev dari Treatment #1.3
  2. Task 2 [cli_t1]: Selesai 866,1s (~14,4 m). Model mengalami persistent empty output [0 kata] pada fase PM selama 3 giliran. Gerbang V1 menolak dokumen kosong secara deterministik. Fail-closed, loops: 0. Verdict: FAIL [C. Contract / PM Failure].
  3. Task 3 [flutter_t1]: Selesai 794,3s (~13,2 m). Architect mendeklarasikan `http_method: 'CONSTRUCTOR'` pada widget UI selama 3 giliran. Gerbang V2 [P0-2.1] menolak pelanggaran skema Pydantic secara deterministik. Fail-closed, loops: 0. Verdict: FAIL [C. Contract Failure].
  Menyusun laporan evaluasi komparatif tiga arah `treatment1_6_ornith9b_pilot_evaluation_report.md` dan menyinkronkan seluruh catatan riset, decision log, dan riwayat validasi ke GitHub).
+
+
+---
+
+[USER (INTENT ARCHITECT) - 11:44]
+"FORENSIC FAILURE PATTERN MINING — AGENT CAPABILITY TREATMENT v1
+Analisis seluruh corpus eksperimen yang tersedia untuk menemukan KEGAGALAN BERULANG pada setiap titik tanggung jawab agen sebagai evidence base untuk merancang Agent Capability Treatment."
+
+[ANTIGRAVITY - 11:55]
+(Melaksanakan audit investigasi forensik empiris menyeluruh terhadap seluruh corpus eksperimen [Treatment #1.3 – #1.6, 42 distinct runs, 3 model, 3 task] secara read-only tanpa mengubah sistem atau tata kelola.
+ Menambang 145 failure events dari jejak eksekusi `run_trace.jsonl` dan mengidentifikasi 8 pola kegagalan kanonikal berulang [FP-001 hingga FP-008].
+ Menyusun laporan forensik komprehensif `agent_capability_failure_pattern_forensic_v1.md` yang memuat inventaris 42 run, rekonstruksi kegagalan 12-field, analisis perbaikan/invarian, analisis cross-model/treatment, taksonomi formal, pemetaan kapabilitas agen, dan penetapan Architect Call-Shape Alignment sebagai kandidat prioritas perlakuan utama pertama).
+
+---
+
+[USER (INTENT ARCHITECT) - 11:56]
+"push laporan ini ke github"
+
+[ANTIGRAVITY - 11:58]
+(Memutakhirkan catatan riset, decision log, commit history, dan conversation log, melakukan commit formal terhadap laporan forensik empiris v1, serta menyinkronkan branch `experiment/fastapi-recovery` ke remote GitHub).

@@ -1374,3 +1374,34 @@ Untuk melengkapi analisis komparatif model pada arsitektur ReinDev Treatment #1.
 ### 3. Kesimpulan Sintesis Tiga Arah (Triangular Synthesis)
 1. **Model Spesialis Coding Unggul Mutlak**: `qwen2.5-coder:7b` tetap menjadi model terbaik untuk pipeline rekayasa software terstruktur (satu-satunya yang mencapai 4/5 pada FastAPI dan 2/2 PASS 100% pada Flutter).
 2. **Arsitektur ReinDev Terbukti 100% Model-Agnostik**: Di hadapan 3 model dengan karakteristik berbeda (`qwen2.5-coder:7b`, `qwen3.5:9b`, `ornith:9b`), seluruh kegagalan model berhasil diisolasi secara deterministik (*zero downstream leakage*, *zero unhandled regressions*, *100% Oracle SHA-256 intact*).
+
+
+---
+
+## IX. AUDIT FORENSIK PENAMBANGAN POLA KEGAGALAN MENYELURUH (FORENSIC FAILURE PATTERN MINING v1)
+
+### 1. Mandat & Ruang Lingkup Audit
+Intent Architect menginstruksikan audit investigasi forensik menyeluruh (*trace-level forensic audit*) terhadap seluruh corpus eksperimen ReinDev Studio (Treatment #1.3 – #1.6) untuk menambang kegagalan berulang (*repeated failure patterns*) di setiap titik tanggung jawab agen sebagai landasan empiris perancangan *Agent Capability Treatment*.
+
+### 2. Parameter & Metrik Inti Corpus
+* **Total Eksekusi Diaudit**: 42 independent runs (14 summary suites) lintas 3 model (qwen2.5-coder:7b, qwen3.5:9b, ornith:9b) dan 3 task (astapi_t1, cli_t1, lutter_t1).
+* **Hasil Global**: Full PASS = 13 (31,0%), Non-Full PASS = 29 (69,0%), Kontrak FROZEN = 21 (50,0%), Kontrak REJECTED = 20 (47,6%), Kontrak DRAFT = 1 (2,4%).
+* **Integritas Acceptance Test Suite**: 42/42 runs (100,0%) Oracle SHA-256 intact.
+* **Failure Events Mined**: 145 events dari jejak 
+un_trace.jsonl.
+
+### 3. Taksonomi 8 Pola Kegagalan Berulang Empiris (FP-001 – FP-008)
+1. **FP-001 (V0 Epistemic Citation Anchoring Gap)**: 33 events, 31 runs. Sifat: STRONG evidence, 100% pulih pada Turn 1.
+2. **FP-002 (PM Completion Collapse)**: 4 events, 2 runs. Sifat: MEDIUM evidence, kolaps permanen pada ornith:9b.
+3. **FP-003 (Architect File-Tree Test Pollution)**: 32 events, 21 runs. Sifat: STRONG evidence.
+4. **FP-004 (Architect Call-Shape Mismatch / Pilar 4)**: 70 events, 20 runs. Sifat: STRONG evidence. **Primary System Bottleneck (20 kontrak REJECTED)**.
+5. **FP-005 (Architect Negative Scenario Scaffold Omission)**: 14 events, 8 runs. Sifat: MEDIUM evidence.
+6. **FP-006 (Developer Symbol Drift / Gate V3)**: 10 events, 7 runs. Sifat: STRONG evidence.
+7. **FP-007 (Developer 404 Exception Logic Gap)**: 14 events, 10 runs. Sifat: STRONG evidence.
+8. **FP-008 (Developer Invariant Degradation / Gate V5 Regresi)**: 13 events, 8 runs. Sifat: STRONG evidence.
+
+### 4. Putusan Prioritas Perlakuan Agen (Candidate Treatment Priorities)
+* **PRIORITAS 1: ARCHITECT CAPABILITY TREATMENT (Pilar 4 Call-Shape Alignment)** — Membuka sumbatan terbesar sistem di mana 47,6% run terhenti di pembekuan kontrak.
+* **PRIORITAS 2: DEVELOPER INVARIANT-PRESERVING REPAIR TREATMENT** — Menekan mutasi regresi dan kelemahan semantik 404 pada run yang kontraknya berhasil di-freeze.
+* **PRIORITAS 3: V0 ZERO-SHOT CITATION PRECISION TREATMENT** — Efisiensi turn zero-shot.
+* **PRIORITAS 4: PM PROMPT DESENSITIZATION TREATMENT** — Mitigasi sensitivitas template pada model heterogen.

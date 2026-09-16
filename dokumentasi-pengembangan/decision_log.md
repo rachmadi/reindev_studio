@@ -227,3 +227,16 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   3. Mengonfirmasi secara konklusif bahwa `qwen2.5-coder:7b` adalah model optimal untuk squad koding terstruktur di ReinDev Studio.
   4. Seluruh gerbang validasi (V1, V2, V3, V5) mempertahankan 100% *zero downstream leakage* dan Oracle immutability di ketiga model yang diuji.
 * **Dampak**: Menuntaskan studi komparatif model Treatment #1.6 dan memperkuat dasar empiris untuk publikasi/laporan sintesis arsitektur pemulihan.
+
+
+---
+
+### [D-116] Forensic Failure Pattern Mining (Agent Capability Treatment v1) (2026-09-16)
+* **Konteks**: Intent Architect menginstruksikan investigasi forensik empiris menyeluruh terhadap seluruh corpus eksperimen (#1.3 – #1.6, 42 runs, 3 model, 3 task) untuk memetakan kegagalan berulang agen tanpa mengubah sistem atau tata kelola.
+* **Keputusan / Temuan**:
+  1. Mengidentifikasi 8 pola kegagalan empiris (FP-001 – FP-008) dari 145 failure events.
+  2. Menetapkan **Architect Pilar 4 Call-Shape Mismatch (FP-004)** sebagai bottleneck utama sistem (20/42 kontrak rejected).
+  3. Menetapkan **Developer Invariant Degradation (FP-008) & 404 Exception Logic (FP-007)** sebagai bottleneck utama pada fase runtime.
+  4. Menetapkan urutan prioritas target perlakuan: Prioritas 1 = Architect Call-Shape Alignment, Prioritas 2 = Developer Invariant-Preserving Repair, Prioritas 3 = V0 Zero-Shot Citation, Prioritas 4 = PM Prompt Desensitization.
+  5. Mengonfirmasi integritas 100% Oracle SHA-256 dan kepatuhan deterministik seluruh validator.
+* **Dampak**: Menjadi dasar empiris resmi (*evidence base*) untuk merancang Agent Capability Treatment mendatang.

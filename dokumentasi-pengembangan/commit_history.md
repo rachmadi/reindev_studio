@@ -701,3 +701,16 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-115.
   - `dokumentasi-pengembangan/validation_log.md`: Penambahan entri VAL-T16-ORNITH9B.
   - `dokumentasi-pengembangan/durasi_per_fitur.md`: Pencatatan durasi eksekusi ornith:9b (2539.6s).
+
+
+### Commit: 54a6511 — 2026-09-16
+- **Status:** TERVERIFIKASI PENUH (Audit Forensik Empiris v1 Selesai, 42 Runs Audited, Oracle Intact)
+- **Tipe:** `docs(forensic)`
+- **Pesan Commit:** `docs(forensic): add exhaustive empirical failure pattern mining report (Treatments #1.3-#1.6)`
+- **Waktu:** 2026-09-16 11:58 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/agent_capability_failure_pattern_forensic_v1.md`: Laporan audit forensik empiris komprehensif mencakup 42 runs, rekonstruksi kegagalan 12-field, analisis perbaikan, taksonomi FP-001 s.d. FP-008, peta kapabilitas agen, dan rekomendasi perlakuan.
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Penambahan Bagian IX mengenai metodologi, temuan kunci, dan taksonomi kegagalan berulang.
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-116.
+  - `dokumentasi-pengembangan/conversation_log.md`: Dokumentasi dialog instruksi audit dan penyelesaian laporan forensik.
+  - `dokumentasi-pengembangan/commit_history.md`: Pencatatan riwayat commit formal.
