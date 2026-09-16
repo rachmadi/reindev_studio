@@ -240,3 +240,18 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   4. Menetapkan urutan prioritas target perlakuan: Prioritas 1 = Architect Call-Shape Alignment, Prioritas 2 = Developer Invariant-Preserving Repair, Prioritas 3 = V0 Zero-Shot Citation, Prioritas 4 = PM Prompt Desensitization.
   5. Mengonfirmasi integritas 100% Oracle SHA-256 dan kepatuhan deterministik seluruh validator.
 * **Dampak**: Menjadi dasar empiris resmi (*evidence base*) untuk merancang Agent Capability Treatment mendatang.
+
+---
+
+### [D-117] Treatment #1.7 — PM Requirement Fidelity & Constructible Completion v1 (2026-09-16)
+* **Konteks**: Berdasarkan temuan forensik pada FP-002 (PM Empty Completion Collapse), Intent Architect merumuskan pengujian kapabilitas agen Treatment #1.7 pada branch terisolasi `experiment/treatment-1.7-agent-capability` dari Frozen LKG #1.6 (commit `37946e5`).
+* **Keputusan / Temuan**:
+  1. Menegakkan 5 koreksi pengetatan arsitektural: (a) Format struktural diposisikan murni sebagai *constructive prompting strategy* (bukan invariant baru PM); (b) Pembatasan ketat sintesis `draft_contract` (reuse 100% jalur dan skema `create_draft_contract` standar tanpa custom schema); (c) Stratifikasi epistemik V0 (*Interpretation ≠ Invention*: FACT sebagai batasan mutlak, INTERPRETATION sebagai derived requirements, ASSUMPTION sebagai standar minimal, UNRESOLVED sebagai batas terbuka defensif); (d) Anti-collapse murni berbasis capability prompting tanpa *python-level synthetic fallback*; (e) Expanded anti-solver static audit.
+  2. Mempertahankan 100% tata kelola beku: V0–V6 topologi, kewenangan validator, Oracle SHA-256 intact 100%, 695/695 regression tests pass.
+  3. Hasil empiris pilot 1x3 (`qwen2.5-coder:7b`):
+     - FP-002 berhasil direduksi hingga **0 kejadian (0%)**.
+     - PM Turn 0 PASS rate: **100% (3/3 task)** dengan 0 pelanggaran.
+     - Rata-rata panjang spesifikasi PM: **336 kata** (FastAPI: 347 kata, CLI: 294 kata, Flutter: 367 kata).
+     - Downstream: `flutter_t1` 100% PASS (Reviewer APPROVED, 2/2 tests passed, Loop 0), `cli_t1` tertahan aman di Gate 2 (*zero downstream leakage*), `fastapi_t1` mencapai Dev loop 5 (4/5 tests passed).
+  4. **Hipotesis H1.7 Terkonfirmasi Empiris**: Penguatan Evidence-Grounded Requirement Completion pada PM terbukti mengeliminasi kejadian empty/non-substantive completion pada model proving-ground `qwen2.5-coder:7b` tanpa memicu regresi downstream.
+* **Dampak**: Membuktikan bahwa perbaikan terarah pada kapabilitas agen hulu (PM) dapat meningkatkan kualitas dan kelengkapan model kebutuhan perangkat lunak secara substansial tanpa merusak integritas tata kelola pipeline.

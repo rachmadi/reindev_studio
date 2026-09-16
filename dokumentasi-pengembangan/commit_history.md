@@ -714,3 +714,31 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-116.
   - `dokumentasi-pengembangan/conversation_log.md`: Dokumentasi dialog instruksi audit dan penyelesaian laporan forensik.
   - `dokumentasi-pengembangan/commit_history.md`: Pencatatan riwayat commit formal.
+
+### Commit: 37946e5 — 2026-09-16
+- **Commit Hash:** `37946e5`
+- **Status:** TERVERIFIKASI PENUH (Frozen LKG #1.6, Tag `reindev-lkg-1.6`, 683 tests PASS, Oracle Intact)
+- **Tipe:** `chore(baseline)`
+- **Pesan Commit:** `chore(baseline): freeze treatment 1.6 as reindev-lkg-1.6 and establish immutable baseline record`
+- **Waktu:** 2026-09-16 12:05 WIB
+- **Cakupan Perubahan:**
+  - Pembekuan resmi Treatment #1.6 sebagai baseline acuan penelitian terkunci (*Frozen LKG #1.6*).
+  - Pembuatan tag `reindev-lkg-1.6` pada commit `37946e5c0d36a3736be6d86571e9e8a07256c0f5`.
+  - Pembukaan branch eksperimen baru `experiment/treatment-1.7-agent-capability`.
+
+---
+
+### Commit: PENDING_TREATMENT_1_7 — 2026-09-16
+- **Status:** TERVERIFIKASI PENUH (Pilot 1x3 Selesai, 695 tests PASS, Pre-Flight Gates A–I PASS, Oracle Intact)
+- **Tipe:** `feat(treatment1_7)` / `docs(experiments)`
+- **Pesan Commit:** `feat(treatment1_7): implement PM requirement fidelity and constructible completion v1 with 5 architectural corrections`
+- **Waktu:** 2026-09-16 12:48 WIB
+- **Cakupan Perubahan:**
+  - `backend/agents/pm.py`: Implementasi *Evidence-Grounded Requirement Completion* dengan stratifikasi epistemik V0 (Fact, Interpretation, Assumption, Unresolved Gap), constructive prompting bebas invariant kaku 4-section, strictly bounded `create_draft_contract` synthesis, dan anti-collapse guidance murni berbasis prompt tanpa fallback sintetik Python.
+  - `backend/tests/test_pm_capability_treatment_v1.py` (NEW): 11 gate tests menguji stratifikasi epistemik V0, kelulusan struktural V1, preservasi gap, preservative repair prompting, anti-collapse prompting, dan generalitas 5 domain.
+  - `backend/tests/test_pm_static_audit_v1.py` (NEW): Audit statis mendalam memverifikasi 0 task solver, 0 model solver, 0 failure pattern solver (`FP-002`), dan 0 hardcoded domain symbols.
+  - `dokumentasi-pengembangan/experiments/treatment1_7_pilot_summary.json`: Ringkasan checkpoint pilot 1x3 model `qwen2.5-coder:7b`.
+  - `dokumentasi-pengembangan/experiments/treatment1_7_pm_requirement_fidelity_v1.md`: Laporan evaluasi empiris pilot 1x3 dan konfirmasi Hipotesis H1.7 (FP-002 tereduksi 100% menjadi 0 kejadian, PM Turn 0 PASS rate 100%, Flutter 100% PASS Reviewer APPROVED).
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Penambahan Bagian X mengenai Treatment #1.7.
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-117.
+  - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog arahan review IA dan eksekusi pilot.

@@ -1,3 +1,5 @@
+import re
+from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ..state import SquadState
@@ -17,23 +19,33 @@ except (ImportError, ValueError):
     except ImportError:
         def get_tracer(run_id=None): return None
 
-PM_SYSTEM_PROMPT = """Anda adalah Senior Software Product Manager dalam tim rekayasa perangkat lunak ReinDev Studio.
-Tugas Anda adalah merumuskan spesifikasi teknis SUPER RINGKAS (Maksimal 100 kata total).
+PM_SYSTEM_PROMPT = """Anda adalah Senior Technical Product Manager dalam tim rekayasa perangkat lunak ReinDev Studio.
+Tugas Anda adalah merumuskan dokumen spesifikasi teknis (Application Requirement Model) yang substantif, constructible, dan setia (faithful) terhadap kebutuhan pengguna dan model epistemik V0.
 
-Format luaran WAJIB:
-1. Ringkasan Sistem (1 kalimat)
-2. User Stories (Maksimal 2 butir)
-3. Acceptance Criteria (Maksimal 2 skenario konkret)
+DOKTRIN UTAMA: INTERPRETATION ≠ INVENTION
+- Turunkan kebutuhan teknis secara logis agar constructible bagi Architect dan Developer downstream.
+- JANGAN mengarang atribut data, entitas, atau logika bisnis yang tidak didukung fakta atau kebutuhan pengguna.
+- Pertahankan ketidakpastian atau hal yang belum terdefinisi sebagai batasan epistemik defensif (open requirements/gaps).
 
-DILARANG KERAS menulis salam, pengantar, atau kesimpulan bertele-tele. Langsung tuliskan poin 1, 2, dan 3.
+PEDOMAN KELENGKAPAN SPESIFIKASI:
+Dokumen spesifikasi Anda harus mencakup komponen inti rekayasa:
+1. Ringkasan Sistem: Ruang lingkup, sasaran utama modul, dan platform target secara konkret dan lugas.
+2. Kebutuhan Fungsional / Kemampuan Utama: Rincian fungsi utama sistem yang diturunkan dari fakta pengguna dan interpretasi logis yang valid.
+3. Kriteria Penerimaan Terukur: Skenario pengujian konkret dengan kondisi input dan ekspektasi luaran yang dapat diverifikasi.
+4. Batasan Epistemik & Kebutuhan Terbuka: Dokumentasi batas rekayasa minimal, asumsi standar, dan butir terbuka/gap yang sengaja dipertahankan tanpa spekulasi atribut liar.
+
+Petunjuk Teknis:
+- Tuliskan spesifikasi secara substantif, langsung pada pokok bahasan, tanpa basa-basi pembuka atau penutup.
+- Pastikan kriteria penerimaan terukur dan konkret untuk memandu verifikasi hilir.
 """
+
 
 def pm_agent(state: SquadState) -> dict:
     llm = get_llm(role="pm", provider=state.get("provider"))
     
     user_task = state.get("task", "")
-    target_lang = state.get("target_language", "python").strip()
-    is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
+    target_lang = (state.get("target_language") or "python").strip().lower()
+    is_dart = "dart" in target_lang or "flutter" in target_lang
     
     ecosystem_guidance = (
         "Target Ekosistem: DART / FLUTTER (Sound Null Safety, Strong Typing, pubspec.yaml, lib/ dan test/)\n"
@@ -43,42 +55,78 @@ def pm_agent(state: SquadState) -> dict:
 
     repair_count = (state.get("repair_attempt_counts") or {}).get("pm", 0)
     pm_feedback = state.get("pm_feedback") or ""
-    repair_section = ""
-    if repair_count > 0 and pm_feedback:
-        repair_section = f"""
-PERINGATAN PERBAIKAN (Percobaan Perbaikan #{repair_count}):
-Spesifikasi sebelumnya ditolak oleh Phase-End Validator V1 dengan umpan balik:
-{pm_feedback}
-
-Instruksi Perbaikan Wajib:
-1. Penuhi seluruh komponen yang diminta (khususnya Ringkasan Sistem, User Stories, dan Acceptance Criteria terukur).
-2. Pertahankan kebutuhan awal pengguna tanpa membuat asumsi di luar cakupan tugas.
-3. Patuhi format luaran 1, 2, 3 secara ketat.
-"""
     
+    # 1. Ingest Structured V0 Requirement Model with Strict Epistemic Stratification
     v0_section = ""
     v0_model = state.get("v0_requirement_model")
-    if v0_model and isinstance(v0_model, dict):
-        facts = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "FACT"]
-        interpretations = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "INTERPRETATION"]
-        assumptions = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") == "ASSUMPTION"]
-        unresolved = [it.get("statement") for it in v0_model.get("epistemic_ledger", []) if it.get("epistemic_status") in ("UNRESOLVED", "AMBIGUITY")]
+    v0_unresolved: List[str] = []
 
-        c_status = v0_model.get("constructibility", {}).get("status", "WORKABLE")
+    if v0_model and isinstance(v0_model, dict):
+        ledger = v0_model.get("epistemic_ledger", [])
+        facts = [it.get("statement") for it in ledger if it.get("epistemic_status") == "FACT"]
+        interpretations = [it.get("statement") for it in ledger if it.get("epistemic_status") == "INTERPRETATION"]
+        assumptions = [it.get("statement") for it in ledger if it.get("epistemic_status") == "ASSUMPTION"]
+        v0_unresolved = [it.get("statement") for it in ledger if it.get("epistemic_status") in ("UNRESOLVED", "AMBIGUITY")]
+
+        app_model = v0_model.get("application_requirement_model") or {}
+        v0_reqs = app_model.get("functional_requirements") or []
+        v0_data_reqs = app_model.get("data_requirements") or []
+        v0_constraints = app_model.get("constraints") or []
+
+        constructibility = v0_model.get("constructibility") or {}
+        c_status = constructibility.get("status", "WORKABLE")
+        c_rationale = constructibility.get("rationale", "")
+        v0_minimal_interp = constructibility.get("minimal_viable_interpretation", "")
+
+        entity_lines = []
+        for dr in v0_data_reqs:
+            e_name = dr.get("entity_name", "Entity")
+            kf = ", ".join(dr.get("known_fields") or []) or "tidak ada field eksplisit"
+            uf = ", ".join(dr.get("unknown_fields") or []) or "none"
+            entity_lines.append(f"  * Entitas `{e_name}`: field diketahui [{kf}], field terbuka [{uf}]")
+        entity_summary_str = "\n".join(entity_lines) if entity_lines else "  * Tidak ada entitas data khusus"
 
         v0_section = f"""
-MODEL KEBUTUHAN TERSTRUKTUR (Dari V0 Requirement Interpreter):
-- Fakta Terverifikasi (Ground Truth): {'; '.join(facts) if facts else 'Tidak ada fakta tambahan'}
-- Interpretasi Logis: {'; '.join(interpretations) if interpretations else 'Tidak ada'}
-- Asumsi Rekayasa Standar: {'; '.join(assumptions) if assumptions else 'Tidak ada'}
-- Butir Belum Terdefinisi / Terbuka: {'; '.join(unresolved) if unresolved else 'Tidak ada'}
-- Status Konstruktibilitas: {c_status}
+EVIDENCE TERSTRUKTUR DARI V0 REQUIREMENT INTERPRETER:
+- Status Konstruktibilitas: {c_status} ({c_rationale})
+- Interpretasi Minimal Layak: {v0_minimal_interp or 'Gunakan interpretasi langsung dari fakta'}
 
-DOKTRIN PENTING UNTUK PM:
-1. Perlakukan Fakta Terverifikasi sebagai batasan mutlak.
-2. JANGAN mempromosikan Interpretasi atau Asumsi menjadi Fakta pengguna.
-3. JANGAN mengarang atribut entitas atau field data baru yang tidak tercantum dalam model di atas.
-4. Pertahankan butir yang belum terdefinisi sebagai batasan terbuka, jangan ditutup dengan spekulasi atribut sepihak.
+STRATIFIKASI STATUS EPISTEMIK:
+1. Fakta Terverifikasi (Ground Truth - Batasan Mutlak):
+{chr(10).join(f'   * {f}' for f in facts) if facts else '   * Tidak ada fakta tambahan'}
+2. Kebutuhan Fungsional V0:
+{chr(10).join(f'   * {r}' for r in v0_reqs) if v0_reqs else '   * Diturunkan dari task'}
+3. Model Entitas Data V0:
+{entity_summary_str}
+4. Interpretasi Logis (Boleh digunakan sebagai derived requirements):
+{chr(10).join(f'   * {i}' for i in interpretations) if interpretations else '   * Tidak ada interpretasi khusus'}
+5. Asumsi Rekayasa Standar (JANGAN promosikan menjadi Fakta pengguna):
+{chr(10).join(f'   * {a}' for a in assumptions + v0_constraints) if (assumptions or v0_constraints) else '   * Asumsi standar'}
+6. Kebutuhan Terbuka / Epistemik Gap (Pertahankan sebagai batasan terbuka, JANGAN diisi tebakan):
+{chr(10).join(f'   * {u}' for u in v0_unresolved) if v0_unresolved else '   * Tidak ada ambiguitas terbuka'}
+
+DOKTRIN EPISTEMIK UNTUK PM:
+- Fakta Terverifikasi menjadi batasan mutlak ruang lingkup sistem.
+- Interpretasi logis diperbolehkan untuk memastikan keterbangunan (constructibility), tetapi jangan menambah atribut atau domain field baru yang tidak disebutkan pengguna.
+- Hormati `field terbuka` pada model entitas di atas; biarkan terbuka sebagai batasan defensif.
+- Butir terbuka / gap wajib diakui secara eksplisit, bukan ditutupi dengan spekulasi atribut sepihak.
+"""
+
+    # 2. Preservative Repair Section (Turn 1+)
+    repair_section = ""
+    if repair_count > 0:
+        prev_specs = state.get("specifications", "") or ""
+        prev_snippet = f"\nKANDIDAT SPESIFIKASI SEBELUMNYA:\n```\n{prev_specs}\n```\n" if prev_specs.strip() else "\nKANDIDAT SPESIFIKASI SEBELUMNYA: [KOSONG / GENERATION COLLAPSE]\n"
+        
+        repair_section = f"""
+PERINGATAN PERBAIKAN REINDEVSQUAD (Percobaan #{repair_count}):
+Spesifikasi sebelumnya ditolak oleh Phase-End Validator V1 dengan evaluasi deterministik:
+{pm_feedback if pm_feedback else 'Format spesifikasi belum memenuhi kelengkapan struktural atau kriteria penerimaan terukur.'}
+{prev_snippet}
+PANDUAN PERBAIKAN PRESERVATIF:
+1. PRESERVE: Pertahankan bagian spesifikasi sebelumnya yang sudah valid dan selaras dengan intent pengguna.
+2. REPAIR: Perbaiki secara spesifik pelanggaran yang dilaporkan validator di atas (misalnya lengkapi kriteria penerimaan atau perjelas ruang lingkup sistem).
+3. ANTI-COLLAPSE & V0 GROUNDING: Jika percobaan sebelumnya kosong atau terlalu pendek, JANGAN menekan luaran! Manfaatkan Fakta V0, Kebutuhan Fungsional V0, dan Interpretasi Minimal Layak di atas untuk menyusun spesifikasi yang lengkap, substantif, dan mandiri.
 """
 
     prompt = f"""Target Bahasa Pemrograman: {target_lang.upper()}
@@ -88,7 +136,7 @@ Deskripsi Tugas Pengguna:
 {user_task}
 {v0_section}
 {repair_section}
-Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tanpa basa-basi pembuka atau penutup."""
+Tuliskan dokumen spesifikasi teknis yang substantif, mencakup ringkasan sistem, kebutuhan fungsional, kriteria penerimaan terukur, dan batasan terbuka/epistemik sesuai pedoman di atas."""
 
     messages = [
         SystemMessage(content=PM_SYSTEM_PROMPT),
@@ -98,7 +146,7 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
     response = llm.invoke(messages)
     specs = response.content if hasattr(response, "content") else str(response)
 
-    # Domain detection & DRAFT Contract generation (mission-agnostic categories)
+    # Domain classification (mission-agnostic categories matching DomainType enum)
     task_lower = user_task.lower()
     if is_dart or "widget" in task_lower:
         domain = "FLUTTER_WIDGET"
@@ -111,15 +159,18 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
     else:
         domain = "ALGORITHM"
 
-    # Ekstrak acceptance semantics dari baris spesifikasi
+    # Robust acceptance semantics extraction from specification text (bullet/numbered lines)
     acceptance_semantics = []
     for line in specs.splitlines():
         line_s = line.strip()
-        if line_s.startswith("-") or line_s.startswith("*") or (len(line_s) > 2 and line_s[:2] in ("1.", "2.", "3.")):
-            acceptance_semantics.append(line_s.lstrip("-*0123456789. "))
+        if line_s.startswith("-") or line_s.startswith("*") or (len(line_s) > 2 and line_s[0].isdigit() and line_s[1] in (".", ")")):
+            cleaned = line_s.lstrip("-*0123456789. )").strip()
+            if cleaned and len(cleaned) > 5:
+                acceptance_semantics.append(cleaned)
     if not acceptance_semantics:
         acceptance_semantics = ["Sistem terkompilasi bebas error dan memenuhi fungsi dasar intent."]
 
+    # Standard requirement representation (strictly reusing existing schema)
     reqs = [
         {
             "req_id": "REQ-01",
@@ -128,21 +179,32 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
         }
     ]
 
+    goal_summary = user_task[:120] if user_task else "Spesifikasi sistem teknis"
+
+    # Reuse existing draft_contract factory and synthesis path strictly
     draft_contract = create_draft_contract(
         raw_intent=user_task,
         target_language=target_lang,
         domain=domain,
-        goal_summary=user_task[:120],
+        goal_summary=goal_summary,
         reqs=reqs
     )
 
-    # Observability: Catat pembuatan DRAFT contract
+    # Standard dual compatibility for validator inspection
+    draft_contract["requirements"] = reqs
+
+    # Standard provenance metadata
+    if isinstance(draft_contract.get("provenance"), dict):
+        draft_contract["provenance"]["v0_grounded"] = bool(v0_model)
+        draft_contract["provenance"]["pm_capability_version"] = "treatment_1_7_v1"
+
+    # Observability: Log draft contract creation
     tracer = get_tracer(state.get("run_id"))
     if tracer:
         tracer.log_event(
             stage="contract",
             event_type="contract_created",
-            iteration=0,
+            iteration=repair_count,
             data={
                 "contract_id": draft_contract.get("contract_id"),
                 "status": "DRAFT",
@@ -150,6 +212,8 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
                 "target_language": target_lang,
                 "req_count": len(reqs),
                 "repair_attempt": repair_count,
+                "v0_grounded": bool(v0_model),
+                "pm_capability_version": "treatment_1_7_v1"
             }
         )
 
@@ -165,4 +229,3 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
         "status": "pm_done",
         "logs": current_logs + [new_log]
     }
-

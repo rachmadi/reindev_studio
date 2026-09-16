@@ -2462,3 +2462,89 @@ Analisis seluruh corpus eksperimen yang tersedia untuk menemukan KEGAGALAN BERUL
 
 [ANTIGRAVITY - 11:58]
 (Memutakhirkan catatan riset, decision log, commit history, dan conversation log, melakukan commit formal terhadap laporan forensik empiris v1, serta menyinkronkan branch `experiment/fastapi-recovery` ke remote GitHub).
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## PEMBEKUAN LKG #1.6 & TREATMENT #1.7: PM REQUIREMENT FIDELITY v1
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Metadata
+- Tanggal: 2026-09-16
+- Waktu: 12:00 – 12:50 WIB
+- Platform: Google Antigravity
+- Intent Architect (IA): Muhammad Rachmadi
+- Agent: Antigravity (Agentic IDE / Co-developer)
+- Topik: Pembekuan LKG #1.6, Penerapan 5 Koreksi Pengetatan Arsitektural, dan Evaluasi Pilot 1x3 Treatment #1.7
+
+## Log Percakapan (Verbatim)
+
+---
+
+[USER (INTENT ARCHITECT) - 12:00]
+"INSTRUKSI — FREEZE TREATMENT #1.6 & CREATE EXPERIMENT BRANCH v1
+Membekukan Treatment #1.6 sebagai Frozen LKG penelitian dan membuat branch eksperimen baru yang identik dengan state #1.6.
+Branch eksperimen: experiment/treatment-1.7-agent-capability
+Tag: reindev-lkg-1.6
+Parent: 37946e5c0d36a3736be6d86571e9e8a07256c0f5"
+
+[ANTIGRAVITY - 12:05]
+(Menuntaskan pembekuan formal Treatment #1.6:
+ 1. Menjalankan verifikasi regresi penuh: 683/683 unit tests PASS (35.09s).
+ 2. Menjalankan Pre-Flight Gates A–I: 100% PASS (Oracle SHA-256 intact 100% di ketiga task).
+ 3. Membuat tag annotasi permanen `reindev-lkg-1.6` pada commit `37946e5c0d36a3736be6d86571e9e8a07256c0f5`.
+ 4. Membuat dan beralih ke branch baru `experiment/treatment-1.7-agent-capability` yang 100% identik dengan parent LKG.
+ 5. Mendorong tag dan branch eksperimen ke remote GitHub).
+
+---
+
+[USER (INTENT ARCHITECT) - 12:10]
+"INSTRUKSI — TREATMENT #1.7: PM REQUIREMENT FIDELITY & CONSTRUCTIBLE COMPLETION v1
+Tujuan: memperkuat CAPABILITY PM dalam menghasilkan Application Requirement Model yang faithful, constructible, lengkap sejauh evidence memungkinkan, tidak kosong karena generation collapse (FP-002), dan mempertahankan provenance epistemik V0.
+Lokasi: experiment/treatment-1.7-agent-capability.
+Tata kelola, Oracle, dan validator tetap beku."
+
+[ANTIGRAVITY - 12:15]
+(Menyusun implementation plan formal Treatment #1.7 di `implementation_plan.md` mencakup analisis akar masalah FP-002, perancangan constructive section prompting, stratifikasi epistemik V0, preservative repair guidance, dan rencana pilot 1x3 pada `qwen2.5-coder:7b`).
+
+---
+
+[USER (INTENT ARCHITECT) - 12:22]
+"Saya review terhadap failure corpus yang sudah kita punya dan baseline #1.6. Secara arah, GO, tetapi ada beberapa bagian yang harus diperketat sebelum eksekusi. Yang paling penting: jangan sampai treatment yang dimaksudkan memperkuat PM capability malah diam-diam menjadi perubahan schema/contract architecture.
+
+Koreksi wajib:
+1. Jangan hardcode '4-section output' sebagai capability requirement. Section 1...4 boleh jadi strategi prompting, tapi bukan invariant baru PM.
+2. draft_contract synthesis perlu dibatasi. Reuse existing draft_contract schema dan existing synthesis path. Jangan membuat contract representation baru.
+3. 'Full V0 ingestion' jangan berarti PM bebas menggunakan semua V0 sebagai requirement. Terapkan doktrin: Interpretation != Invention (FACT = batasan mutlak, INTERPRETATION = derived req, ASSUMPTION != fact, UNRESOLVED = open gap tanpa tebakan).
+4. Empty Completion Recovery harus menguji capability, bukan fallback (NO hardcoded template, NO synthetic requirement injection).
+5. Static audit harus mencari bentuk solver yang lebih luas (if task, if model, if failure_pattern, hardcoded symbols).
+Metodologi: Rumuskan hipotesis H1.7: Penguatan Evidence-Grounded Requirement Completion pada PM akan menguji apakah capability ini mengurangi kejadian PM empty completion (FP-002) dan/atau meningkatkan recovery-nya, tanpa meningkatkan failure atau regression downstream."
+
+[ANTIGRAVITY - 12:26]
+(Mengonfirmasi dan membatalkan run awal yang sedang berjalan, menerapkan 5 koreksi pengetatan arsitektural:
+ 1. Memutakhirkan `implementation_plan.md` dengan hipotesis H1.7 dan 5 pengetatan.
+ 2. Memperbarui `backend/agents/pm.py`: membebaskan parser dari invariant heading kaku, menggunakan kembali 100% skema dan jalur `create_draft_contract` eksisting, menerapkan stratifikasi epistemik V0 ketat, dan bimbingan anti-collapse murni via prompt repair tanpa fallback sintetik Python.
+ 3. Menyusun unit test suite `test_pm_capability_treatment_v1.py` (11 test cases) dan static audit suite `test_pm_static_audit_v1.py` (memverifikasi 0 solver/hardcoding).
+ 4. Seluruh 25 unit test + static audit PASS (0.70s), full regression suite 695/695 PASS (32.38s), dan Pre-Flight Gates A–I 100% PASS.
+ 5. Meluncurkan kembali Controlled Pilot 1x3 pada model `qwen2.5-coder:7b`).
+
+---
+
+[USER (INTENT ARCHITECT) - 12:41]
+"ADa progress?"
+
+[ANTIGRAVITY - 12:43]
+(Melaporkan status eksekusi: Task 1 [FastAPI] dan Task 2 [CLI] telah selesai; Task 3 [Flutter] sedang aktif berjalan di loop perbaikan.
+ Mengungkapkan temuan empiris awal yang signifikan pada kapabilitas PM:
+ - PM Turn 0 PASS rate: 100% (3/3 task).
+ - FP-002 (Empty Completion Collapse): 0 kejadian di seluruh task.
+ - Spesifikasi PM substantif [347 kata di FastAPI, 294 kata di CLI, 367 kata di Flutter]).
+
+---
+
+[ANTIGRAVITY - 12:47]
+(Melaporkan penyelesaian tuntas seluruh 3 run Controlled Pilot 1x3:
+ 1. `fastapi_t1`: PM Turn 0 PASS (347 kata, 0 violations), Developer mencapai loop 5 (4/5 tests passed).
+ 2. `cli_t1`: PM Turn 0 PASS (294 kata, 0 violations, FP-002 tereliminasi total), tertahan di Gate 2 Architect Scenario Compatibility dengan zero downstream leakage.
+ 3. `flutter_t1`: PM Turn 0 PASS (367 kata), Architect PASS, Developer PASS, Reviewer APPROVED (2/2 tests PASS, 100% Convergent pada Loop 0).
+ Menyusun laporan evaluasi resmi `treatment1_7_pm_requirement_fidelity_v1.md`, memutakhirkan catatan riset, decision log D-117, commit history, dan conversation log. Hipotesis H1.7 terkonfirmasi empiris).
