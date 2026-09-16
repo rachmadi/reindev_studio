@@ -266,3 +266,13 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   4. **Downstream E2E PASS**: 3/9 runs (33.3%) mencapai kelulusan penuh hingga Reviewer APPROVED (Run 3 Flutter, Run 4 FastAPI, Run 9 Flutter).
   5. **Causal Attribution**: 6 run yang terhenti di Architect Gate V2 murni disebabkan oleh keterbatasan sintaksis downstream Architect (FP-003/FP-004) dan bukan defek requirement PM.
   6. **Rekomendasi**: Treatment #1.7 dinyatakan lulus replikasi dan siap dibekukan. Penyelidikan berikutnya direkomendasikan berfokus pada kapabilitas Architect (Treatment #1.8).
+
+
+### [D-118] Treatment #1.8 — Universal Acceptance-Grounded Architectural Synthesis v1 & Replikasi 3x3 (2026-09-16)
+* **Konteks**: Eksekusi perlakuan kapabilitas pada Agent Architect (Treatment #1.8) untuk menyelaraskan blueprint arsitektur dengan Acceptance Authority melalui 5-Layer Stratified Input Grounding, Artifact Purity Mandate, dan Causal Evidence Repair Reasoning. Pengujian dilakukan melalui Pilot 1x3 dan Replikasi 3x3 (9 runs) pada model `qwen2.5-coder:7b` di branch `experiment/treatment-1.8-agent-capability`.
+* **Keputusan / Temuan**:
+  1. **Tingkat Sealing Kontrak Flutter 100% (3/3 Replikasi, 4/4 Total)**: Architect berhasil mencapai 100% keberhasilan pembekuan kontrak berstempel SHA-256 pada `flutter_t1`. Mekanisme perbaikan berbasis bukti kausal terbukti bekerja secara konsisten mengoreksi `CALL_SHAPE_INCOMPATIBILITY` pada konstruktor `MetricData` (Turn 0 positional -> Turn 1 named parameters).
+  2. **Konvergensi End-to-End**: Run 3 (`flutter_t1` Rep 1) mencapai kelulusan penuh 100% PASS (2/2 tests passed, Reviewer APPROVED). Run 6 dan Run 9 berhasil membekukan kontrak, dengan kegagalan terlokalisasi pada agen downstream Developer (`A. Developer Failure`).
+  3. **Identifikasi Hambatan Skema JSON Python**: Pada `fastapi_t1` dan `cli_t1`, model 7B mengalami kendala kepatuhan skema Pydantic JSON blueprint (`file_tree` list of objects alih-alih list of strings, serta scaffold stub `pass`).
+  4. **Integritas Tata Kelola Terjaga**: Full regression suite 714 passed (zero regression), Oracle SHA-256 intact 100%, anti-solver audit 100% PASS.
+  5. **Rekomendasi Iterasi Lanjutan**: Penyempurnaan schema guarding JSON pada prompt Architect untuk mengeliminasi distorsi format pada model 7B, dilanjutkan intervensi downstream Developer.

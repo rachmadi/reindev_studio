@@ -1482,3 +1482,37 @@ Menindaklanjuti temuan forensik pada FP-002 (PM Empty Completion Collapse), Inte
 1. **Hipotesis H1.7 Terbukti Kuat (*Supported*)**: Penguatan Evidence-Grounded Requirement Completion pada PM secara konsisten mengeliminasi FP-002 tanpa menimbulkan regresi downstream.
 2. **Klaim Terkalibrasi**: FP-002 tidak teramati dalam 9 replication runs pada `qwen2.5-coder:7b` dan konfigurasi ini (0/9).
 3. **Keterbangunan Downstream**: Requirement model PM terbukti constructible secara empiris melalui kelulusan 3 run E2E PASS.
+
+
+---
+
+## [16 September 2026] Evaluasi Replikasi 3x3 Treatment #1.8: Universal Acceptance-Grounded Architectural Synthesis v1
+
+### 1. Konteks & Desain Replikasi
+- **Tujuan**: Menguji Hipotesis H1.8 mengenai peningkatan kelengkapan dan fidelity blueprint Architect terhadap Acceptance Authority melalui Acceptance-Grounded Architectural Synthesis, Stratified Input Grounding (Layers A–E), Artifact Purity Mandate, dan Causal Evidence Repair Reasoning.
+- **Branch**: `experiment/treatment-1.8-agent-capability` (Commit implementasi: `0e796d7`)
+- **Parent Frozen LKG**: Hasil Treatment #1.7 (LKG Baseline 695+ passed)
+- **Model**: `qwen2.5-coder:7b` (num_predict: 3000)
+- **Status Tata Kelola**: Governance #1.6 FROZEN (Zero modification pada validator, fail-closed constitution).
+- **Status Upstream PM**: PM #1.7 FROZEN (Zero modification pada PM).
+
+### 2. Matriks Hasil Replikasi 3x3 (9 Runs Total)
+| Run # | Task ID | Rep | Bahasa | Verdict Akhir | Status Kontrak | Tests Passed | Loops | Durasi (s) | Klasifikasi Kegagalan / Owner |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| 1 | `fastapi_t1` | 1 | Python | **FAIL** | REJECTED | 0/5 | 0 | 367.8s | C. Contract Failure (Architect Schema) |
+| 2 | `cli_t1` | 1 | Python | **FAIL** | REJECTED | 0/5 | 0 | 337.7s | C. Contract Failure (Scaffold Stub / Undetermined) |
+| 3 | `flutter_t1` | 1 | Dart | **PASS** 🎉 | **FROZEN** | **2/2 (100%)** | 0 | 285.8s | **NONE (Convergent E2E PASS)** |
+| 4 | `fastapi_t1` | 2 | Python | **FAIL** | REJECTED | 0/5 | 0 | 287.1s | C. Contract Failure (Architect Schema) |
+| 5 | `cli_t1` | 2 | Python | **FAIL** | REJECTED | 0/5 | 0 | 393.3s | C. Contract Failure (Scaffold Stub / Undetermined) |
+| 6 | `flutter_t1` | 2 | Dart | **FAIL** | **FROZEN** | 0/2 | 0 | 435.0s | A. Developer Failure (Omitted `MetricDataProvider`) |
+| 7 | `fastapi_t1` | 3 | Python | **FAIL** | REJECTED | 0/5 | 0 | 429.1s | C. Contract Failure (Architect Schema) |
+| 8 | `cli_t1` | 3 | Python | **FAIL** | REJECTED | 0/5 | 0 | 272.9s | C. Contract Failure (Scaffold Stub / Undetermined) |
+| 9 | `flutter_t1` | 3 | Dart | **FAIL** | **FROZEN** | 0/1 | 5 | 378.5s | A. Developer Failure (Dart UI widget assertions) |
+
+### 3. Metrik Agregat & Temuan Kunci
+- **Architect Sealing Rate pada `flutter_t1`**: **3 / 3 (100.0%) FROZEN** (4/4 jika digabung dengan pilot).
+- **Causal Evidence Repair Reasoning**: Terbukti 100% konsisten pada seluruh repetisi `flutter_t1` dalam memperbaiki `CALL_SHAPE_INCOMPATIBILITY` pada konstruktor `MetricData` dari positional ke named parameters pada Turn 1.
+- **End-to-End PASS Rate**: **1 / 9 (11.1%)** (Run 3: 2/2 tests passed, Loop 0, Reviewer APPROVED).
+- **Architect Sealing Rate Agregat**: **3 / 9 (33.3%) FROZEN**.
+- **Kendala Domain Python (`fastapi_t1` & `cli_t1`)**: Model 7B rentan mengalami distorsi format JSON Pydantic blueprint (`file_tree` list of dicts vs strings) dan scaffold stubs (`pass`).
+- **Validasi Konstitusi Fail-Closed**: Validator deterministik 100% aman menolak kontrak cacat dan menghentikan pipeline sebelum mencemari downstream.

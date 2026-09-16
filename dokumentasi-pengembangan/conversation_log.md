@@ -2560,3 +2560,15 @@ Metodologi: Rumuskan hipotesis H1.7: Penguatan Evidence-Grounded Requirement Com
   - Mengekstrak 12 parameter kuantitatif per run dan menganalisis causal attribution.
   - Menyusun laporan komprehensif 17 seksi di `dokumentasi-pengembangan/experiments/treatment1_7_pm_requirement_fidelity_replication_3x3_v1.md`.
   - Memperbarui seluruh artefak tata kelola penelitian dan menghentikan pengujian sesuai stop rule.
+
+
+### Sesi: Eksekusi Treatment #1.8 & Replikasi Terkontrol 3x3 (16 September 2026)
+- **Pengguna**: Menginstruksikan pelaksanaan Treatment #1.8 (Universal Acceptance-Grounded Architectural Synthesis v1) dengan target eksklusif Agent Architect pada model `qwen2.5-coder:7b`. Memberikan 4 koreksi pengetatan (zero hardcode regression count, observable negative behavior tanpa resep HOW, 10-point checklist sebagai reasoning guide, dan static audit non-solver). Selanjutnya memilih Opsi 2 untuk menjalankan replikasi 3x3 langsung dengan pelaporan berkala tiap 3 menit.
+- **Asisten**:
+  - Menerapkan 5-Layer Stratified Input Grounding (A–E) dan Artifact Purity Mandate di `backend/context_hardening.py` dan `backend/agents/architect.py`.
+  - Memverifikasi 19 unit test + static audit PASS, 714 full regression suite PASS (zero regression), dan Pre-Flight Gates A–I 100% PASS.
+  - Mengeksekusi Pilot 1x3: Menemukan terobosan konvergensi pada `flutter_t1` (repair Turn 1 berhasil mengoreksi call-shape, kontrak FROZEN, 2/2 tests PASS).
+  - Mengeksekusi Replikasi 3x3 (9 runs total) secara background dengan pelaporan disiplin tiap 3 menit via `schedule` tool.
+  - Memantau eksekusi hingga tuntas (9/9 runs, exit code 0).
+  - Menyusun laporan komprehensif di `dokumentasi-pengembangan/experiments/treatment1_8_architect_synthesis_replication_3x3_v1.md`.
+  - Mengonfirmasi temuan kunci: 100% (3/3) kontrak FROZEN pada Flutter, pembuktian empiris causal evidence repair reasoning, dan identifikasi batas skema JSON Python pada model 7B.

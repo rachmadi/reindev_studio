@@ -751,3 +751,26 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Menerbitkan laporan riset formal di `dokumentasi-pengembangan/experiments/treatment1_7_pm_requirement_fidelity_replication_3x3_v1.md`.
   - Menyimpan data checkpoint dan parsed trace di `treatment1_7_replication_3x3_summary.json` dan `treatment1_7_replication_3x3_parsed_details.json`.
   - Mengonfirmasi reduksi FP-002 menjadi 0% (0/9) dan E2E PASS rate 33.3% (3/9).
+
+
+### Commit: 0e796d7 — 2026-09-16
+- **Commit Hash:** `0e796d7`
+- **Status:** TERVERIFIKASI PENUH (714 tests PASS, Gates A–I PASS, Oracle Intact)
+- **Tipe:** `feat(architect)`
+- **Pesan Commit:** `feat(architect): Treatment #1.8 - Universal Acceptance-Grounded Architectural Synthesis v1`
+- **Waktu:** 2026-09-16 14:35 WIB
+- **Cakupan Perubahan:**
+  - `backend/context_hardening.py`: 5-Layer Stratified Input Grounding (Layer A Ground Truth, Layer B Epistemic V0, Layer C PM Proposal, Layer D Causal Diagnostics, Layer E Technical Constraints & Invariants), Observable Negative Behavior guidance, dan 10-Point Architectural Checklist.
+  - `backend/agents/architect.py`: Artifact Purity Mandate (hanya berkas implementasi murni, larangan mutlak menghasilkan berkas test), call-shape fidelity principle, dan pemanggilan unconditionally build decision context pada Turn 0 & Repair.
+  - `backend/tests/test_architect_capability_treatment_v1.py` (NEW): 14 unit tests menguji Stratifikasi A–E, Turn 0 grounding, artifact purity, negative behavior, repair delegation, dan 5-domain generality.
+  - `backend/tests/test_architect_static_audit_v1.py` (NEW): 5 tests memverifikasi ketiadaan solver kondisional per task/domain, ketiadaan hardcoded failure mapping, ketiadaan symbol injection, dan LLM invocation integrity.
+
+### Commit: f45728a — 2026-09-16
+- **Commit Hash:** `f45728a`
+- **Status:** TERVERIFIKASI PENUH (Replikasi 3x3 Selesai, 9/9 Runs, Exit Code 0)
+- **Tipe:** `docs(experiment)`
+- **Pesan Commit:** `docs(experiment): add treatment 1.8 3x3 replication research report`
+- **Waktu:** 2026-09-16 16:02 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/treatment1_8_architect_synthesis_replication_3x3_v1.md`: Laporan riset formal komprehensif replikasi 3x3 Treatment #1.8.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_replication_3x3_summary.json`: Arsip telemetri kuantitatif 9 run replikasi.
