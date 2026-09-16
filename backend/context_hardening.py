@@ -566,9 +566,38 @@ def format_canonical_blueprint_schema_constraints() -> str:
         if field_name in ("schema_version", "task_id", "target_language"):
             continue
         req_label = "REQUIRED" if f.is_required() else "OPTIONAL"
-        annot_str = str(f.annotation).replace("typing.", "").replace("backend.blueprint_schema.", "").replace("blueprint_schema.", "")
+        annot_str = (
+            str(f.annotation)
+            .replace("typing.", "")
+            .replace("backend.blueprint_schema.", "")
+            .replace("blueprint_schema.", "")
+            .replace("<class 'str'>", "str")
+        )
         desc = f.description or ""
         lines.append(f"  - {field_name}: {annot_str} [{req_label}] — {desc}")
+
+    # Canonical Sub-model Inspection (Introspected directly from Pydantic model fields)
+    if BlueprintFileModule is not None and hasattr(BlueprintFileModule, "model_fields"):
+        lines.append("  Module Schema for elements in 'files':")
+        for fn, f in BlueprintFileModule.model_fields.items():
+            req_label = "REQUIRED" if f.is_required() else "OPTIONAL"
+            ann = str(f.annotation).replace("typing.", "").replace("<class 'str'>", "str")
+            lines.append(f"    * {fn}: {ann} [{req_label}] — {f.description or ''}")
+
+    if BlueprintInterfaceContract is not None and hasattr(BlueprintInterfaceContract, "model_fields"):
+        lines.append("  Contract Schema for elements in 'interface_contracts':")
+        for fn, f in BlueprintInterfaceContract.model_fields.items():
+            req_label = "REQUIRED" if f.is_required() else "OPTIONAL"
+            ann = str(f.annotation).replace("typing.", "").replace("<class 'str'>", "str")
+            lines.append(f"    * {fn}: {ann} [{req_label}] — {f.description or ''}")
+
+    lines.extend([
+        "  Relational Representation Rules (Derived from ArchitecturalBlueprint model validators):",
+        "    * 'file_tree' is strictly a list of file path strings (List[str]). Never nest scaffold dictionaries inside 'file_tree'.",
+        "    * 'files' is strictly a top-level dictionary (Dict[str, BlueprintFileModule]) mapping each path string from 'file_tree' to its module scaffold.",
+        "    * Both 'file_tree' and 'files' are top-level root keys of the blueprint; never replace, omit, or merge them together.",
+        "    * Every file declared in 'file_tree' must exist as a key in 'files', and vice-versa (1-to-1 consistency)."
+    ])
     return "\n".join(lines)
 
 
@@ -862,6 +891,9 @@ def build_architect_repair_context(
     # ========================================================
     # [6] REPAIR TARGET
     # ========================================================
+    schema_constraints = format_canonical_blueprint_schema_constraints()
+    schema_target_text = f"\n\n{schema_constraints}" if schema_constraints else ""
+
     if ledger is not None:
         sections["sec_06_repair_target"] = (
             "[6] REPAIR TARGET\n==================\n"
@@ -869,6 +901,7 @@ def build_architect_repair_context(
             + "\n\nGENERIC REPAIR PRESERVATION (Anti-Field-Loss):\n"
             + "  - Preserve all elements, contracts, and schema fields that remain valid under canonical schema.\n"
             + "  - Perform localized repair: CURRENT VALID STATE + REPAIRED ELEMENT."
+            + schema_target_text
         )
     else:
         sections["sec_06_repair_target"] = (
@@ -880,6 +913,7 @@ def build_architect_repair_context(
             "  - Preserve all elements, contracts, and schema fields that remain valid under canonical schema.\n"
             "  - Perform localized repair: CURRENT VALID STATE + REPAIRED ELEMENT.\n"
             "PRESERVE: All other existing valid interfaces, data models, target artifacts, and behavior."
+            + schema_target_text
         )
 
     # ========================================================
@@ -896,6 +930,7 @@ def build_architect_repair_context(
         "FORBIDDEN:",
         "  x Blind regeneration from scratch (discarding valid interfaces or state)",
         "  x Dropping fields or elements that remain valid under the canonical schema (Generic Anti-Field-Loss)",
+        "  x Dropping top-level schema fields (e.g. omitting 'files' when repairing 'file_tree')",
         "  x Dropping previously compatible public interfaces, scenarios, or modules",
         "  x Mutating immutable acceptance obligations or oracle test suite",
         "  x Introducing regressions on previously COMPATIBLE scenarios"

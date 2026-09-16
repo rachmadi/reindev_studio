@@ -162,8 +162,12 @@ PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
    - Stage 2 (Canonical Serialization): Lakukan serialisasi model semantik tersebut ke dalam skema ArchitecturalBlueprint kanonikal yang ada tanpa improvisasi format atau distorsi tipe data.
 7. Schema Fidelity as Representation Contract:
    - Skema luaran adalah kontrak representasi yang diturunkan langsung dari definisi ArchitecturalBlueprint kanonikal.
-   - Koleksi WAJIB mempertahankan semantik koleksi (misalnya `file_tree` sebagai list of strings, `interface_contracts` dan `data_models` sebagai list of objects).
+   - Koleksi WAJIB mempertahankan semantik koleksi:
+     * `file_tree`: WAJIB List[str] berisi string path berkas (contoh: ["main.py"]).
+     * `files`: WAJIB Dict level teratas yang memetakan setiap path dari `file_tree` ke modul scaffold-nya.
+     * `interface_contracts` dan `data_models` adalah list of objects.
    - Kamus berkas (`files`) WAJIB memiliki kunci yang sama persis dengan jalur di `file_tree`.
+   - DILARANG menggabungkan, mengorbankan, atau menghilangkan salah satu dari `file_tree` atau `files`. Keduanya adalah field terpisah di root JSON.
    - Seluruh field wajib yang ditentukan oleh skema harus dipertahankan.
 8. Blueprint Integrity Invariants (A-H — Architect Reasoning Guidance):
    - INVARIANT-A (Identity Stability): Setiap antarmuka yang dideklarasikan memiliki identitas yang stabil.
@@ -458,8 +462,11 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan (call-shape) yang kompatibel?
 5. Observable Behavior: Apakah scaffold merepresentasikan perilaku observable yang disyaratkan secara memadai untuk analisis kompatibilitas deterministik?
 6. Two-Stage Synthesis & Relational Invariants: Apakah model semantik telah dirancang sebelum serialisasi, dan apakah Invariants A-H terpenuhi?
-7. Schema Fidelity as Representation Contract: Apakah format serialisasi mengikuti skema kanonikal ArchitecturalBlueprint secara presisi tanpa distorsi tipe data (koleksi berupa array/list, kunci files sesuai file_tree, seluruh field wajib terisi)?
-8. Generic Repair Preservation: Jika dalam giliran repair, apakah seluruh field dan elemen valid sebelumnya dipertahankan tanpa penghapusan atau distorsi (CURRENT VALID STATE + REPAIRED ELEMENT)?
+7. Schema Fidelity as Representation Contract: Apakah format serialisasi mengikuti skema kanonikal ArchitecturalBlueprint secara presisi tanpa distorsi tipe data:
+   - `file_tree`: WAJIB List[str] berisi daftar path berkas (contoh: ["path/ke/file.ext"]). Dilarang menaruh objek/scaffold di dalam file_tree.
+   - `files`: WAJIB Dict[str, dict] level teratas yang memetakan setiap berkas di file_tree ke objek scaffold-nya.
+   - `interface_contracts`: WAJIB List[dict] yang memuat field wajib identifier dan target_file.
+8. Generic Repair Preservation (Anti-Field-Loss): Jika dalam giliran repair, apakah seluruh field level teratas (termasuk `files`) dan elemen valid sebelumnya dipertahankan tanpa penghapusan atau distorsi (CURRENT VALID STATE + REPAIRED ELEMENT)?
 (Catatan: Pre-seal checklist ini adalah panduan penalaran Architect; bukan Acceptance Authority dan tidak menggantikan validator deterministik).
 Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===."""
 
