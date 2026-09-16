@@ -150,13 +150,34 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
 1. File-Centric Signatures & Scaffolding: Setiap berkas dituliskan sebagai kerangka interface di dalam string `code_scaffold`.
    - BATAS SCAFFOLD WAJIB: `code_scaffold` berupa interface signatures dan stubs minimal.
-   - OBSERVABLE NEGATIVE BEHAVIOR: Scaffolds must represent the required observable negative behavior sufficiently for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.
+   - OBSERVABLE BEHAVIOR: Scaffolds must represent sufficient observable behavior for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.
    - ARTIFACT PURITY: `file_tree` dan `files` HANYA untuk modul implementasi kode. DILARANG memasukkan file test atau QA test suite (seperti test_*.py atau test/*_test.dart) ke dalam file_tree atau files!
    - TARGET UKURAN: <=1200 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
 2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator, instance dan class dekorator WAJIB dideklarasikan atau diimpor secara lokal di berkas yang bersangkutan.
-3. Authority Hierarchy: Acceptance Oracle adalah Acceptance Authority (WHAT). Architect adalah Design Authority (HOW). Pertahankan seluruh obligasi antarmuka dan skenario otoritatif secara semantik (call-shape fidelity).
+3. Authority Hierarchy: Acceptance Oracle adalah Acceptance Authority (WHAT). Canonical Schema dan Governance menentukan aturan validitas struktur. Architect adalah Design Authority (HOW). Pre-seal checklist dan Invariants A-H adalah panduan penalaran (reasoning guidance) Architect; validator deterministik menentukan REALITY.
 4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
 5. Canonical Data Models: Setiap entitas dalam `data_models` WAJIB menggunakan format kanonikal: `field_name` dan `field_type` untuk setiap item dalam `fields`.
+6. Two-Stage Architect Synthesis:
+   - Stage 1 (Semantic Blueprint Model): Bangun model penalaran semantik terlebih dahulu (acceptance obligations, scenarios, architectural representations, interface identities, target artifacts, dan scaffold observable behaviors).
+   - Stage 2 (Canonical Serialization): Lakukan serialisasi model semantik tersebut ke dalam skema ArchitecturalBlueprint kanonikal yang ada tanpa improvisasi format atau distorsi tipe data.
+7. Schema Fidelity as Representation Contract:
+   - Skema luaran adalah kontrak representasi yang diturunkan langsung dari definisi ArchitecturalBlueprint kanonikal.
+   - Koleksi WAJIB mempertahankan semantik koleksi (misalnya `file_tree` sebagai list of strings, `interface_contracts` dan `data_models` sebagai list of objects).
+   - Kamus berkas (`files`) WAJIB memiliki kunci yang sama persis dengan jalur di `file_tree`.
+   - Seluruh field wajib yang ditentukan oleh skema harus dipertahankan.
+8. Blueprint Integrity Invariants (A-H — Architect Reasoning Guidance):
+   - INVARIANT-A (Identity Stability): Setiap antarmuka yang dideklarasikan memiliki identitas yang stabil.
+   - INVARIANT-B (Consistent Location): Setiap antarmuka memiliki lokasi target artifact yang konsisten.
+   - INVARIANT-C (File Structure Consistency): Koleksi berkas memiliki konsistensi 1-ke-1 dengan modul implementasi.
+   - INVARIANT-D (Obligation Representation): Setiap obligasi penerimaan memiliki representasi arsitektural.
+   - INVARIANT-E (Interface Shape Preservation): Bentuk antarmuka tidak berubah secara semantik tanpa bukti.
+   - INVARIANT-F (Non-Destructive Repair): Perbaikan tidak boleh menghapus elemen atau field lain yang valid di bawah skema kanonikal.
+   - INVARIANT-G (Relational Consistency): Artefak, antarmuka, dan scaffold membentuk struktur yang konsisten secara relasional.
+   - INVARIANT-H (Serialization Equivalence): Serialisasi skema merepresentasikan struktur semantik yang identik.
+9. Generic Repair Preservation (Anti-Field-Loss):
+   - Prinsip: CURRENT VALID STATE + REPAIRED ELEMENT (perbaikan terlokalisasi).
+   - Pada giliran repair, pertahankan seluruh elemen dan field yang masih valid di bawah skema kanonikal.
+   - DILARANG meregenerasi subset dari state atau menghilangkan field valid (seperti `identifier`, `target_file`, atau anggota modul).
 
 Tuliskan output JSON yang valid, presisi, dan konsisten tanpa teks pengantar berlebih di luar penanda.
 """
@@ -358,9 +379,12 @@ def architect_agent(state: SquadState) -> dict:
         feedback_section = (
             f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
             f"{contract_feedback}\n\n"
-            "INSTRUKSI REVISI WAJIB:\n"
-            "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
-            "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
+            "INSTRUKSI REVISI WAJIB (GENERIC REPAIR PRESERVATION):\n"
+            "- Lakukan perbaikan terlokalisasi: CURRENT VALID STATE + REPAIRED ELEMENT.\n"
+            "- Perbaiki hubungan arsitektural atau elemen skema yang dinyatakan tidak valid sesuai feedback di atas.\n"
+            "- Pertahankan seluruh elemen, antarmuka, dan field yang masih valid di bawah skema kanonikal ArchitecturalBlueprint.\n"
+            "- DILARANG menghapus atau meregenerasi hanya subset dari state (anti-field-loss).\n"
+            "- Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
         )
 
     # Environment Grounding untuk Architect
@@ -432,7 +456,10 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
 3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
 4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan (call-shape) yang kompatibel?
-5. Observable Negative Behavior: Apakah representasi perilaku negatif yang disyaratkan terwakili dalam scaffold secara memadai untuk analisis kompatibilitas deterministik?
+5. Observable Behavior: Apakah scaffold merepresentasikan perilaku observable yang disyaratkan secara memadai untuk analisis kompatibilitas deterministik?
+6. Two-Stage Synthesis & Relational Invariants: Apakah model semantik telah dirancang sebelum serialisasi, dan apakah Invariants A-H terpenuhi?
+7. Schema Fidelity as Representation Contract: Apakah format serialisasi mengikuti skema kanonikal ArchitecturalBlueprint secara presisi tanpa distorsi tipe data (koleksi berupa array/list, kunci files sesuai file_tree, seluruh field wajib terisi)?
+8. Generic Repair Preservation: Jika dalam giliran repair, apakah seluruh field dan elemen valid sebelumnya dipertahankan tanpa penghapusan atau distorsi (CURRENT VALID STATE + REPAIRED ELEMENT)?
 (Catatan: Pre-seal checklist ini adalah panduan penalaran Architect; bukan Acceptance Authority dan tidak menggantikan validator deterministik).
 Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===."""
 

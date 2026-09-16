@@ -122,6 +122,27 @@ except (ImportError, ValueError):
         validate_architect_repair_context_delivery = None  # type: ignore
 
 try:
+    from .blueprint_schema import (
+        ArchitecturalBlueprint,
+        BlueprintInterfaceContract,
+        BlueprintFileModule,
+        BlueprintDataModel,
+    )
+except (ImportError, ValueError):
+    try:
+        from blueprint_schema import (
+            ArchitecturalBlueprint,
+            BlueprintInterfaceContract,
+            BlueprintFileModule,
+            BlueprintDataModel,
+        )
+    except ImportError:
+        ArchitecturalBlueprint = None  # type: ignore
+        BlueprintInterfaceContract = None  # type: ignore
+        BlueprintFileModule = None  # type: ignore
+        BlueprintDataModel = None  # type: ignore
+
+try:
     from .developer_semantic_repair import (
         normalize_runtime_evidence,
         compare_scenario_with_observation,
@@ -531,8 +552,109 @@ def check_and_resolve_authority_conflicts(
     return sections, conflicts
 
 
+def format_canonical_blueprint_schema_constraints() -> str:
+    """
+    Ekstrak batasan struktural kanonikal langsung dari definisi skema ArchitecturalBlueprint.
+    TIDAK meng-hardcode aturan solver atau asumsi task spesifik.
+    """
+    if ArchitecturalBlueprint is None:
+        return ""
+    lines = [
+        "CANONICAL BLUEPRINT SCHEMA CONSTRAINTS (Derived directly from ArchitecturalBlueprint definition):"
+    ]
+    for field_name, f in ArchitecturalBlueprint.model_fields.items():
+        if field_name in ("schema_version", "task_id", "target_language"):
+            continue
+        req_label = "REQUIRED" if f.is_required() else "OPTIONAL"
+        annot_str = str(f.annotation).replace("typing.", "").replace("backend.blueprint_schema.", "").replace("blueprint_schema.", "")
+        desc = f.description or ""
+        lines.append(f"  - {field_name}: {annot_str} [{req_label}] — {desc}")
+    return "\n".join(lines)
+
+
+def format_relational_blueprint_state(
+    oracle_obs: Optional[List[Any]] = None,
+    oracle_items: Optional[List[str]] = None,
+    scenarios: Optional[List[Any]] = None,
+    contract: Optional[Dict[str, Any]] = None,
+    auth_file: str = "",
+) -> str:
+    """
+    Membangun representasi struktural turunan [F] RELATIONAL BLUEPRINT STATE.
+    Diturunkan secara deterministik dari evidence yang ada (A-E) tanpa mengarang kewajiban baru.
+    Hierarchy: Acceptance Authority > Existing canonical schema / governance > Architect relational guidance.
+    """
+    lines = [
+        "Relational Dependency Mapping:",
+        "  Acceptance Obligation -> Architectural Representation -> Interface Contract -> File Representation -> Scenario Compatibility",
+        "",
+        "Derived Relational State Ledger (Grounded strictly in available evidence):"
+    ]
+
+    has_entries = False
+    if oracle_obs:
+        for ob in oracle_obs[:8]:
+            sym = (
+                getattr(ob, "public_identity", "")
+                or getattr(ob, "symbol_name", "")
+                or getattr(ob, "callee", "")
+                or getattr(ob, "identifier", "")
+                or str(getattr(ob, "obligation_id", ""))
+            )
+            sig = (
+                getattr(ob, "observable_behavior", "")
+                or getattr(ob, "expected_signature", "")
+                or getattr(ob, "signature", "")
+            )
+            kind = getattr(ob, "obligation_kind", "")
+            target = auth_file or getattr(ob, "target_file", "") or "authoritative_target_file"
+            lines.append(f"  - Obligation: '{sym}' [{kind or 'FUNCTIONAL'}] | Shape: {sig or 'compatible'} -> Target Artifact: '{target}'")
+            has_entries = True
+    elif oracle_items:
+        for it in oracle_items[:8]:
+            target = auth_file or "authoritative_target_file"
+            lines.append(f"  - Oracle Symbol: '{it}' [ORACLE_FACT] -> Target Artifact: '{target}'")
+            has_entries = True
+    elif isinstance(contract, dict) and contract.get("interface_contracts"):
+        for ifc in contract.get("interface_contracts", [])[:8]:
+            if isinstance(ifc, dict) and ifc.get("identifier"):
+                ident = ifc["identifier"]
+                target = ifc.get("target_file") or auth_file or "authoritative_target_file"
+                lines.append(f"  - Interface Symbol: '{ident}' [PM_PROPOSAL] -> Target Artifact: '{target}'")
+                has_entries = True
+
+    if not has_entries:
+        target = auth_file or "authoritative_target_file"
+        lines.append(f"  - Dynamic Relational Target: Map required capabilities to concrete interfaces in '{target}'.")
+
+    # Tambahkan batasan skema kanonikal
+    schema_constraints = format_canonical_blueprint_schema_constraints()
+    if schema_constraints:
+        lines.append("")
+        lines.append(schema_constraints)
+
+    lines.extend([
+        "",
+        "Blueprint Integrity Invariants (A-H — Architect Reasoning Guidance):",
+        "  - INVARIANT-A (Identity Stability): Every declared interface maintains a stable identity.",
+        "  - INVARIANT-B (Consistent Location): Every interface links to a valid target artifact declared in file collection.",
+        "  - INVARIANT-C (File Structure Consistency): File collection matches declared modules with zero phantom files.",
+        "  - INVARIANT-D (Obligation Representation): Acceptance obligations requiring representation have that representation.",
+        "  - INVARIANT-E (Interface Shape Preservation): Interface shapes do not mutate semantically without evidence.",
+        "  - INVARIANT-F (Non-Destructive Repair): Repair must preserve all elements and fields that remain valid under canonical schema.",
+        "  - INVARIANT-G (Relational Consistency): Artifacts, interfaces, and scaffolds form a unified, coherent structure.",
+        "  - INVARIANT-H (Serialization Equivalence): Serialized schema represents the identical semantic structure.",
+        "",
+        "Authority Notice:",
+        "  [F] is a derived structural representation, NOT an independent acceptance authority.",
+        "  Hierarchy: Acceptance Authority > Existing canonical schema / governance > Architect relational guidance.",
+        "  If any conflict arises, Acceptance Authority strictly prevails."
+    ])
+    return "\n".join(lines)
+
+
 # ===========================================================================
-# 4. Architect Decision & Repair Context Packages (Treatment #1.5)
+# 4. Architect Decision & Repair Context Packages (Treatment #1.5 / #1.8.1)
 # ===========================================================================
 
 def build_architect_repair_context(
@@ -744,14 +866,20 @@ def build_architect_repair_context(
         sections["sec_06_repair_target"] = (
             "[6] REPAIR TARGET\n==================\n"
             + ledger.to_repair_targets_text()
+            + "\n\nGENERIC REPAIR PRESERVATION (Anti-Field-Loss):\n"
+            + "  - Preserve all elements, contracts, and schema fields that remain valid under canonical schema.\n"
+            + "  - Perform localized repair: CURRENT VALID STATE + REPAIRED ELEMENT."
         )
     else:
         sections["sec_06_repair_target"] = (
             "[6] REPAIR TARGET\n"
             "==================\n"
-            "ACTIVE TARGET: Repair all identified compatibility failures.\n"
+            "ACTIVE TARGET: Localized repair of identified compatibility failures.\n"
             "REQUIRED TRANSITION: INCOMPATIBLE -> COMPATIBLE\n"
-            "PRESERVE: All other existing valid interfaces and behavior."
+            "GENERIC REPAIR PRESERVATION (Anti-Field-Loss):\n"
+            "  - Preserve all elements, contracts, and schema fields that remain valid under canonical schema.\n"
+            "  - Perform localized repair: CURRENT VALID STATE + REPAIRED ELEMENT.\n"
+            "PRESERVE: All other existing valid interfaces, data models, target artifacts, and behavior."
         )
 
     # ========================================================
@@ -761,12 +889,13 @@ def build_architect_repair_context(
         "[7] REPAIR BOUNDARY",
         "===================",
         "ALLOWED:",
-        "  + Fix constructor parameters / call shapes to match test invocations",
-        "  + Add missing endpoint routes or methods declared in Acceptance Oracle",
-        "  + Implement reachable conditional branches or error paths for error scenarios",
-        "  + Refine data models and function return shapes",
+        "  + Localized repair of broken relationships or invalid schema elements",
+        "  + Aligning interface shapes or signatures to match authoritative acceptance requirements",
+        "  + Adding missing interface declarations or modules required by Acceptance Authority",
+        "  + Refining scaffold code so it represents sufficient observable behavior for deterministic compatibility analysis",
         "FORBIDDEN:",
-        "  x Blind regeneration from scratch (discarding valid interfaces)",
+        "  x Blind regeneration from scratch (discarding valid interfaces or state)",
+        "  x Dropping fields or elements that remain valid under the canonical schema (Generic Anti-Field-Loss)",
         "  x Dropping previously compatible public interfaces, scenarios, or modules",
         "  x Mutating immutable acceptance obligations or oracle test suite",
         "  x Introducing regressions on previously COMPATIBLE scenarios"
@@ -1052,6 +1181,20 @@ def build_architect_decision_context(
         + "\n".join(sec_05_lines)
     )
 
+    # [F] RELATIONAL BLUEPRINT STATE (Derived structural representation)
+    relational_text = format_relational_blueprint_state(
+        oracle_obs=oracle_obs,
+        oracle_items=oracle_items,
+        scenarios=scenarios,
+        contract=contract,
+        auth_file=auth_file,
+    )
+    sections["relational_blueprint_state"] = (
+        "[F] RELATIONAL BLUEPRINT STATE (Derived structural representation — NOT an independent authority)\n"
+        "==================================================================================================\n"
+        + relational_text.strip()
+    )
+
     # [6] PROVEN INVARIANTS
     locked_dict = state.get("locked_invariants") or {}
     inv_lines = []
@@ -1170,16 +1313,23 @@ def build_architect_decision_context(
         "  - Interface contracts HARUS mendefinisikan SEMUA identifier dari Authoritative Acceptance Oracle Interfaces (ORACLE_FACT).\n"
         "  - Elemen [PM_PROPOSAL] hanya digunakan sebagai referensi desain awal jika TIDAK bertentangan dengan [ORACLE_FACT].\n"
         "  - ARTIFACT PURITY: file_tree dan files HANYA untuk modul implementasi kode. DILARANG memasukkan file test atau test runner ke dalam file_tree atau files.\n"
-        "  - OBSERVABLE NEGATIVE BEHAVIOR: Scaffolds must represent the required observable negative behavior sufficiently for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.\n\n"
+        "  - OBSERVABLE BEHAVIOR: Scaffolds must represent sufficient observable behavior for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.\n\n"
+        "CANONICAL SCHEMA AS REPRESENTATION CONTRACT:\n"
+        "  - The output JSON schema is a representation contract derived from canonical ArchitecturalBlueprint definition.\n"
+        "  - Preserve exact schema collection semantics and required fields without data shape alteration.\n"
+        "  - Two-Stage Architect Synthesis:\n"
+        "      Stage 1 (Semantic Blueprint Model): Establish obligations, scenarios, interfaces, and file roles internally.\n"
+        "      Stage 2 (Canonical Serialization): Serialize faithfully to the existing ArchitecturalBlueprint schema.\n"
+        "  - Generic Repair Preservation (Anti-Field-Loss): On repair, perform localized updates (CURRENT VALID STATE + REPAIRED ELEMENT) and preserve all elements and fields that remain valid under the canonical schema.\n\n"
         "PRE-SEAL SELF-CONSISTENCY CHECKLIST (Architect reasoning guidance):\n"
         "  1. Obligation Coverage: Every authoritative acceptance obligation has a traceable architectural representation in interface_contracts or data_models.\n"
         "  2. Authoritative Scenario Coverage: All positive, negative, and boundary scenarios are represented.\n"
         "  3. Call-Shape Fidelity: Invocation form, parameter ordering, and input/output shapes are preserved.\n"
-        "  4. Observable Negative Behavior: Negative scenario paths/guards are represented sufficiently for deterministic static compatibility.\n"
+        "  4. Observable Behavior: Scenario paths and guards are represented sufficiently for deterministic static compatibility.\n"
         "  5. Artifact Purity: Only implementation artifacts; zero test files in file_tree.\n"
         "  6. No Requirement Invention: No invented unrequested features or fabricated endpoints.\n"
         "  7. No Contradiction: Internal consistency between file_tree, files, data_models, and interface_contracts.\n"
-        "  8. Preservation: No regression against locked invariants or proven state.\n"
+        "  8. Preservation: No regression against locked invariants, proven state, or valid schema fields.\n"
         "  9. Evidence Traceability: Every architectural decision is grounded in evidence.\n"
         "  10. Scaffold Sufficiency: Complete stubs for all declared files in file_tree.\n"
         "  (Notice: The 10-point checklist is Architect reasoning guidance. It is NOT an acceptance authority and does NOT replace deterministic validators. Deterministic validators determine REALITY.)"
