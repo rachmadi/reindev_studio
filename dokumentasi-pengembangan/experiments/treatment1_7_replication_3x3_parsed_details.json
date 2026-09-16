@@ -1,0 +1,712 @@
+{
+  "total_runs": 9,
+  "pm_turn0_pass_rate": 1.0,
+  "fp002_recurrence_rate": 0.0,
+  "pm_substantive_rate": 1.0,
+  "e2e_pass_rate": 0.3333333333333333,
+  "average_pm_words": 386.77777777777777,
+  "runs": [
+    {
+      "run_index": 1,
+      "run_id": "pv_pilot_fastapi_t1_rep1_20260916_130535",
+      "task_id": "fastapi_t1",
+      "rep_index": 1,
+      "target_language": "python",
+      "duration_sec": 409.75,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 389,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun modul REST API FastAPI untuk manajemen inventaris pro... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (15 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "389 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 389 words (3675 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "REST_API",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: REST_API, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 5,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 2,
+      "run_id": "pv_pilot_cli_t1_rep1_20260916_131225",
+      "task_id": "cli_t1",
+      "rep_index": 1,
+      "target_language": "python",
+      "duration_sec": 308.68,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 554,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun kalkulator CLI Python dengan operasi matematika matri... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (12 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "554 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 554 words (3943 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "CLI_TOOL",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: CLI_TOOL, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 5,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 3,
+      "run_id": "pv_pilot_flutter_t1_rep1_20260916_131734",
+      "task_id": "flutter_t1",
+      "rep_index": 1,
+      "target_language": "dart",
+      "duration_sec": 258.71,
+      "v0_verdict": "PASS",
+      "v0_iterations": 1,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 322,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun komponen widget kartu metrik modern responsif Flutter... (target: dart)",
+          "expected": "Aligned with target: dart",
+          "fact": "User task present (15 words), target language: dart",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "322 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 322 words (2517 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "FLUTTER_WIDGET",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: FLUTTER_WIDGET, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "PASS",
+      "arch_violations": [],
+      "dev_verdict": "PASS",
+      "oracle_verdict": "PASS",
+      "oracle_sha256": "4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528",
+      "oracle_sha_intact": true,
+      "executor_verdict": "PASS",
+      "tests_passed": 2,
+      "tests_total": 2,
+      "reviewer_verdict": "PASS",
+      "final_verdict": "PASS",
+      "failure_class": "NONE",
+      "causal_attribution": "FULL PIPELINE PASS (PM & downstream success)"
+    },
+    {
+      "run_index": 4,
+      "run_id": "pv_pilot_fastapi_t1_rep2_20260916_132153",
+      "task_id": "fastapi_t1",
+      "rep_index": 2,
+      "target_language": "python",
+      "duration_sec": 377.89,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 360,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun modul REST API FastAPI untuk manajemen inventaris pro... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (15 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "360 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 360 words (2728 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "REST_API",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: REST_API, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "PASS",
+      "arch_violations": [],
+      "dev_verdict": "PASS",
+      "oracle_verdict": "PASS",
+      "oracle_sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+      "oracle_sha_intact": true,
+      "executor_verdict": "PASS",
+      "tests_passed": 5,
+      "tests_total": 5,
+      "reviewer_verdict": "PASS",
+      "final_verdict": "PASS",
+      "failure_class": "NONE",
+      "causal_attribution": "FULL PIPELINE PASS (PM & downstream success)"
+    },
+    {
+      "run_index": 5,
+      "run_id": "pv_pilot_cli_t1_rep2_20260916_132811",
+      "task_id": "cli_t1",
+      "rep_index": 2,
+      "target_language": "python",
+      "duration_sec": 299.7,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 452,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun kalkulator CLI Python dengan operasi matematika matri... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (12 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "452 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 452 words (3032 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "CLI_TOOL",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: CLI_TOOL, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 5,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 6,
+      "run_id": "pv_pilot_flutter_t1_rep2_20260916_133310",
+      "task_id": "flutter_t1",
+      "rep_index": 2,
+      "target_language": "dart",
+      "duration_sec": 295.89,
+      "v0_verdict": "PASS",
+      "v0_iterations": 1,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 391,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun komponen widget kartu metrik modern responsif Flutter... (target: dart)",
+          "expected": "Aligned with target: dart",
+          "fact": "User task present (15 words), target language: dart",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "391 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 391 words (2927 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "FLUTTER_WIDGET",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: FLUTTER_WIDGET, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 2,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 7,
+      "run_id": "pv_pilot_fastapi_t1_rep3_20260916_133806",
+      "task_id": "fastapi_t1",
+      "rep_index": 3,
+      "target_language": "python",
+      "duration_sec": 461.31,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 312,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun modul REST API FastAPI untuk manajemen inventaris pro... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (15 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "312 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 312 words (2638 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "REST_API",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: REST_API, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 5,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 8,
+      "run_id": "pv_pilot_cli_t1_rep3_20260916_134548",
+      "task_id": "cli_t1",
+      "rep_index": 3,
+      "target_language": "python",
+      "duration_sec": 308.68,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 376,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun kalkulator CLI Python dengan operasi matematika matri... (target: python)",
+          "expected": "Aligned with target: python",
+          "fact": "User task present (12 words), target language: python",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "376 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 376 words (2612 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "CLI_TOOL",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: CLI_TOOL, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "FAIL",
+      "arch_violations": [],
+      "dev_verdict": null,
+      "oracle_verdict": null,
+      "oracle_sha256": null,
+      "oracle_sha_intact": false,
+      "executor_verdict": null,
+      "tests_passed": 0,
+      "tests_total": 5,
+      "reviewer_verdict": null,
+      "final_verdict": "FAIL",
+      "failure_class": "C. Contract Failure",
+      "causal_attribution": "Downstream failure (C. Contract Failure) \u2014 PM Requirement Model PASS & Constructible"
+    },
+    {
+      "run_index": 9,
+      "run_id": "pv_pilot_flutter_t1_rep3_20260916_135056",
+      "task_id": "flutter_t1",
+      "rep_index": 3,
+      "target_language": "dart",
+      "duration_sec": 439.07,
+      "v0_verdict": "PASS",
+      "v0_iterations": 2,
+      "pm_raw": "",
+      "pm_char_count": 0,
+      "pm_word_count": 325,
+      "pm_substantive": true,
+      "pm_turn0_verdict": "PASS",
+      "pm_violations": [],
+      "pm_evidence": [
+        {
+          "item": "authoritative_user_intent",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "Task: Bangun komponen widget kartu metrik modern responsif Flutter... (target: dart)",
+          "expected": "Aligned with target: dart",
+          "fact": "User task present (15 words), target language: dart",
+          "inference": "PM specification does not contradict authoritative user intent",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_length",
+          "evidence_class": "DETERMINISTIC",
+          "observed": "325 words",
+          "expected": ">= 8 words",
+          "fact": "Specifications contain 325 words (2590 characters)",
+          "inference": "Adequate length for functional specification",
+          "status": "VALID"
+        },
+        {
+          "item": "specifications_structure",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "has_summary": true,
+            "has_stories": true,
+            "has_ac": true
+          },
+          "expected": "Mandatory structural sections: Scope/Summary, Capabilities/Stories, Acceptance Criteria",
+          "fact": "Sections detected - Scope: True, Stories/Capabilities: True, Acceptance Criteria: True",
+          "inference": "Document structural completeness according to Engineering Quality Standard",
+          "status": "VALID"
+        },
+        {
+          "item": "draft_contract_metadata",
+          "evidence_class": "DETERMINISTIC",
+          "observed": {
+            "domain": "FLUTTER_WIDGET",
+            "reqs_count": 1
+          },
+          "expected": "Domain present and reqs_count >= 1",
+          "fact": "DRAFT contract domain: FLUTTER_WIDGET, requirements count: 1",
+          "inference": "Draft contract initialized properly",
+          "status": "VALID"
+        }
+      ],
+      "pm_repairs_consumed": 0,
+      "fp002_occurrence": "NO",
+      "v0_grounding_provenance": "VALID",
+      "constructibility": "CONSTRUCTIBLE",
+      "arch_verdict": "PASS",
+      "arch_violations": [],
+      "dev_verdict": "PASS",
+      "oracle_verdict": "PASS",
+      "oracle_sha256": "4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528",
+      "oracle_sha_intact": true,
+      "executor_verdict": "PASS",
+      "tests_passed": 2,
+      "tests_total": 2,
+      "reviewer_verdict": "PASS",
+      "final_verdict": "PASS",
+      "failure_class": "NONE",
+      "causal_attribution": "FULL PIPELINE PASS (PM & downstream success)"
+    }
+  ]
+}

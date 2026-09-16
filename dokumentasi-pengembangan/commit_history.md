@@ -742,3 +742,12 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Penambahan Bagian X mengenai Treatment #1.7.
   - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-117.
   - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog arahan review IA dan eksekusi pilot.
+
+
+### [16 September 2026] Evaluasi Replikasi 3x3 Treatment #1.7 Selesai (9/9 Runs)
+- **Branch**: `experiment/treatment-1.7-agent-capability`
+- **Tindakan**:
+  - Menyelesaikan seluruh 9 run pengujian replikasi terkontrol 3x3 pada `qwen2.5-coder:7b`.
+  - Menerbitkan laporan riset formal di `dokumentasi-pengembangan/experiments/treatment1_7_pm_requirement_fidelity_replication_3x3_v1.md`.
+  - Menyimpan data checkpoint dan parsed trace di `treatment1_7_replication_3x3_summary.json` dan `treatment1_7_replication_3x3_parsed_details.json`.
+  - Mengonfirmasi reduksi FP-002 menjadi 0% (0/9) dan E2E PASS rate 33.3% (3/9).

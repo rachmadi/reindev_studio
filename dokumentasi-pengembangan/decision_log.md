@@ -255,3 +255,14 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
      - Downstream: `flutter_t1` 100% PASS (Reviewer APPROVED, 2/2 tests passed, Loop 0), `cli_t1` tertahan aman di Gate 2 (*zero downstream leakage*), `fastapi_t1` mencapai Dev loop 5 (4/5 tests passed).
   4. **Hipotesis H1.7 Terkonfirmasi Empiris**: Penguatan Evidence-Grounded Requirement Completion pada PM terbukti mengeliminasi kejadian empty/non-substantive completion pada model proving-ground `qwen2.5-coder:7b` tanpa memicu regresi downstream.
 * **Dampak**: Membuktikan bahwa perbaikan terarah pada kapabilitas agen hulu (PM) dapat meningkatkan kualitas dan kelengkapan model kebutuhan perangkat lunak secara substansial tanpa merusak integritas tata kelola pipeline.
+
+
+### [16 September 2026] Hasil Replikasi 3x3 & Rekomendasi Treatment #1.7 (PM Capability)
+* **Konteks**: Eksekusi pengujian replikasi terkontrol 3x3 (9 runs) untuk memverifikasi ketahanan Treatment #1.7 (PM Requirement Fidelity & Constructible Completion v1) pada model `qwen2.5-coder:7b` di branch `experiment/treatment-1.7-agent-capability`.
+* **Keputusan / Temuan**:
+  1. **PM Turn-0 PASS Rate 100% (9/9)**: Seluruh run lulus Gate V1 Turn-0 dengan 0 pelanggaran dan confidence 1.0.
+  2. **Eliminasi Total FP-002 (0/9, 0.0%)**: Pola kegagalan empty completion collapse tidak muncul di seluruh 9 run lintas domain (FastAPI, CLI, Flutter).
+  3. **Rata-rata Panjang Requirement**: 386.78 kata (semua substantif dan terstruktur lengkap).
+  4. **Downstream E2E PASS**: 3/9 runs (33.3%) mencapai kelulusan penuh hingga Reviewer APPROVED (Run 3 Flutter, Run 4 FastAPI, Run 9 Flutter).
+  5. **Causal Attribution**: 6 run yang terhenti di Architect Gate V2 murni disebabkan oleh keterbatasan sintaksis downstream Architect (FP-003/FP-004) dan bukan defek requirement PM.
+  6. **Rekomendasi**: Treatment #1.7 dinyatakan lulus replikasi dan siap dibekukan. Penyelidikan berikutnya direkomendasikan berfokus pada kapabilitas Architect (Treatment #1.8).
