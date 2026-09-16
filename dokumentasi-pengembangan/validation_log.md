@@ -1255,3 +1255,21 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
 
 
 
+
+
+---
+
+### [VAL-T16-QWEN35] Pilot Evaluation 1x3 — Model `qwen3.5:9b` (2026-09-16)
+* **Model**: `qwen3.5:9b` via Ollama (Hybrid CPU 43% / GPU 57%)
+* **Pipeline**: Treatment #1.6 (Commit `e29550b`)
+* **Test Suite Baseline**: 683 passed (100% PASS)
+* **Hasil Pengujian**:
+  - `fastapi_t1`: FAIL (1/5 PASS, 4 loops, Developer drift, durasi 2927.7s)
+  - `cli_t1`: FAIL (0/5 PASS, 0 loops, Scenario exception missing, durasi 1615.4s)
+  - `flutter_t1`: FAIL (0/2 PASS, 0 loops, UI schema violation, durasi 1123.5s)
+* **Metrik Integritas**:
+  - Oracle SHA-256 Intact: 3/3 (100%)
+  - Downstream Leakage: 0 (100% fail-closed on contract rejection)
+  - Tester LLM Invocations: 0 (100% bypassed)
+* **Summary File**: `dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_summary.json`
+* **Laporan Evaluasi**: `dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_evaluation_report.md`

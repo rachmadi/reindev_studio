@@ -204,3 +204,14 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
 
 
 
+
+
+---
+
+### [D-114] Evaluasi Komparatif Cross-Model: Pilot 1x3 `qwen3.5:9b` (2026-09-16)
+* **Konteks**: Setelah membuktikan efektivitas Treatment #1.6 pada `qwen2.5-coder:7b` (3x3 replication), Intent Architect menguji ketahanan arsitektur terhadap model generalist berbobot lebih besar (`qwen3.5:9b`).
+* **Keputusan / Temuan**:
+  1. Pipeline Treatment #1.6 mempertahankan integritas 100% *fail-closed* di hadapan anomali baru dari model generalist (`http_method: 'CONSTRUCTOR'`, string literal `'None'`, *trailing-slash drift*, *interface renaming drift*).
+  2. Seluruh gerbang validasi deterministik (V1, V2, V3, V5) bekerja sempurna: *zero downstream leakage*, *zero unhandled regressions*, dan Oracle SHA-256 100% utuh.
+  3. Mempertahankan `qwen2.5-coder:7b` sebagai rekomendasi squad model utama untuk lingkungan komputasi 6GB VRAM, dengan opsi eksplorasi *schema sanitization filter* jika ingin mengintegrasikan model generalist heterogen.
+* **Dampak**: Memvalidasi doktrin bahwa batas kapasitas penalaran/kepatuhan model (H2) dapat dibedakan secara objektif dari kualitas arsitektur perbaikan.

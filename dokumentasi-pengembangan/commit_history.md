@@ -668,3 +668,20 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 
 
 
+
+
+### Commit: 3f56452 — 2026-09-16
+- **Commit Hash:** 3f56452
+- **Status:** TERVERIFIKASI PENUH (Pilot 1x3 qwen3.5:9b Selesai, 683 tests PASS, Oracle Intact)
+- **Tipe:** docs(experiments)
+- **Pesan Commit:** docs(experiments): add forensic synthesis #1.3-#1.6 and qwen3.5:9b pilot evaluation report
+- **Waktu:** 2026-09-16 10:52 WIB
+- **Cakupan Perubahan:**
+  - dokumentasi-pengembangan/experiments/treatment1_3_to_1_6_forensic_synthesis_v1.md: Laporan sintesis empiris menyeluruh evolusi arsitektur #1.3 -> #1.6 (31 runs).
+  - dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_summary.json: Ringkasan checkpoint pilot 1x3 model qwen3.5:9b.
+  - dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_evaluation_report.md: Laporan evaluasi komparatif mendalam qwen3.5:9b vs qwen2.5-coder:7b.
+  - dokumentasi-pengembangan/catatan_riset_pengujian_preset.md: Penambahan bagian VII evaluasi komparatif qwen3.5:9b.
+  - dokumentasi-pengembangan/conversation_log.md: Penambahan log instruksi sintesis dan pengujian qwen3.5:9b.
+  - dokumentasi-pengembangan/decision_log.md: Penambahan entri D-114.
+  - dokumentasi-pengembangan/validation_log.md: Penambahan entri VAL-T16-QWEN35.
+  - dokumentasi-pengembangan/durasi_per_fitur.md: Pencatatan durasi eksekusi qwen3.5:9b (5666.6s).

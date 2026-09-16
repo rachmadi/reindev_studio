@@ -1325,3 +1325,29 @@ Di bawah konfigurasi terkunci penuh (*LOCKED*), model `qwen2.5-coder:7b` menghas
 1. **H1 Terbukti Empiris & Reproducible**: Penyediaan konteks semantik 10-tier terbukti memampukan Developer model 7B memulihkan multi-kegagalan secara simultan dan deterministik across-runs tanpa resep implementasi imperatif.
 2. **H2 Tervalidasi Terkalibrasi**: Kegagalan residual pada error-branching 404 stabil di kedua run konvergen (Run 1 & Run 3), membuktikan batas kapasitas inferensi model 7B dalam mengelola nested conditional exception handling REST API.
 3. **Preservasi Invarian Bekerja Sempurna**: `zero_regression_invariant` menghentikan seluruh upaya modifikasi kode yang merusak tes yang telah berstatus `PROVEN`, mencegah fenomena catastrophic forgetting.
+
+
+---
+
+## VII. EKSPERIMEN KOMPARATIF PILOT 1X3: MODEL GENERALIST FRONTIER-TIER QWEN3.5:9B
+
+### 1. Latar Belakang & Pertanyaan Riset
+Setelah Treatment #1.6 terbukti stabil (*empirically supported*) pada model spesialis qwen2.5-coder:7b (3x3 replication), Intent Architect menginstruksikan pengujian cross-model menggunakan model generalist yang lebih besar: qwen3.5:9b (9B parameters, bobot 6.3 GB, offload hybrid 43% CPU RAM / 57% GPU VRAM).
+* Pertanyaan Riset: Apakah arsitektur ReinDev Treatment #1.6 mampu memandu model generalist dengan karakteristik penalaran berbeda, dan apakah gerbang validasi deterministik mampu membendung anomali/drift dari model berbobot lebih besar secara konsisten?
+
+### 2. Hasil Empiris Pilot 1x3 (qwen3.5:9b)
+* Total Durasi: 5.666,63 detik (~94,4 menit).
+* Checkpoint: 	reatment1_6_qwen35_9b_pilot_summary.json (Commit baseline e29550b).
+
+| Kasus Uji / Task | Status Kontrak | Developer Loops | Hasil Pengujian | Klasifikasi Kegagalan | Karakteristik Perilaku Empiris |
+|---|:---:|:---:|:---:|:---:|---|
+| **astapi_t1** | **FROZEN** (Turn 2) | 4 | **1/5 PASS** (20%)<br>(Durasi: 2.927,7s) | A. Developer Failure | **High Initial Reasoning vs Repair Drift**: Initial Developer turn langsung meloloskan **3/5 tes**. Namun pada Repair Turn 1 terjadi *trailing slash drift* (/products/) yang memicu 405 Method Not Allowed (dicegat V5 Regression Gate). Pada Repair Turn 2-3 terjadi *interface renaming drift* (get_product vs get_product_by_id) yang dicegat V3 Pre-Execution Gate hingga batas anggaran habis. |
+| **cli_t1** | **REJECTED** (Turn 2) | 0 | **0/5 PASS**<br>(Durasi: 1.615,4s) | C. Contract Failure | **Symbol Recovery Success vs Scenario Exception Gap**: Berbeda dari model 7B yang kaku pada Pydantic, qwen3.5:9b berhasil menyelaraskan 4/4 interface callable kanonikal (Matrix, dd_matrices, dsb). Namun Gerbang V2 (Treatment #1.3 Scenario Compatibility) menolak membekukan kontrak karena scaffold fungsi matriks tidak menyertakan cabang 
+aise ValueError untuk skenario negatif beda dimensi. **Fail-closed 100%, 0 downstream leakage**. |
+| **lutter_t1** | **REJECTED** (Turn 2) | 0 | **0/2 PASS**<br>(Durasi: 1.123,5s) | C. Contract Failure | **UI Archetype JSON Schema Drift**: Turn 0 menghasilkan http_method: 'CONSTRUCTOR'. Repair Turn 1 merespons instruksi None dengan mengemisikan string literal 'None' alih-alih JSON 
+ull, ditolak skema Pydantic. Repair Turn 2 mengulangi 'None' dan menambahkan file tes ke ile_tree. **Fail-closed 100%, 0 downstream leakage**. |
+
+### 3. Temuan Kunci & Rekomendasi
+1. **Pipeline Immunity 100%**: Seluruh deviasi baru yang dihasilkan qwen3.5:9b (string 'None', halusinasi method UI, *trailing slash*, *interface renaming*) dicegat secara deterministik oleh gerbang V1, V2, V3, dan V5 tanpa satu pun kebocoran ke sandbox atau perusakan invariant.
+2. **Oracle SHA-256 Intact**: Ketiga task mempertahankan segel SHA-256 Frozen Oracle 100% identik tanpa deviasi.
+3. **Spesialis Coder vs Generalist**: qwen2.5-coder:7b tetap menjadi pilihan paling disiplin dan efisien untuk pipeline rekayasa software terstruktur di lingkungan komputasi 6GB VRAM.
