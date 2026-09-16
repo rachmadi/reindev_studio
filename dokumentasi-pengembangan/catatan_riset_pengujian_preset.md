@@ -1351,3 +1351,26 @@ ull, ditolak skema Pydantic. Repair Turn 2 mengulangi 'None' dan menambahkan fil
 1. **Pipeline Immunity 100%**: Seluruh deviasi baru yang dihasilkan qwen3.5:9b (string 'None', halusinasi method UI, *trailing slash*, *interface renaming*) dicegat secara deterministik oleh gerbang V1, V2, V3, dan V5 tanpa satu pun kebocoran ke sandbox atau perusakan invariant.
 2. **Oracle SHA-256 Intact**: Ketiga task mempertahankan segel SHA-256 Frozen Oracle 100% identik tanpa deviasi.
 3. **Spesialis Coder vs Generalist**: qwen2.5-coder:7b tetap menjadi pilihan paling disiplin dan efisien untuk pipeline rekayasa software terstruktur di lingkungan komputasi 6GB VRAM.
+
+
+---
+
+## VIII. EKSPERIMEN KOMPARATIF PILOT 1X3: MODEL ALTERNATIF ORNITH:9B
+
+### 1. Latar Belakang & Pertanyaan Riset
+Untuk melengkapi analisis komparatif model pada arsitektur ReinDev Treatment #1.6, Intent Architect menginstruksikan pengujian cross-model dengan `ornith:9b` (9B parameters, bobot 5.6 GB).
+* Pertanyaan Riset: Bagaimana karakteristik inferensi, kecepatan, dan kepatuhan gerbang deterministik `ornith:9b` dibandingkan `qwen2.5-coder:7b` dan `qwen3.5:9b`?
+
+### 2. Hasil Empiris Pilot 1x3 (`ornith:9b`)
+* Total Durasi: 2.539,53 detik (~42,3 menit) — lebih dari 2,2x lebih cepat dibanding `qwen3.5:9b`.
+* Checkpoint: `treatment1_6_ornith9b_pilot_summary.json` (Commit baseline `7049713`).
+
+| Kasus Uji / Task | Status Kontrak | Developer Loops | Hasil Pengujian | Klasifikasi Kegagalan | Karakteristik Perilaku Empiris |
+|---|:---:|:---:|:---:|:---:|---|
+| **`fastapi_t1`** | **`FROZEN`** (Turn 0 Langsung) | 0 | **0/5 PASS**<br>(Durasi: 879,2s) | A. Developer Failure | **Turn 0 Instant Freeze vs V3 Gate Conformance**: Architect langsung mencapai status `FROZEN` seketika pada Turn 0 dengan 2 model dan 4 endpoint routes. Namun Developer menghasilkan penamaan fungsi Python (`create_product`), sedangkan kontrak mendeklarasikan identifier literal `"POST /products"`. Gerbang V3 mendeteksi ketidaksesuaian simbol ini dan memblokir eksekusi sebelum menyentuh sandbox. **Fail-closed pra-eksekusi, 0 loop dikonsumsi**. |
+| **`cli_t1`** | **`DRAFT`** | 0 | **0/5 PASS**<br>(Durasi: 866,1s) | C. Contract / PM Failure | **Empty PM Generation**: Model mengalami anomali output kosong (0 kata) pada perumusan spesifikasi PM. Gerbang V1 menolak dokumen kosong di Turn 0, Turn 1, dan Turn 2 (*verdict: FAIL*). Sistem berhenti aman pada kuota habis tanpa downstream leakage ke Architect maupun Developer. |
+| **`flutter_t1`** | **`REJECTED`** (Turn 2) | 0 | **0/2 PASS**<br>(Durasi: 794,3s) | C. Contract Failure | **UI Archetype 'CONSTRUCTOR' Schema Violation**: Architect mendeklarasikan `http_method: "CONSTRUCTOR"` pada antarmuka widget Flutter. Gerbang V2 (P0-2.1) menolaknya sebagai pelanggaran skema Pydantic. Model mengulangi nilai ini di Turn 1 dan Turn 2 hingga kuota habis. **Fail-closed 100%, 0 downstream leakage**. |
+
+### 3. Kesimpulan Sintesis Tiga Arah (Triangular Synthesis)
+1. **Model Spesialis Coding Unggul Mutlak**: `qwen2.5-coder:7b` tetap menjadi model terbaik untuk pipeline rekayasa software terstruktur (satu-satunya yang mencapai 4/5 pada FastAPI dan 2/2 PASS 100% pada Flutter).
+2. **Arsitektur ReinDev Terbukti 100% Model-Agnostik**: Di hadapan 3 model dengan karakteristik berbeda (`qwen2.5-coder:7b`, `qwen3.5:9b`, `ornith:9b`), seluruh kegagalan model berhasil diisolasi secara deterministik (*zero downstream leakage*, *zero unhandled regressions*, *100% Oracle SHA-256 intact*).

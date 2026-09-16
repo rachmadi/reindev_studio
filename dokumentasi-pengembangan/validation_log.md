@@ -1273,3 +1273,21 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
   - Tester LLM Invocations: 0 (100% bypassed)
 * **Summary File**: `dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_summary.json`
 * **Laporan Evaluasi**: `dokumentasi-pengembangan/experiments/treatment1_6_qwen35_9b_pilot_evaluation_report.md`
+
+
+---
+
+### [VAL-T16-ORNITH9B] Pilot Evaluation 1x3 — Model `ornith:9b` (2026-09-16)
+* **Model**: `ornith:9b` via Ollama (5.6 GB)
+* **Pipeline**: Treatment #1.6 (Commit `7049713`)
+* **Test Suite Baseline**: 683 passed (100% PASS)
+* **Hasil Pengujian**:
+  - `fastapi_t1`: FAIL (0/5 PASS, 0 loops, V3 pre-execution fail-closed, durasi 879.2s)
+  - `cli_t1`: FAIL (0/5 PASS, 0 loops, PM empty output fail-closed, durasi 866.1s)
+  - `flutter_t1`: FAIL (0/2 PASS, 0 loops, UI schema violation fail-closed, durasi 794.3s)
+* **Metrik Integritas**:
+  - Oracle SHA-256 Intact: 3/3 (100%)
+  - Downstream Leakage: 0 (100% fail-closed)
+  - Tester LLM Invocations: 0 (100% bypassed)
+* **Summary File**: `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_summary.json`
+* **Laporan Evaluasi**: `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_evaluation_report.md`

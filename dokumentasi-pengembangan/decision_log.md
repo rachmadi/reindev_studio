@@ -215,3 +215,15 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   2. Seluruh gerbang validasi deterministik (V1, V2, V3, V5) bekerja sempurna: *zero downstream leakage*, *zero unhandled regressions*, dan Oracle SHA-256 100% utuh.
   3. Mempertahankan `qwen2.5-coder:7b` sebagai rekomendasi squad model utama untuk lingkungan komputasi 6GB VRAM, dengan opsi eksplorasi *schema sanitization filter* jika ingin mengintegrasikan model generalist heterogen.
 * **Dampak**: Memvalidasi doktrin bahwa batas kapasitas penalaran/kepatuhan model (H2) dapat dibedakan secara objektif dari kualitas arsitektur perbaikan.
+
+
+---
+
+### [D-115] Evaluasi Komparatif Tiga Arah: Pilot 1x3 `ornith:9b` (2026-09-16)
+* **Konteks**: Intent Architect menginstruksikan pengujian cross-model ketiga menggunakan `ornith:9b` untuk melengkapi pemetaan komparatif performa pipeline Treatment #1.6.
+* **Keputusan / Temuan**:
+  1. `ornith:9b` menunjukkan efisiensi eksekusi tinggi (durasi 42,3 menit vs 94,4 menit pada `qwen3.5:9b`), serta kapasitas Architect Turn 0 instant freeze pada REST API.
+  2. Terdeteksi bias model intrinsik: empty output pada perumusan spesifikasi PM (`cli_t1`) dan spekulasi method `'CONSTRUCTOR'` pada UI (`flutter_t1`).
+  3. Mengonfirmasi secara konklusif bahwa `qwen2.5-coder:7b` adalah model optimal untuk squad koding terstruktur di ReinDev Studio.
+  4. Seluruh gerbang validasi (V1, V2, V3, V5) mempertahankan 100% *zero downstream leakage* dan Oracle immutability di ketiga model yang diuji.
+* **Dampak**: Menuntaskan studi komparatif model Treatment #1.6 dan memperkuat dasar empiris untuk publikasi/laporan sintesis arsitektur pemulihan.

@@ -685,3 +685,19 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - dokumentasi-pengembangan/decision_log.md: Penambahan entri D-114.
   - dokumentasi-pengembangan/validation_log.md: Penambahan entri VAL-T16-QWEN35.
   - dokumentasi-pengembangan/durasi_per_fitur.md: Pencatatan durasi eksekusi qwen3.5:9b (5666.6s).
+
+
+### Commit: 12dc0d9 — 2026-09-16
+- **Commit Hash:** 12dc0d9
+- **Status:** TERVERIFIKASI PENUH (Pilot 1x3 ornith:9b Selesai, 683 tests PASS, Oracle Intact)
+- **Tipe:** `docs(experiments)`
+- **Pesan Commit:** `docs(experiments): add ornith:9b pilot evaluation report and comparative model synthesis`
+- **Waktu:** 2026-09-16 11:41 WIB
+- **Cakupan Perubahan:**
+  - `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_summary.json`: Ringkasan checkpoint pilot 1x3 model ornith:9b.
+  - `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_evaluation_report.md`: Laporan evaluasi komparatif tiga arah (ornith:9b vs qwen3.5:9b vs qwen2.5-coder:7b).
+  - `dokumentasi-pengembangan/catatan_riset_pengujian_preset.md`: Penambahan bagian VIII evaluasi komparatif ornith:9b.
+  - `dokumentasi-pengembangan/conversation_log.md`: Penambahan log instruksi pengujian ornith:9b.
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan entri D-115.
+  - `dokumentasi-pengembangan/validation_log.md`: Penambahan entri VAL-T16-ORNITH9B.
+  - `dokumentasi-pengembangan/durasi_per_fitur.md`: Pencatatan durasi eksekusi ornith:9b (2539.6s).

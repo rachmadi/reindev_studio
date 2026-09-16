@@ -968,3 +968,8 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 | Pilot 1x3 `qwen3.5:9b` (CLI) | 1615.4s (~26.9 m) | Eksekusi V0-V2, Architect 2 repair turns (fail-closed) |
 | Pilot 1x3 `qwen3.5:9b` (Flutter) | 1123.5s (~18.7 m) | Eksekusi V0-V2, Architect 2 repair turns (fail-closed) |
 | Total Pilot 1x3 `qwen3.5:9b` | 5666.6s (~94.4 m) | Evaluasi komparatif cross-model frontier-tier |
+
+| Pilot 1x3 `ornith:9b` (FastAPI) | 879.2s (~14.6 m) | Eksekusi V0-V3, Architect Turn 0 freeze, Developer V3 fail-closed |
+| Pilot 1x3 `ornith:9b` (CLI) | 866.1s (~14.4 m) | Eksekusi V0-V1, PM 3 attempts empty output fail-closed |
+| Pilot 1x3 `ornith:9b` (Flutter) | 794.3s (~13.2 m) | Eksekusi V0-V2, Architect 2 repair turns fail-closed |
+| Total Pilot 1x3 `ornith:9b` | 2539.6s (~42.3 m) | Evaluasi komparatif cross-model alternatif 9B |

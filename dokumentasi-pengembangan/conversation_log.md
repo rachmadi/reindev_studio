@@ -2423,3 +2423,22 @@ Lakukan sintesis empiris menyeluruh terhadap evolusi ReinDev dari Treatment #1.3
  2. Task 2 [cli_t1]: Selesai 1.615,4s (~26,9 m). Architect Turn 1 berhasil meliput 4/4 interface callable kanonikal [Matrix, add_matrices, dsb]. Ditolak oleh Gerbang V2 [Treatment #1.3 Scenario Compatibility] karena scaffold tidak menyediakan branch exception `ValueError` untuk skenario negatif beda dimensi. Fail-closed deterministik, loops: 0, verdict: FAIL [C. Contract Failure].
  3. Task 3 [flutter_t1]: Selesai 1.123,5s (~18,7 m). Architect Turn 0 ditolak karena spekulasi `http_method: 'CONSTRUCTOR'`. Turn 1 merespons 'None' dengan string `'None'` alih-alih JSON `null`, ditolak skema Pydantic. Turn 2 mengulangi string `'None'` dan menambahkan file tes ke `file_tree`. Fail-closed deterministik, loops: 0, verdict: FAIL [C. Contract Failure].
  Menyusun laporan komparatif mendalam `treatment1_6_qwen35_9b_pilot_evaluation_report.md` dan memutakhirkan seluruh catatan riset, decision log, dan riwayat validasi).
+
+
+---
+
+[USER (INTENT ARCHITECT) - 10:55]
+"Ganti model ke ornith dan lakukan uji 1x3 sebagai perbandingan"
+
+[ANTIGRAVITY - 10:57]
+(Mengalihkan model ke `ornith:9b` [bobot 5.6 GB di Ollama lokal]. Menjalankan verifikasi Pre-Flight Gates A–I [100% PASS, 683 unit tests lulus, Oracle SHA utuh] dan meluncurkan background pilot runner:
+ `backend/.venv/Scripts/python.exe backend/run_phase_end_validation_pilot.py --model ornith:9b --summary-file dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_summary.json`).
+
+---
+
+[ANTIGRAVITY - 11:40]
+(Memantau eksekusi background pilot secara berkala menggunakan timer otomatis hingga ketiga task selesai secara tuntas dalam durasi total 2.539,5s [~42,3 m]:
+ 1. Task 1 [fastapi_t1]: Selesai 879,2s (~14,6 m). Architect Turn 0 langsung meraih status `FROZEN` seketika. Namun Developer menghasilkan implementasi dengan penamaan fungsi Python, sedangkan kontrak mendefinisikan identifier literal `"POST /products"`. Gerbang V3 mendeteksi ketidakcocokan simbol dan memblokir eksekusi sebelum menyentuh sandbox. Fail-closed, tests run: 0/5. Verdict: FAIL [A. Developer Failure].
+ 2. Task 2 [cli_t1]: Selesai 866,1s (~14,4 m). Model mengalami persistent empty output [0 kata] pada fase PM selama 3 giliran. Gerbang V1 menolak dokumen kosong secara deterministik. Fail-closed, loops: 0. Verdict: FAIL [C. Contract / PM Failure].
+ 3. Task 3 [flutter_t1]: Selesai 794,3s (~13,2 m). Architect mendeklarasikan `http_method: 'CONSTRUCTOR'` pada widget UI selama 3 giliran. Gerbang V2 [P0-2.1] menolak pelanggaran skema Pydantic secara deterministik. Fail-closed, loops: 0. Verdict: FAIL [C. Contract Failure].
+ Menyusun laporan evaluasi komparatif tiga arah `treatment1_6_ornith9b_pilot_evaluation_report.md` dan menyinkronkan seluruh catatan riset, decision log, dan riwayat validasi ke GitHub).
