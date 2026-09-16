@@ -149,10 +149,12 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 
 PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
 1. File-Centric Signatures & Scaffolding: Setiap berkas dituliskan sebagai kerangka interface di dalam string `code_scaffold`.
-   - BATAS SCAFFOLD WAJIB: `code_scaffold` HANYA berupa interface signatures & stubs (misal: deklarasi fungsi/metode dengan `pass`).
-   - TARGET UKURAN: <=800 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
+   - BATAS SCAFFOLD WAJIB: `code_scaffold` berupa interface signatures dan stubs minimal.
+   - OBSERVABLE NEGATIVE BEHAVIOR: Scaffolds must represent the required observable negative behavior sufficiently for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.
+   - ARTIFACT PURITY: `file_tree` dan `files` HANYA untuk modul implementasi kode. DILARANG memasukkan file test atau QA test suite (seperti test_*.py atau test/*_test.dart) ke dalam file_tree atau files!
+   - TARGET UKURAN: <=1200 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
 2. Symbol Resolvability: Setiap berkas WAJIB menyertakan statement `import` lengkap di awal berkas. Jika menggunakan decorator, instance dan class dekorator WAJIB dideklarasikan atau diimpor secara lokal di berkas yang bersangkutan.
-3. Specification Authority: Pertahankan antarmuka dan data model yang telah ditentukan spesifikasi secara eksak.
+3. Authority Hierarchy: Acceptance Oracle adalah Acceptance Authority (WHAT). Architect adalah Design Authority (HOW). Pertahankan seluruh obligasi antarmuka dan skenario otoritatif secara semantik (call-shape fidelity).
 4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
 5. Canonical Data Models: Setiap entitas dalam `data_models` WAJIB menggunakan format kanonikal: `field_name` dan `field_type` untuk setiap item dalam `fields`.
 
@@ -291,86 +293,75 @@ def architect_agent(state: SquadState) -> dict:
     
     structure_rule = (
         "ATURAN STRUKTUR PROYEK DART / FLUTTER (WAJIB):\n"
-        "- Gunakan struktur modul tunggal kohesif: MAKSIMAL 1 file kode implementasi untuk Developer di lib/ (contoh: `lib/card_metric.dart`) dan 1 file test untuk QA Tester (`test/card_metric_test.dart`).\n"
+        "- Gunakan struktur modul tunggal kohesif: MAKSIMAL 1 file kode implementasi untuk Developer di lib/ (contoh: `lib/card_metric.dart`).\n"
         "- Gabungkan model data, provider Riverpod, dan Widget UI dalam 1 file `lib/card_metric.dart` untuk mencegah fragmentasi file dan kesalahan impor silang.\n"
         "- DILARANG merancang struktur banyak file yang terpisah-pisah untuk widget sederhana.\n"
+        "- ARTIFACT PURITY (WAJIB): file_tree dan files HANYA untuk modul kode implementasi. DILARANG KERAS memasukkan file pengujian/test ke dalam file_tree atau files!\n"
         if is_dart else
         "ATURAN STRUKTUR PROYEK PYTHON (WAJIB):\n"
-        "- Gunakan struktur modul Python sederhana dan kohesif: MAKSIMAL 1-2 file kode implementasi untuk Developer (misal: `main.py` atau `models.py` + `main.py`) dan 1 file test untuk QA Tester (`test_*.py`).\n"
+        "- Gunakan struktur modul Python sederhana dan kohesif: MAKSIMAL 1-2 file kode implementasi untuk Developer (misal: `main.py` atau `models.py` + `main.py`).\n"
         "- Gabungkan data models, in-memory store/state, dan antarmuka utama dalam modul utama (contoh: `main.py` atau `models.py` + `main.py`) untuk menghindari fragmentasi folder dan kesalahan impor silang.\n"
         "- DILARANG merancang hierarki folder yang terlalu dalam (hindari app/api/, app/schemas/, app/models/). Jaga struktur tetap datar di root.\n"
+        "- ARTIFACT PURITY (WAJIB): file_tree dan files HANYA untuk modul kode implementasi. DILARANG KERAS memasukkan file pengujian/test ke dalam file_tree atau files!\n"
     )
     
     feedback_section = ""
     latest_cep = state.get("latest_evidence_package")
     tracer = get_tracer(state.get("run_id"))
 
+    pkg = None
     if latest_cep and latest_cep.get("causal_owner") == "ARCHITECT":
         try:
-            from ..context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+            from ..contextual_evidence import ContextualEvidencePackage
         except (ImportError, ValueError):
             try:
-                from context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+                from contextual_evidence import ContextualEvidencePackage
             except ImportError:
-                build_architect_decision_context = None
-                ContextTelemetry = None
-                emit_context_telemetry = None
+                ContextualEvidencePackage = None
+        if ContextualEvidencePackage and latest_cep:
+            pkg = ContextualEvidencePackage.from_dict(latest_cep)
 
-        if build_architect_decision_context:
-            pkg = None
-            try:
-                from ..contextual_evidence import ContextualEvidencePackage
-            except (ImportError, ValueError):
-                try:
-                    from contextual_evidence import ContextualEvidencePackage
-                except ImportError:
-                    ContextualEvidencePackage = None
-            if ContextualEvidencePackage and latest_cep:
-                pkg = ContextualEvidencePackage.from_dict(latest_cep)
+    decision_ctx = ""
+    telem_data = {}
+    try:
+        from ..context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+    except (ImportError, ValueError):
+        try:
+            from context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+        except ImportError:
+            build_architect_decision_context = None
+            ContextTelemetry = None
+            emit_context_telemetry = None
 
-            decision_ctx, telem_data = build_architect_decision_context(state, pkg=pkg)
-            feedback_section = f"\n\n{decision_ctx}\n"
-
-            if tracer and ContextTelemetry and emit_context_telemetry:
-                import dataclasses
-                known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
-                filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
-                telem = ContextTelemetry(
-                    agent="architect",
-                    model=str(state.get("model_name", "")),
-                    context_version="hardening_v1",
-                    run_id=str(state.get("run_id", "")),
-                    iteration=state.get("contract_revision_count", 0),
-                    **filtered_telem_data
-                )
-                emit_context_telemetry(tracer, "architect", telem)
-                if hasattr(tracer, "log_repair_attempt") and pkg:
-                    rev_idx = state.get("contract_revision_count", 0)
-                    tracer.log_repair_attempt(turn=rev_idx, package_id=pkg.package_id, iteration=rev_idx)
-
-    if not feedback_section:
-        contract_feedback = state.get("contract_feedback")
-        if contract_feedback:
-            feedback_section = (
-                f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
-                f"{contract_feedback}\n\n"
-                "INSTRUKSI REVISI WAJIB:\n"
-                "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
-                "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
+    if build_architect_decision_context:
+        decision_ctx, telem_data = build_architect_decision_context(state, pkg=pkg)
+        if tracer and ContextTelemetry and emit_context_telemetry and telem_data:
+            import dataclasses
+            known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
+            filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
+            telem = ContextTelemetry(
+                agent="architect",
+                model=str(state.get("model_name", "")),
+                context_version="hardening_v1",
+                run_id=str(state.get("run_id", "")),
+                iteration=state.get("contract_revision_count", 0),
+                **filtered_telem_data
             )
+            emit_context_telemetry(tracer, "architect", telem)
+            if hasattr(tracer, "log_repair_attempt") and pkg:
+                rev_idx = state.get("contract_revision_count", 0)
+                tracer.log_repair_attempt(turn=rev_idx, package_id=pkg.package_id, iteration=rev_idx)
 
-    # V0 App Requirements Grounding (Epistemic Grounding)
-    v0_section = ""
-    v0_model = state.get("v0_requirement_model")
-    if v0_model and isinstance(v0_model, dict):
-        core_reqs = v0_model.get("requirements", [])
-        if core_reqs:
-            v0_lines = [
-                f"- [{r.get('category', 'REQ')}] {r.get('description', str(r))}"
-                if isinstance(r, dict) else f"- {r}"
-                for r in core_reqs[:8]
-            ]
-            v0_section = "\nKebutuhan Aplikasi V0 (Epistemic Grounding):\n" + "\n".join(v0_lines) + "\n"
+    feedback_section = ""
+    contract_feedback = state.get("contract_feedback")
+    if contract_feedback:
+        feedback_section = (
+            f"\n\n[PERHATIAN: KONTRAK SEBELUMNYA DITOLAK OLEH GERBANG VALIDASI - REVISI DIPERLUKAN]\n"
+            f"{contract_feedback}\n\n"
+            "INSTRUKSI REVISI WAJIB:\n"
+            "Perbaiki rancangan arsitektur dan definisikan `interface_contracts` secara eksplisit sesuai feedback di atas.\n"
+            "Pastikan antarmuka publik yang didefinisikan dapat dipanggil oleh pengujian independen (nama fungsi/kelas, callable signature, parameter, return type)."
+        )
 
     # Environment Grounding untuk Architect
     try:
@@ -391,17 +382,17 @@ def architect_agent(state: SquadState) -> dict:
         if oracle_obs:
             ledger_text = format_authoritative_obligation_ledger(oracle_obs)
             usage_evidence_text = format_acceptance_usage_evidence(oracle_obs)
-            sections = []
+            sec_items = []
             if ledger_text:
-                sections.append(ledger_text)
+                sec_items.append(ledger_text)
             if usage_evidence_text:
-                sections.append(usage_evidence_text)
-            if sections:
-                oracle_ledger_section = f"\n" + "\n\n".join(sections) + "\n"
+                sec_items.append(usage_evidence_text)
+            if sec_items:
+                oracle_ledger_section = f"\n" + "\n\n".join(sec_items) + "\n"
     except Exception:
         oracle_ledger_section = ""
 
-    # Acceptance Behavior & Scenarios (Read-Only Authoritative Ground Truth - Treatment #1.3)
+    # Acceptance Behavior & Scenarios (Read-Only Authoritative Ground Truth)
     oracle_scenario_section = ""
     try:
         f_oracle_path = state.get("frozen_oracle_path")
@@ -417,19 +408,22 @@ def architect_agent(state: SquadState) -> dict:
     except Exception:
         oracle_scenario_section = ""
 
+    decision_text = f"\n{decision_ctx}\n" if decision_ctx else ""
+
     prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
 
 {structure_rule}
 {env_section}
 Deskripsi Tugas Pengguna:
 {user_task}
-{v0_section}{oracle_ledger_section}{oracle_scenario_section}
+{oracle_ledger_section}{oracle_scenario_section}
 Spesifikasi Product Manager:
 {specs}{feedback_section}
-
+{decision_text}
 ATURAN KETAT:
-Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {target_lang.upper()} murni (Maksimal 2-3 file total).
+Seluruh file tree, hierarki modul, dan ekstensi file WAJIB menggunakan bahasa {target_lang.upper()} murni (Maksimal 2-3 file implementasi total).
 DILARANG KERAS merancang file tree atau struktur dalam bahasa selain {target_lang.upper()}!
+ARTIFACT PURITY (WAJIB): DILARANG KERAS memasukkan file pengujian/test ke dalam file_tree atau files!
 DILARANG KERAS merancang kelas, dependensi, atau pola yang dinyatakan dilarang dalam BATASAN ARSITEKTUR WAJIB di atas!
 
 PRE-SEAL SELF-REVIEW (Sebelum menyerahkan blueprint):
@@ -437,8 +431,10 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 1. Specification -> Coverage: Apakah seluruh requirement dari spesifikasi sudah terwakili tanpa ada yang terlewat?
 2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
 3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
-4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan yang kompatibel?
-Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan kontrak interface secara SUPER RINGKAS tanpa basa-basi narasi."""
+4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan (call-shape) yang kompatibel?
+5. Observable Negative Behavior: Apakah representasi perilaku negatif yang disyaratkan terwakili dalam scaffold secara memadai untuk analisis kompatibilitas deterministik?
+(Catatan: Pre-seal checklist ini adalah panduan penalaran Architect; bukan Acceptance Authority dan tidak menggantikan validator deterministik).
+Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===."""
 
     messages = [
         SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),

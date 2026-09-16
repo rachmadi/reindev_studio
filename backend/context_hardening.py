@@ -37,16 +37,22 @@ except (ImportError, ValueError):
 try:
     from .canonical_obligation import (
         extract_canonical_oracle_obligations,
+        format_authoritative_obligation_ledger,
+        format_acceptance_usage_evidence,
         ObligationKind,
     )
 except (ImportError, ValueError):
     try:
         from canonical_obligation import (
             extract_canonical_oracle_obligations,
+            format_authoritative_obligation_ledger,
+            format_acceptance_usage_evidence,
             ObligationKind,
         )
     except ImportError:
         extract_canonical_oracle_obligations = None  # type: ignore
+        format_authoritative_obligation_ledger = None  # type: ignore
+        format_acceptance_usage_evidence = None  # type: ignore
         ObligationKind = None  # type: ignore
 
 try:
@@ -878,29 +884,49 @@ def build_architect_decision_context(
             + user_task.strip()
         )
 
-    # [2] V0 APP REQUIREMENTS
+    # [2] V0 APP REQUIREMENTS (FACT / INTERPRETATION / ASSUMPTION / UNRESOLVED)
     v0_model = state.get("v0_requirement_model")
     if v0_model:
         if isinstance(v0_model, dict):
             core_reqs = v0_model.get("requirements", [])
             constructibility = v0_model.get("constructibility_status", "")
-            v0_text = ""
+            interpretations = v0_model.get("interpretations", [])
+            assumptions = v0_model.get("assumptions", [])
+            unresolved = v0_model.get("open_ambiguities", []) or v0_model.get("unresolved_items", [])
+
+            v0_lines = []
             if constructibility:
-                v0_text += f"Constructibility: {constructibility}\n"
+                v0_lines.append(f"Constructibility: {constructibility}")
             if core_reqs and isinstance(core_reqs, list):
-                v0_text += "Core Requirements (FACT):\n"
+                v0_lines.append("Core Requirements (FACT — grounded in user task):")
                 for i, r in enumerate(core_reqs[:8], 1):
                     if isinstance(r, dict):
                         label = r.get("category", "REQ")
                         desc = r.get("description", str(r))
-                        v0_text += f"  {i}. [{label}] {desc}\n"
+                        v0_lines.append(f"  {i}. [{label}] {desc}")
                     else:
-                        v0_text += f"  {i}. {r}\n"
+                        v0_lines.append(f"  {i}. {r}")
+            if interpretations and isinstance(interpretations, list):
+                v0_lines.append("\nInterpretations (INTERPRETATION — derived requirements for constructibility):")
+                for i, it in enumerate(interpretations[:6], 1):
+                    desc = it.get("description", str(it)) if isinstance(it, dict) else str(it)
+                    v0_lines.append(f"  {i}. {desc}")
+            if assumptions and isinstance(assumptions, list):
+                v0_lines.append("\nAssumptions (ASSUMPTION — engineering baselines; NOT facts):")
+                for i, asm in enumerate(assumptions[:6], 1):
+                    desc = asm.get("description", str(asm)) if isinstance(asm, dict) else str(asm)
+                    v0_lines.append(f"  {i}. {desc}")
+            if unresolved and isinstance(unresolved, list):
+                v0_lines.append("\nUnresolved Gaps (UNRESOLVED — preserved boundaries; DO NOT invent):")
+                for i, un in enumerate(unresolved[:6], 1):
+                    desc = un.get("description", str(un)) if isinstance(un, dict) else str(un)
+                    v0_lines.append(f"  {i}. {desc}")
+            v0_text = "\n".join(v0_lines)
         else:
             v0_text = str(v0_model)[:600]
         sections["authority_v0_reqs"] = (
             "[2] V0 APP REQUIREMENTS (FACT — grounded in user task)\n"
-            "=======================================================\\n"
+            "=======================================================\n"
             + v0_text.strip()
         )
 
@@ -963,28 +989,68 @@ def build_architect_decision_context(
     # [5] AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES
     # WAJIB bersumber dari Frozen Acceptance Oracle test suite (ORACLE_FACT)
     oracle_items = extract_authoritative_oracle_interfaces(state)
+    frozen_path = state.get("frozen_oracle_path")
+    test_files = state.get("test_files")
+
+    oracle_obs = []
+    if extract_canonical_oracle_obligations and (frozen_path or test_files):
+        try:
+            oracle_obs = extract_canonical_oracle_obligations(
+                frozen_oracle_path=frozen_path,
+                test_files=test_files
+            )
+        except Exception:
+            oracle_obs = []
+
+    scenarios = []
+    if extract_canonical_scenarios and (frozen_path or test_files):
+        try:
+            scenarios = extract_canonical_scenarios(
+                frozen_oracle_path=frozen_path,
+                test_files=test_files
+            )
+        except Exception:
+            scenarios = []
+
+    sec_05_lines = []
     if oracle_items:
-        sections["authority_oracle_interfaces"] = (
-            "[5] AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES (ORACLE_FACT — verified test suite)\n"
-            "=================================================================================\n"
-            + "\n".join(f"  - {item}" for item in oracle_items)
-            + "\n  Authority Notice: The above symbols are verified directly from Acceptance Test Suite (Ground Truth)."
-        )
+        sec_05_lines.extend(f"  - {item}" for item in oracle_items)
     elif is_frozen and interfaces:
-        # Jika test suite tidak memuat file eksplisit tapi kontrak sudah FROZEN
-        sections["authority_oracle_interfaces"] = (
-            "[5] AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES (ORACLE_FACT — from sealed contract)\n"
-            "====================================================================================\n"
-            + "\n".join(f"  - [ORACLE_FACT] {ifc}" for ifc in interfaces)
-        )
+        sec_05_lines.extend(f"  - [ORACLE_FACT] {ifc}" for ifc in interfaces)
     else:
-        # JANGAN PERNAH melabeli PM draft sebagai FROZEN/ORACLE-DERIVED!
-        sections["authority_oracle_interfaces"] = (
-            "[5] AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES (ORACLE_FACT)\n"
-            "============================================================\n"
-            "  [ORACLE_FACT] No explicit public oracle interfaces extracted from tests.\n"
-            "  Implement functional requirements according to Section [1] User Intent and Section [2] V0 App Requirements."
-        )
+        sec_05_lines.append("  [ORACLE_FACT] No explicit public oracle interfaces extracted from tests.")
+        sec_05_lines.append("  Implement functional requirements according to Section [1] User Intent and Section [2] V0 App Requirements.")
+
+    if oracle_obs:
+        try:
+            ledger_text = format_authoritative_obligation_ledger(oracle_obs)
+            if ledger_text:
+                sec_05_lines.append("\n" + ledger_text)
+        except Exception:
+            pass
+        try:
+            usage_evidence_text = format_acceptance_usage_evidence(oracle_obs)
+            if usage_evidence_text:
+                sec_05_lines.append("\n" + usage_evidence_text)
+        except Exception:
+            pass
+
+    if scenarios:
+        try:
+            scenario_text = format_scenarios_for_architect(scenarios)
+            if scenario_text:
+                sec_05_lines.append("\n" + scenario_text)
+        except Exception:
+            pass
+
+    sec_05_lines.append("\n  Authority Notice: The above symbols, obligations, and scenarios are verified directly from Acceptance Test Suite (Ground Truth — Acceptance Authority).")
+    sec_05_lines.append("  Architect is strictly FORBIDDEN from altering, removing, or omitting these requirements.")
+
+    sections["authority_oracle_interfaces"] = (
+        "[5] AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES (ORACLE_FACT — verified test suite)\n"
+        "=================================================================================\n"
+        + "\n".join(sec_05_lines)
+    )
 
     # [6] PROVEN INVARIANTS
     locked_dict = state.get("locked_invariants") or {}
@@ -1092,17 +1158,31 @@ def build_architect_decision_context(
                     + rb_text.strip()
                 )
 
-    # [11] OUTPUT CONTRACT
+    # [11] OUTPUT CONTRACT & REASONING GUIDANCE
     sections["authority_output_contract"] = (
-        "[11] OUTPUT CONTRACT\n"
-        "=====================\n"
+        "[11] OUTPUT CONTRACT & REASONING GUIDANCE\n"
+        "=========================================\n"
         "Output: JSON blueprint dalam marker === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===\n"
         "Aturan code_scaffold:\n"
-        "  - code_scaffold HARUS berupa interface signatures / stubs (misal: stubs fungsi dengan pass).\n"
-        "  - Target ukuran: <=800 karakter per file.\n"
-        "  - Jangan menuliskan logika bisnis atau implementasi penuh di dalam scaffold.\n"
+        "  - code_scaffold HARUS berupa interface signatures / stubs minimal.\n"
+        "  - Target ukuran: <=1200 karakter per file.\n"
+        "  - DILARANG menuliskan logika bisnis atau implementasi penuh di dalam scaffold.\n"
         "  - Interface contracts HARUS mendefinisikan SEMUA identifier dari Authoritative Acceptance Oracle Interfaces (ORACLE_FACT).\n"
-        "  - Elemen [PM_PROPOSAL] hanya digunakan sebagai referensi desain awal jika TIDAK bertentangan dengan [ORACLE_FACT]."
+        "  - Elemen [PM_PROPOSAL] hanya digunakan sebagai referensi desain awal jika TIDAK bertentangan dengan [ORACLE_FACT].\n"
+        "  - ARTIFACT PURITY: file_tree dan files HANYA untuk modul implementasi kode. DILARANG memasukkan file test atau test runner ke dalam file_tree atau files.\n"
+        "  - OBSERVABLE NEGATIVE BEHAVIOR: Scaffolds must represent the required observable negative behavior sufficiently for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.\n\n"
+        "PRE-SEAL SELF-CONSISTENCY CHECKLIST (Architect reasoning guidance):\n"
+        "  1. Obligation Coverage: Every authoritative acceptance obligation has a traceable architectural representation in interface_contracts or data_models.\n"
+        "  2. Authoritative Scenario Coverage: All positive, negative, and boundary scenarios are represented.\n"
+        "  3. Call-Shape Fidelity: Invocation form, parameter ordering, and input/output shapes are preserved.\n"
+        "  4. Observable Negative Behavior: Negative scenario paths/guards are represented sufficiently for deterministic static compatibility.\n"
+        "  5. Artifact Purity: Only implementation artifacts; zero test files in file_tree.\n"
+        "  6. No Requirement Invention: No invented unrequested features or fabricated endpoints.\n"
+        "  7. No Contradiction: Internal consistency between file_tree, files, data_models, and interface_contracts.\n"
+        "  8. Preservation: No regression against locked invariants or proven state.\n"
+        "  9. Evidence Traceability: Every architectural decision is grounded in evidence.\n"
+        "  10. Scaffold Sufficiency: Complete stubs for all declared files in file_tree.\n"
+        "  (Notice: The 10-point checklist is Architect reasoning guidance. It is NOT an acceptance authority and does NOT replace deterministic validators. Deterministic validators determine REALITY.)"
     )
 
     # Deterministic Consistency Check & Authority Conflict Resolution
