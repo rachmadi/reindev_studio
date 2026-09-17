@@ -864,9 +864,43 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Implementasi Active Validation Lifecycle v1):
+### Kasus E-069: Pydantic Dict-Mapping Schema Incompatibility in `data_models` (FastAPI T1 Turn 0)
+- **Waktu:** 2026-09-16 ~23:16 WIB (Pilot `fastapi_t1` Treatment #1.8.4)
+- **Tingkat Keparahan:** Medium (Schema Syntactic Deviation)
+- **Gejala:** Validasi skema blueprint V2 gagal pada Turn 0 `fastapi_t1` dengan error deterministik: `data_models.0: Input should be a valid dictionary or instance of DataModelDeclaration`.
+- **Akar Masalah:** Model `qwen2.5-coder:7b` menghasilkan list data models sebagai dictionary berpasangan kunci-nilai (misal `[{"Product": {"fields": ...}}]`) alih-alih representasi kanonikal list of objects dengan field `model_name` dan `fields` (`[{"model_name": "Product", ...}]`).
+- **Tindakan Korektif:** Validator skema Pydantic V2 secara deterministik menolak format cacat dan menerbitkan umpan balik diagnostik terstruktur ke Turn 1 (*fail-closed*).
+- **Sumber Solusi:** SISTEM REINDEV (Deterministic Blueprint Schema Validator V2).
+- **Status:** Teridentifikasi & Terdokumentasi (Batas Kapabilitas Sintaksis Model 7B).
+
+---
+
+### Kasus E-070: Unexported Private Helper Scenario Incompatibility in CLI T1 (`_add`, `_sub`, `_mul`)
+- **Waktu:** 2026-09-16 ~23:21 WIB (Pilot `cli_t1` Treatment #1.8.4)
+- **Tingkat Keparahan:** Medium (Downstream Scenario Helper Mismatch)
+- **Gejala:** Pada Turn 0 kasus `cli_t1`, model Architect berhasil memetakan 100% acceptance obligations ke 4 interface kanonikal (`Matrix`, `add_matrices`, `subtract_matrices`, `multiply_matrices`), namun validasi skenario V2 menolak blueprint karena scaffold tidak mendeklarasikan fungsi privat pembantu `_add`, `_sub`, dan `_mul`.
+- **Akar Masalah:** Test suite Frozen Oracle menggunakan fungsi bantuan privat internal (`_add(a, b)`) untuk mengevaluasi dispatch polimorfik. Model mendefinisikan antarmuka publik sesuai spesifikasi Acceptance Authority, tetapi scaffold tidak memuat stub helper privat yang diekspektasikan skenario uji.
+- **Tindakan Korektif:** Validator Skenario V2 mempertahankan *fail-closed* deterministik, mencegah kebocoran downstream (*zero downstream leakage*).
+- **Sumber Solusi:** SISTEM REINDEV (Deterministic Scenario Validator V2).
+- **Status:** Teridentifikasi & Terdokumentasi.
+
+---
+
+### Kasus E-071: Model Field Cross-Talk & Identifier Injection in Flutter T1 `data_models`
+- **Waktu:** 2026-09-16 ~23:26 WIB (Pilot `flutter_t1` Treatment #1.8.4)
+- **Tingkat Keparahan:** Medium (Cognitive Field Interference / Representation Cross-Talk)
+- **Gejala:** Validasi skema Pydantic menolak Turn 0 `flutter_t1` dengan error: `data_models.0.model_name: Field required`.
+- **Akar Masalah:** Terjadi interferensi kognitif lintas-skema (*cross-talk*): Model 7B mencampurkan skema `InterfaceContract` (yang memiliki field `identifier`) ke dalam `DataModelDeclaration` (yang memiliki field `model_name`), menghasilkan objek `{"identifier": "MetricData", "fields": ...}` alih-alih `{"model_name": "MetricData", ...}`.
+- **Tindakan Korektif:** Validator V2 menolak objek cacat tersebut secara instan (*fail-closed*).
+- **Sumber Solusi:** SISTEM REINDEV (Deterministic Blueprint Schema Validator V2).
+- **Status:** Teridentifikasi & Terdokumentasi (Batas Kapabilitas Kognitif Model 7B).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Treatment #1.8.4):
 - **Diselesaikan Mandiri oleh Agen:** 30 kasus (termasuk E-065, E-068)
 - **Diselesaikan atas Intervensi IA:** 7 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
-- **Kasus Forensik & Rekomendasi Terbuka:** 4 kasus (E-060, E-061, E-062, E-066)
-- **Total Galat Terdokumentasi:** 68 kasus (E-001 s/d E-068)
+- **Kasus Forensik & Rekomendasi Terbuka:** 7 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071)
+- **Total Galat Terdokumentasi:** 71 kasus (E-001 s/d E-071)
+

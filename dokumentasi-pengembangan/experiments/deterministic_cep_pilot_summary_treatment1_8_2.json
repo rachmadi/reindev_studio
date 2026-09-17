@@ -1,30 +1,16 @@
 {
   "experiment": "phase_end_validation_pilot",
-  "experiment_mode": "full_matrix",
-  "selected_tasks": [
-    "fastapi_t1",
-    "cli_t1",
-    "flutter_t1"
-  ],
-  "available_tasks": [
-    "fastapi_t1",
-    "cli_t1",
-    "flutter_t1"
-  ],
-  "skipped_tasks": [],
-  "pipeline_version": "1.8.3",
-  "governance_version": "1.6",
-  "date": "2026-09-16T23:30:32.290460",
+  "date": "2026-09-15T08:58:26.702133",
   "total_runs_planned": 3,
   "runs_completed": 3,
   "status": "COMPLETED",
-  "pass_count": 0,
-  "convergent_within_3_loops_count": 0,
+  "pass_count": 2,
+  "convergent_within_3_loops_count": 2,
   "aggregate_otrr": 0.0,
   "aggregate_otrr_percent": 0.0,
   "runs": [
     {
-      "run_id": "pv_pilot_fastapi_t1_rep1_20260916_231624",
+      "run_id": "pv_pilot_fastapi_t1_rep1_20260915_084424",
       "task_id": "fastapi_t1",
       "rep_index": 1,
       "target_language": "python",
@@ -39,7 +25,7 @@
       "contract_status": "REJECTED",
       "trajectory": "divergent",
       "failure_classification": "C. Contract Failure",
-      "duration_sec": 310.47,
+      "duration_sec": 233.57,
       "oracle_sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
       "oracle_sha_intact": true,
       "tester_agent_invocations": 0,
@@ -51,39 +37,25 @@
         "total_failures_with_repair": 0,
         "first_turn_successes": 0,
         "repair_records": []
-      },
-      "experiment_mode": "full_matrix",
-      "selected_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "available_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "skipped_tasks": [],
-      "pipeline_version": "1.8.3",
-      "governance_version": "1.6"
+      }
     },
     {
-      "run_id": "pv_pilot_cli_t1_rep1_20260916_232135",
+      "run_id": "pv_pilot_cli_t1_rep1_20260915_084818",
       "task_id": "cli_t1",
       "rep_index": 1,
       "target_language": "python",
       "model": "qwen2.5-coder:7b",
-      "final_verdict": "FAIL",
-      "review_verdict": "FAIL",
+      "final_verdict": "PASS",
+      "review_verdict": "APPROVED",
       "loops_consumed": 0,
-      "converged_within_3_loops": false,
-      "tests_passed": 0,
+      "converged_within_3_loops": true,
+      "tests_passed": 5,
       "tests_failed": 0,
       "tests_total": 5,
-      "contract_status": "REJECTED",
-      "trajectory": "divergent",
-      "failure_classification": "C. Contract Failure",
-      "duration_sec": 275.86,
+      "contract_status": "FROZEN",
+      "trajectory": "convergent",
+      "failure_classification": "NONE",
+      "duration_sec": 259.26,
       "oracle_sha256": "0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124",
       "oracle_sha_intact": true,
       "tester_agent_invocations": 0,
@@ -95,39 +67,25 @@
         "total_failures_with_repair": 0,
         "first_turn_successes": 0,
         "repair_records": []
-      },
-      "experiment_mode": "full_matrix",
-      "selected_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "available_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "skipped_tasks": [],
-      "pipeline_version": "1.8.3",
-      "governance_version": "1.6"
+      }
     },
     {
-      "run_id": "pv_pilot_flutter_t1_rep1_20260916_232610",
+      "run_id": "pv_pilot_flutter_t1_rep1_20260915_085237",
       "task_id": "flutter_t1",
       "rep_index": 1,
       "target_language": "dart",
       "model": "qwen2.5-coder:7b",
-      "final_verdict": "FAIL",
-      "review_verdict": "FAIL",
-      "loops_consumed": 0,
-      "converged_within_3_loops": false,
-      "tests_passed": 0,
+      "final_verdict": "PASS",
+      "review_verdict": "APPROVED",
+      "loops_consumed": 2,
+      "converged_within_3_loops": true,
+      "tests_passed": 2,
       "tests_failed": 0,
       "tests_total": 2,
-      "contract_status": "REJECTED",
-      "trajectory": "divergent",
-      "failure_classification": "C. Contract Failure",
-      "duration_sec": 261.32,
+      "contract_status": "FROZEN",
+      "trajectory": "convergent",
+      "failure_classification": "NONE",
+      "duration_sec": 349.35,
       "oracle_sha256": "4589e15cfb8f37ba70642e70623ca143bceee1a44175aefd072f441d9e8a9528",
       "oracle_sha_intact": true,
       "tester_agent_invocations": 0,
@@ -139,21 +97,7 @@
         "total_failures_with_repair": 0,
         "first_turn_successes": 0,
         "repair_records": []
-      },
-      "experiment_mode": "full_matrix",
-      "selected_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "available_tasks": [
-        "fastapi_t1",
-        "cli_t1",
-        "flutter_t1"
-      ],
-      "skipped_tasks": [],
-      "pipeline_version": "1.8.3",
-      "governance_version": "1.6"
+      }
     }
   ]
 }

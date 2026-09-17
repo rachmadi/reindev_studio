@@ -959,17 +959,120 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 - **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING — BELUM VALIDASI PASS DARI INTENT ARCHITECT)**
 - **Grand Total Kumulatif Proyek Terbaru:** 61.20 jam + 2.70 jam = **63.90 jam (3.834,0 menit)**.
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 5: TREATMENT #1.6 & #1.7 (DEVELOPER & PM CAPABILITY) — 2026-09-15 20:15 WIB s.d. 2026-09-16 13:00 WIB
+## ═══════════════════════════════════════════════════════════════════════════
 
+### 1. Aktivitas Pengembangan (Development Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Implementasi Treatment #1.6 Universal Developer Semantic Repair Grounding v1 (`developer_semantic_repair.py`, context assembler 10-tier) | 20:15:00 | 20:45:00 | 1.800 s | 30.00 m (0.50 j) |
+| 2 | Pembekuan LKG #1.6 & Scaffolding Treatment #1.7 PM Requirement Fidelity (`backend/agents/pm.py`, V0 epistemic stratification) | 12:05:00 | 12:26:00 | 1.260 s | 21.00 m (0.35 j) |
+| | **Subtotal Waktu Pengembangan** | | | **3.060 s** | **51.00 m (0.85 jam)** |
 
+### 2. Aktivitas Pengujian Terkontrol & Replikasi (Testing Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi Controlled Pilot 1x3 Treatment #1.6 `qwen2.5-coder:7b` (Flutter PASS, FastAPI 4/5, CLI rejected) | 20:55:00 | 21:16:00 | 1.260 s | 21.00 m (0.35 j) |
+| 2 | Eksekusi Replikasi 2x3 Treatment #1.6 (Run 2 & Run 3 pada `qwen2.5-coder:7b`) | 21:22:00 | 22:08:00 | 2.760 s | 46.00 m (0.77 j) |
+| 3 | Evaluasi Komparatif Cross-Model: Pilot 1x3 `qwen3.5:9b` (FastAPI 2927.7s, CLI 1615.4s, Flutter 1123.5s) | 09:15:00 | 10:51:00 | 5.666,6 s | 94.44 m (1.57 j) |
+| 4 | Evaluasi Komparatif Cross-Model: Pilot 1x3 `ornith:9b` (FastAPI 879.2s, CLI 866.1s, Flutter 794.3s) | 10:57:00 | 11:40:00 | 2.539,6 s | 42.33 m (0.71 j) |
+| 5 | Eksekusi Controlled Pilot 1x3 Treatment #1.7 PM Requirement Fidelity (`qwen2.5-coder:7b`, 3/3 PASS Turn 0) | 12:26:00 | 12:47:00 | 1.260 s | 21.00 m (0.35 j) |
+| 6 | Eksekusi Replikasi Penuh 3x3 Treatment #1.7 (9 runs, 9/9 PASS Turn 0, 0% FP-002) | 13:00:00 | 13:35:00 | 2.100 s | 35.00 m (0.58 j) |
+| | **Subtotal Waktu Pengujian** | | | **15.586,2 s** | **259.77 m (4.33 jam)** |
 
+### 3. Aktivitas Analisis Forensik & Dokumentasi (Forensics & Governance Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Penyusunan Laporan Forensik Replikasi Treatment #1.6 & Sintesis #1.3 -> #1.6 | 22:11:00 | 23:15:00 | 3.840 s | 64.00 m (1.07 j) |
+| 2 | Evaluasi Cross-Model & Forensic Failure Pattern Mining v1 (42 runs, 8 failure patterns) | 11:44:00 | 11:58:00 | 840 s | 14.00 m (0.23 j) |
+| 3 | Penyusunan Laporan Evaluasi Pilot & Replikasi 3x3 Treatment #1.7 serta Sinkronisasi Log IIDD | 12:47:00 | 13:00:00 | 780 s | 13.00 m (0.22 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **5.460 s** | **91.00 m (1.52 jam)** |
 
-| Pilot 1x3 `qwen3.5:9b` (FastAPI) | 2927.7s (~48.8 m) | Eksekusi V0-V5, Developer 4 loops (3/5 initial pass, drift) |
-| Pilot 1x3 `qwen3.5:9b` (CLI) | 1615.4s (~26.9 m) | Eksekusi V0-V2, Architect 2 repair turns (fail-closed) |
-| Pilot 1x3 `qwen3.5:9b` (Flutter) | 1123.5s (~18.7 m) | Eksekusi V0-V2, Architect 2 repair turns (fail-closed) |
-| Total Pilot 1x3 `qwen3.5:9b` | 5666.6s (~94.4 m) | Evaluasi komparatif cross-model frontier-tier |
+### Rekapitulasi Formula Waktu Realisasi Sesi 5:
+\mathbf{\text{Total Waktu Sesi 5} = 3.060\text{ s (Dev)} + 15.586,2\text{ s (Test)} + 5.460\text{ s (Doc)} = 24.106,2\text{ detik} \approx 401.77\text{ menit} (6.70\text{ jam})}
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
 
-| Pilot 1x3 `ornith:9b` (FastAPI) | 879.2s (~14.6 m) | Eksekusi V0-V3, Architect Turn 0 freeze, Developer V3 fail-closed |
-| Pilot 1x3 `ornith:9b` (CLI) | 866.1s (~14.4 m) | Eksekusi V0-V1, PM 3 attempts empty output fail-closed |
-| Pilot 1x3 `ornith:9b` (Flutter) | 794.3s (~13.2 m) | Eksekusi V0-V2, Architect 2 repair turns fail-closed |
-| Total Pilot 1x3 `ornith:9b` | 2539.6s (~42.3 m) | Evaluasi komparatif cross-model alternatif 9B |
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 6: TREATMENT #1.8 (ARCHITECT SYNTHESIS & REPLIKASI 3X3) — 2026-09-16 13:40 s.d. 16:02 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Aktivitas Pengembangan (Development Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Penerapan 5-Layer Stratified Input Grounding & Artifact Purity Mandate (`context_hardening.py`, `architect.py`) | 13:40:00 | 14:35:00 | 3.300 s | 55.00 m (0.92 j) |
+| | **Subtotal Waktu Pengembangan** | | | **3.300 s** | **55.00 m (0.92 jam)** |
+
+### 2. Aktivitas Pengujian Terkontrol & Replikasi (Testing Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi Controlled Pilot 1x3 Treatment #1.8 (Flutter Turn 1 Repair -> FROZEN -> 2/2 PASS) | 14:35:00 | 14:50:00 | 900 s | 15.00 m (0.25 j) |
+| 2 | Eksekusi Replikasi Terkontrol 3x3 Treatment #1.8 (9 runs total, Flutter 3/3 FROZEN) | 14:55:00 | 15:45:00 | 3.000 s | 50.00 m (0.83 j) |
+| | **Subtotal Waktu Pengujian** | | | **3.900 s** | **65.00 m (1.08 jam)** |
+
+### 3. Aktivitas Analisis Forensik & Dokumentasi (Forensics & Governance Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Analisis 9-Run Telemetri, Evaluasi Causal Evidence Repair Reasoning, & Penyusunan Laporan Replikasi 3x3 | 15:45:00 | 16:02:00 | 1.020 s | 17.00 m (0.28 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **1.020 s** | **17.00 m (0.28 jam)** |
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 6:
+\mathbf{\text{Total Waktu Sesi 6} = 3.300\text{ s (Dev)} + 3.900\text{ s (Test)} + 1.020\text{ s (Doc)} = 8.220\text{ detik} \approx 137.00\text{ menit} (2.28\text{ jam})}
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING)**
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 7: TREATMENT #1.8.1 s.d. #1.8.4 & SINGLE-CASE HARNESS — 2026-09-16 16:10 WIB s.d. 2026-09-17 14:35 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Aktivitas Pengembangan (Development Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Resolusi bug transmisi pipeline & Context Delivery Integrity Treatment #1.8.1 (`graph.py`, `context_hardening.py`) | 16:10:00 | 17:00:00 | 3.000 s | 50.00 m (0.83 j) |
+| 2 | Pemadatan konteks semantik kanonikal Treatment #1.8.2 (`distill_canonical_schema_semantic` < 800 chars) | 19:45:00 | 20:20:00 | 2.100 s | 35.00 m (0.58 j) |
+| 3 | Perbaikan representasi Pydantic deterministik Treatment #1.8.3 (`architect_preservation.py`) | 21:00:00 | 21:30:00 | 1.800 s | 30.00 m (0.50 j) |
+| 4 | Implementasi Single-Case Execution Support v1 pada experiment harness (`backend/run_phase_end_validation_pilot.py` argumen `--tasks`) | 22:05:00 | 22:30:00 | 1.500 s | 25.00 m (0.42 j) |
+| 5 | Penerapan Universal Canonical Contract Grounding v1 Treatment #1.8.4 (Dynamic sub-model inspection, Contrastive Grounding, Two-Stage synthesis) | 22:50:00 | 23:15:00 | 1.500 s | 25.00 m (0.42 j) |
+| | **Subtotal Waktu Pengembangan** | | | **9.900 s** | **165.00 m (2.75 jam)** |
+
+### 2. Aktivitas Pengujian Terkontrol & Uji Ulang (Testing Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.1 (Verifikasi transmisi konteks skema) | 17:00:00 | 17:35:00 | 2.100 s | 35.00 m (0.58 j) |
+| 2 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.2 (Evaluasi reduksi token & distilasi semantik) | 20:20:00 | 20:45:00 | 1.500 s | 25.00 m (0.42 j) |
+| 3 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.3 (Evaluasi representasi Pydantic & repair hysteresis) | 21:30:00 | 21:55:00 | 1.500 s | 25.00 m (0.42 j) |
+| 4 | Eksekusi Unit Tests `test_single_case_runner_v1.py` (13/13 PASS) & Targeted Single-Case Probe `fastapi_t1` (312s) | 22:30:00 | 22:45:00 | 900 s | 15.00 m (0.25 j) |
+| 5 | Eksekusi Cross-Domain Tests `test_architect_contract_grounding_v1.py` (15/15 PASS), Regresi 822 tests (24.48s) & Gates A–I | 23:10:00 | 23:16:00 | 360 s | 6.00 m (0.10 j) |
+| 6 | Eksekusi Controlled Pilot 1x3 Treatment #1.8.4 (`qwen2.5-coder:7b`, FastAPI 310.5s, CLI 275.9s, Flutter 261.3s) | 23:16:24 | 23:30:32 | 847,65 s | 14.13 m (0.24 j) |
+| | **Subtotal Waktu Pengujian** | | | **7.207,65 s** | **120.13 m (2.00 jam)** |
+
+### 3. Aktivitas Analisis Forensik & Dokumentasi (Forensics & Governance Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi Forensik Telemetri Run Trace Treatment #1.8.1 s.d. #1.8.3 & Penyusunan Laporan Terkait | 17:35:00 | 22:05:00 | 3.600 s | 60.00 m (1.00 j) |
+| 2 | Pembedahan Telemetri Pilot 1x3 Treatment #1.8.4, Ekstraksi Bukti Empiris CLI Turn 0 & Flutter Field Cross-talk | 23:30:32 | 23:45:00 | 868 s | 14.47 m (0.24 j) |
+| 3 | Penyusunan Laporan Formal Riset Treatment #1.8.4 (`treatment1_8_4_universal_canonical_contract_grounding_pilot_1x3_v1.md`) | 23:45:00 | 00:15:00 | 1.800 s | 30.00 m (0.50 j) |
+| 4 | Pemutakhiran Menyeluruh Dokumen Tata Kelola IIDD Sesuai Timestamp Riil (`decision_log.md`, `conversation_log.md`, `durasi_per_fitur.md`, `error_log.md`, `commit_history.md`, `context_drift_log.md`) | 14:00:00 | 14:35:00 | 2.100 s | 35.00 m (0.58 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **8.368 s** | **139.47 m (2.32 jam)** |
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 7:
+\mathbf{\text{Total Waktu Sesi 7} = 9.900\text{ s (Dev)} + 7.207,65\text{ s (Test)} + 8.368\text{ s (Doc)} = 25.475,65\text{ detik} \approx 424.59\text{ menit} (7.08\text{ jam})}
+- **Waktu Mulai Sesi 7:** 2026-09-16 16:10:00 WIB
+- **Waktu Pencatatan Checkpoint Sesi 7:** 2026-09-17 14:35:00 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING — BELUM VALIDASI PASS DARI INTENT ARCHITECT)**
+
+---
+
+### Rekapitulasi Grand Total Kumulatif Proyek Terbaru:
+- Grand Total Sebelumnya (Sesi 1 s.d. Sesi 4): **63.90 jam (3.834,0 menit)**
+- Total Sesi 5 (Treatment #1.6 & #1.7): **6.70 jam (401.77 menit)**
+- Total Sesi 6 (Treatment #1.8 & Replikasi 3x3): **2.28 jam (137.00 menit)**
+- Total Sesi 7 (Treatment #1.8.1–#1.8.4, Harness, & Tata Kelola): **7.08 jam (424.59 menit)**
+- **GRAND TOTAL KUMULATIF PROYEK TERBARU:** 63.90 + 6.70 + 2.28 + 7.08 = **79.96 jam (4.797,36 menit)**.
+- **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+

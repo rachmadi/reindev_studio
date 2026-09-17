@@ -547,10 +547,10 @@ def validate_architect_repair_context_delivery(context_str: str) -> Tuple[bool, 
     Ensures critical sections are present before invoking the Architect:
     - Immutable acceptance obligations present
     - Current failures present (when failures exist)
-    - Repair target present
-    - Preserved state present
+    - Repair target present (atomic: target location, observed/invalid state, expected correction)
+    - Preserved state present (valid structural state, locked invariants)
     - Expected transition present
-    - Repair boundary present
+    - Repair boundary present (atomic: PRESERVE, ALLOWED, FORBIDDEN)
 
     If any critical section is missing due to truncation:
     Returns (False, ["ARCHITECT_CONTEXT_DELIVERY_FAILURE: ..."])
@@ -559,9 +559,9 @@ def validate_architect_repair_context_delivery(context_str: str) -> Tuple[bool, 
 
     # 1. Immutable acceptance authority / obligations check
     has_authority = bool(
-        re.search(r"\[1\]\s+IMMUTABLE ACCEPTANCE AUTHORITY", context_str) or
+        re.search(r"(\[\d+\]\s+)?IMMUTABLE ACCEPTANCE AUTHORITY", context_str) or
         re.search(r"\[IMMUTABLE ACCEPTANCE OBLIGATIONS\]", context_str) or
-        re.search(r"\[2\]\s+ACCEPTANCE OBLIGATION LEDGER", context_str) or
+        re.search(r"(\[\d+\]\s+)?ACCEPTANCE OBLIGATION LEDGER", context_str) or
         "AUTHORITATIVE ACCEPTANCE ORACLE INTERFACES" in context_str
     )
     if not has_authority:
@@ -569,46 +569,80 @@ def validate_architect_repair_context_delivery(context_str: str) -> Tuple[bool, 
 
     # 2. Current failures / violations check
     has_failures = bool(
-        re.search(r"\[3\]\s+CURRENT COMPATIBILITY FAILURES", context_str) or
+        re.search(r"(\[\d+\]\s+)?CURRENT COMPATIBILITY FAILURES", context_str) or
         re.search(r"\[9\]\s+EVIDENCE/VIOLATIONS", context_str) or
         re.search(r"\[REGRESSION EVIDENCE", context_str) or
         "Violations (" in context_str or
         "CURRENT COMPATIBILITY FAILURES" in context_str or
         "BEHAVIORAL COMPATIBILITY EVIDENCE" in context_str or
-        "No active repair targets" in context_str
+        "No active repair targets" in context_str or
+        "ACTIVE FAILURES" in context_str or
+        "No active static failures" in context_str
     )
     if not has_failures:
         errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing current compatibility failures or deterministic evidence.")
 
     # 3. Locked / Proven / Preserved state check
     has_preserved = bool(
-        re.search(r"\[4\]\s+LOCKED/PROVEN STATE", context_str) or
+        re.search(r"(\[\d+\]\s+)?LOCKED/PROVEN STATE", context_str) or
+        re.search(r"(\[\d+\]\s+)?CURRENT SCAFFOLD", context_str) or
         re.search(r"\[CURRENT ARCHITECT STATE\]", context_str) or
         re.search(r"\[6\]\s+PROVEN INVARIANTS", context_str) or
         "PRESERVE (" in context_str or
-        "PRESERVED=" in context_str
+        "PRESERVED=" in context_str or
+        "PRESERVE" in context_str or
+        "VALID != REPAIR TARGET" in context_str
     )
     if not has_preserved:
         errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing preserved state or locked proven invariants.")
 
-    # 4. Repair target & expected transition check
-    has_target = bool(
-        re.search(r"\[6\]\s+REPAIR TARGET", context_str) or
-        re.search(r"\[REPAIR TARGETS\]", context_str) or
-        "REQUIRED TRANSITION:" in context_str or
-        "No active repair targets" in context_str
+    # 4. Repair target & expected transition check (Atomic Check: WHAT, WHERE, OBSERVED, EXPECTED)
+    has_target_header = bool(
+        re.search(r"(\[\d+\]\s+)?REPAIR TARGET", context_str) or
+        re.search(r"\[REPAIR TARGETS\]", context_str)
     )
-    if not has_target:
-        errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing explicit repair target or required transition.")
+    has_target_what = bool(
+        "WHAT" in context_str or "ACTIVE TARGET:" in context_str or "TARGET:" in context_str or "Repair of" in context_str
+    )
+    has_target_where = bool(
+        "WHERE" in context_str or "Target File:" in context_str or "target_file" in context_str or "authoritative_target_file" in context_str or "file_tree" in context_str or ".py" in context_str or ".dart" in context_str
+    )
+    has_target_observed = bool(
+        "OBSERVED" in context_str or "Observed:" in context_str or "INCOMPATIBLE" in context_str or "ACTIVE FAILURES" in context_str or "No active static failures" in context_str or "No active repair targets" in context_str
+    )
+    has_target_expected = bool(
+        "EXPECTED" in context_str or "Required:" in context_str or "COMPATIBLE" in context_str or "REQUIRED TRANSITION:" in context_str or "EXPECTED POST-REPAIR" in context_str
+    )
 
-    # 5. Repair boundary check
-    has_boundary = bool(
-        re.search(r"\[7\]\s+REPAIR BOUNDARY", context_str) or
-        re.search(r"\[10\]\s+REPAIR BOUNDARY", context_str) or
+    if not has_target_header:
+        errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing repair target section.")
+    else:
+        missing_payload = []
+        if not has_target_what: missing_payload.append("what")
+        if not has_target_where: missing_payload.append("where")
+        if not has_target_observed: missing_payload.append("observed")
+        if not has_target_expected: missing_payload.append("expected")
+        if missing_payload:
+            errors.append(f"ARCHITECT_CONTEXT_DELIVERY_FAILURE: Repair target payload incomplete (missing: {', '.join(missing_payload)}).")
+
+    # 5. Repair boundary check (Atomic Check: PRESERVE, ALLOWED, and FORBIDDEN)
+    has_boundary_header = bool(
+        re.search(r"(\[\d+\]\s+)?REPAIR BOUNDARY", context_str) or
         "REPAIR BOUNDARY" in context_str
     )
-    if not has_boundary:
-        errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing repair boundary (ALLOWED vs FORBIDDEN).")
+    has_preserve = bool("PRESERVE" in context_str or "PRESERVED" in context_str)
+    has_allowed = bool("ALLOWED:" in context_str or "ALLOWED" in context_str)
+    has_forbidden = bool("FORBIDDEN:" in context_str or "FORBIDDEN" in context_str)
+
+    if not has_boundary_header:
+        errors.append("ARCHITECT_CONTEXT_DELIVERY_FAILURE: Missing repair boundary section.")
+    else:
+        missing_boundary_parts = []
+        if not has_preserve: missing_boundary_parts.append("PRESERVE")
+        if not has_allowed: missing_boundary_parts.append("ALLOWED")
+        if not has_forbidden: missing_boundary_parts.append("FORBIDDEN")
+        if missing_boundary_parts:
+            errors.append(f"ARCHITECT_CONTEXT_DELIVERY_FAILURE: Repair boundary atomic payload incomplete (missing: {', '.join(missing_boundary_parts)}).")
 
     is_valid = (len(errors) == 0)
     return is_valid, errors

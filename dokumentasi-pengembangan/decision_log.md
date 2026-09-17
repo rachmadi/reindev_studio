@@ -276,3 +276,61 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   3. **Identifikasi Hambatan Skema JSON Python**: Pada `fastapi_t1` dan `cli_t1`, model 7B mengalami kendala kepatuhan skema Pydantic JSON blueprint (`file_tree` list of objects alih-alih list of strings, serta scaffold stub `pass`).
   4. **Integritas Tata Kelola Terjaga**: Full regression suite 714 passed (zero regression), Oracle SHA-256 intact 100%, anti-solver audit 100% PASS.
   5. **Rekomendasi Iterasi Lanjutan**: Penyempurnaan schema guarding JSON pada prompt Architect untuk mengeliminasi distorsi format pada model 7B, dilanjutkan intervensi downstream Developer.
+
+---
+
+### [D-119] Treatment #1.8.1 — Context Hardening v1 & Pipeline Delivery Integrity (2026-09-16)
+* **Konteks**: Analisis pasca-replikasi 3x3 Treatment #1.8 mendapati kendala format JSON Pydantic pada model `qwen2.5-coder:7b` (`fastapi_t1` dan `cli_t1`). Investigasi mendalam menemukan bug transmisi pipeline: blok `schema_constraints` yang dibangun di `context_hardening.py` tidak diteruskan ke prompt Architect di `graph.py`.
+* **Keputusan / Temuan**:
+  1. Memperbaiki `backend/graph.py` untuk menjamin `schema_constraints` diteruskan secara deterministik ke prompt Architect pada Turn 0 maupun Repair turns (*Context Delivery Integrity*).
+  2. Menyusun test suite verifikasi `test_blueprint_schema_pipeline_fix.py` dan `test_context_delivery_integrity_v1.py` (100% PASS).
+  3. Menjalankan Pilot 1x3: Membuktikan saluran transmisi pulih sepenuhnya, namun model 7B mengalami kelebihan beban kognitif (*cognitive overload*) ketika batasan skema disajikan terlalu panjang dan mentah.
+* **Dampak**: Menjamin integritas transmisi konteks skema ke agen dan menetapkan kebutuhan teknik distilasi semantik skema.
+
+---
+
+### [D-120] Treatment #1.8.2 — Context Semantic Distillation v1 (2026-09-16)
+* **Konteks**: Prompt Architect yang memuat representasi skema Pydantic panjang memicu distorsi token dan halusinasi format pada model `qwen2.5-coder:7b`.
+* **Keputusan / Temuan**:
+  1. Mengimplementasikan `distill_canonical_schema_semantic()` di `backend/context_hardening.py`, memadatkan definisi skema kanonikal menjadi representasi semantik ringkas (< 800 karakter) yang memfokuskan model pada intisari field dan struktur relasional.
+  2. Menyusun unit test suite `test_context_semantic_distillation_v1.py` (100% PASS).
+  3. Eksekusi Pilot 1x3: Mengurangi latensi dan token footprint secara drastis, namun model 7B masih menghasilkan deviasi struktural pada deklarasi parameter dan return tipe data model akibat ambiguitas sub-model Pydantic.
+* **Dampak**: Membuktikan bahwa pemadatan konteks semantik efektif mereduksi kelebihan beban token tanpa kehilangan batasan arsitektural.
+
+---
+
+### [D-121] Treatment #1.8.3 — Deterministic Pydantic Representation Repair v1 & Deep Dive Forensics (2026-09-16)
+* **Konteks**: Model 7B menghasilkan struktur dictionary yang tidak valid di dalam `interface_contracts` dan `data_models` saat menghadapi skema relasional bersarang.
+* **Keputusan / Temuan**:
+  1. Merancang bimbingan perbaikan representasi Pydantic deterministik di `backend/context_hardening.py` dan `backend/architect_preservation.py`.
+  2. Mengembangkan suite tes `test_pydantic_representation_repair_v1.py`.
+  3. Eksekusi Pilot 1x3 menunjukkan perbaikan parsial, namun mengungkap fenomena *repair hysteresis* di mana penolakan Turn 0 menyebabkan model mengosongkan kontrak secara defensif pada Turn 1 dan 2 (`interface_contracts: []`).
+  4. Investigasi forensik mendalam (`deep_dive_events.py` dan `forensic_investigation_extractor.py`) memetakan bahwa model 7B memerlukan panduan sintesis dua tahap (*Two-Stage Synthesis*) dan pembumian kontras (*Contrastive Grounding*).
+* **Dampak**: Mengisolasi mekanisme kegagalan representasi Pydantic dan menjadi landasan formulasi Treatment #1.8.4.
+
+---
+
+### [D-122] Experiment Harness — Single-Case Execution Support v1 (2026-09-16)
+* **Konteks**: Intent Architect menginstruksikan penambahan kemampuan menjalankan SATU task/case secara terpilih melalui experiment runner (`--tasks fastapi`) untuk melakukan targeted capability probing tanpa memicu eksekusi 1x3 yang mahal secara komputasi.
+* **Keputusan / Temuan**:
+  1. Modifikasi dibatasi secara ketat hanya pada runner orchestration (`backend/run_phase_end_validation_pilot.py`), tanpa mengubah V0–V6, PM, Architect, Developer, Executor, Tester, Reviewer, Oracle, governance, atau repair budget.
+  2. Menambahkan argumen CLI `--tasks` dengan validasi ketat terhadap nama task kanonikal (`fastapi`, `cli`, `flutter`).
+  3. Menyusun unit test suite `backend/tests/test_single_case_runner_v1.py` (Tests A–M, 13/13 PASS).
+  4. Menjalankan probe terisolasi pada `fastapi_t1` (312s) dengan integritas penuh.
+* **Dampak**: Menyediakan kapabilitas orkestrasi eksperimen presisi tinggi untuk inspeksi cepat kapabilitas agen secara terisolasi.
+
+---
+
+### [D-123] Treatment #1.8.4 — Universal Canonical Contract Grounding v1 & Batas Kapabilitas Kognitif Model 7B (2026-09-16)
+* **Konteks**: Pengujian kapabilitas Architect dalam mentransformasikan Acceptance Obligations menjadi canonical `interface_contracts` melalui Two-Stage Synthesis (Semantic Mapping $\to$ Canonical Serialization), Dynamic Sub-model Inspection, dan Contrastive Grounding tanpa mengubah governance, Oracle, validator, atau menyuntikkan task-specific solver.
+* **Keputusan / Temuan**:
+  1. Menerapkan koreksi Intent Architect: tidak membuat enum `param_location` baru pada prompt, menggunakan skema Pydantic kanonikal yang ada, sintesis dua tahap, dan pengujian lintas-domain generik (`backend/tests/test_architect_contract_grounding_v1.py`, 15/15 PASS).
+  2. Memverifikasi seluruh 822 regression tests PASS (0 regressions) dan Pre-Flight Gates A–I PASS (100% intact).
+  3. Menjalankan Controlled Pilot 1x3 (`2026-09-16 23:16:24 s.d. 23:30:32 WIB`, durasi komputasi 847.65s):
+     - `fastapi_t1`: FAIL (310.47s) — Turn 0 data_models dict-mapping error, Turn 1-2 empty contracts collapse.
+     - `cli_t1`: FAIL (275.86s) — Turn 0 membuktikan mapping capability 100% obligation coverage (4/4 interfaces), tertahan downstream pada helper skenario non-ekspor `_add`/`_sub`/`_mul`.
+     - `flutter_t1`: FAIL (261.32s) — Field cross-talk: model menyuntikkan `identifier` ke `data_models` (meminjam dari skema contract).
+  4. Mengonfirmasi kriteria keputusan IA: *"Flutter/CLI rusak $\to$ treatment dianggap tidak general, dan kita tidak mengejar FastAPI dengan mengorbankan kontrol."*
+  5. Menetapkan batas kapabilitas kognitif (*clean cognitive capability ceiling*) model `qwen2.5-coder:7b`: model 7B mengalami interferensi representasi (*field cross-talk*) dan *repair collapse* saat menangani skema Pydantic relasional multi-entitas yang padat.
+* **Dampak**: Membuktikan batas pemisahan arsitektur tata kelola vs batas kapasitas penalaran intrinsik model koding 7B, mengunci eksperimen Treatment #1.8.4 secara definitif sesuai Stop Rule.
+

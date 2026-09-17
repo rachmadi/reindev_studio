@@ -10,6 +10,7 @@ Self-Healing Revision Loop (max 2 revisions).
 
 import re
 import json
+from typing import Any, Optional, Dict, List, Tuple
 from datetime import datetime
 from pathlib import Path
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -124,9 +125,18 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
   "interface_contracts": [
     {
       "identifier": "operation_a",
-      "route": "/operation_a",
-      "method": "POST",
-      "target_file": "main.py"
+      "target_file": "main.py",
+      "parameters": [
+        {
+          "param_name": "param_1",
+          "param_type": "TypeA",
+          "param_location": "ARGUMENT",
+          "is_required": true
+        }
+      ],
+      "expected_return": {
+        "return_type": "TypeA"
+      }
     }
   ],
   "data_models": [
@@ -150,6 +160,7 @@ Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON
 PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
 1. File-Centric Signatures & Scaffolding: Setiap berkas dituliskan sebagai kerangka interface di dalam string `code_scaffold`.
    - BATAS SCAFFOLD WAJIB: `code_scaffold` berupa interface signatures dan stubs minimal.
+   - STRING FORMAT: `code_scaffold` WAJIB berupa single string (teks kode langsung dengan baris baru) atau list of strings (tiap baris). DILARANG KERAS menggunakan nested dictionary atau objek JSON terpecah untuk kode (seperti {'imports': ..., 'models': ..., 'endpoints': ...}).
    - OBSERVABLE BEHAVIOR: Scaffolds must represent sufficient observable behavior for deterministic compatibility analysis. Do not prescribe implementation-specific mechanisms. The Architect may choose the appropriate architectural representation, provided that the required observable behavior is preserved.
    - ARTIFACT PURITY: `file_tree` dan `files` HANYA untuk modul implementasi kode. DILARANG memasukkan file test atau QA test suite (seperti test_*.py atau test/*_test.dart) ke dalam file_tree atau files!
    - TARGET UKURAN: <=1200 karakter per file. DILARANG menuliskan implementasi logika bisnis penuh di dalam scaffold.
@@ -157,9 +168,14 @@ PRINSIP KONSISTENSI & KODIFIKASI ARSITEKTUR (WAJIB):
 3. Authority Hierarchy: Acceptance Oracle adalah Acceptance Authority (WHAT). Canonical Schema dan Governance menentukan aturan validitas struktur. Architect adalah Design Authority (HOW). Pre-seal checklist dan Invariants A-H adalah panduan penalaran (reasoning guidance) Architect; validator deterministik menentukan REALITY.
 4. INTEGRITAS ENVIRONMENT: Patuhi batasan ENVIRONMENT FACT CARD dan dilarang menggunakan API terlarang.
 5. Canonical Data Models: Setiap entitas dalam `data_models` WAJIB menggunakan format kanonikal: `field_name` dan `field_type` untuk setiap item dalam `fields`.
-6. Two-Stage Architect Synthesis:
-   - Stage 1 (Semantic Blueprint Model): Bangun model penalaran semantik terlebih dahulu (acceptance obligations, scenarios, architectural representations, interface identities, target artifacts, dan scaffold observable behaviors).
-   - Stage 2 (Canonical Serialization): Lakukan serialisasi model semantik tersebut ke dalam skema ArchitecturalBlueprint kanonikal yang ada tanpa improvisasi format atau distorsi tipe data.
+6. Two-Stage Architect Synthesis & Obligation Grounding:
+   - Stage 1 (Semantic Blueprint Model): Bangun model penalaran semantik terlebih dahulu (acceptance obligations, scenarios, architectural representations, interface identities, target artifacts, parameter shapes, return structures, dan scaffold observable behaviors).
+   - Stage 2 (Canonical Serialization): Lakukan serialisasi model semantik tersebut ke dalam skema ArchitecturalBlueprint kanonikal tanpa improvisasi format atau distorsi tipe data.
+   - Obligation Coverage Rule: Setiap mandatory acceptance obligation harus mempunyai canonical architectural representation yang dapat ditelusuri secara deterministik (baik melalui interface_contracts maupun data_models).
+   - Parameter & Return Canonical Fidelity:
+     * Elemen 'parameters' pada interface_contracts WAJIB menggunakan field kanonikal: `param_name`, `param_type`, `param_location` ('PATH', 'QUERY', 'BODY', 'ARGUMENT', atau 'PROP'), dan `is_required`. DILARANG menggunakan 'name' atau 'type'.
+     * Elemen 'expected_return' pada interface_contracts WAJIB berupa objek dictionary dengan kunci `return_type` (contoh: {"return_type": "TypeA", "status_code_success": 200} atau {"return_type": "TypeA"}). DILARANG berupa string telanjang.
+     * Untuk antarmuka berbasis HTTP endpoint, sertakan 'route' dan 'method' jika relevan (misal: "route": "/operation_a", "method": "POST").
 7. Schema Fidelity as Representation Contract:
    - Skema luaran adalah kontrak representasi yang diturunkan langsung dari definisi ArchitecturalBlueprint kanonikal.
    - Koleksi WAJIB mempertahankan semantik koleksi:
@@ -308,8 +324,11 @@ def _build_default_aligned_contract(draft_contract: dict, task: str, target_lang
     )
 
 
-def architect_agent(state: SquadState) -> dict:
-    llm = get_llm(role="architect", provider=state.get("provider"))
+def architect_agent(state: SquadState, llm: Any = None, tracer: Any = None) -> dict:
+    if llm is None:
+        llm = get_llm(role="architect", provider=state.get("provider"))
+    if tracer is None:
+        tracer = get_tracer(state.get("run_id"))
     
     user_task = state.get("task", "")
     specs = state.get("specifications", "")
@@ -332,8 +351,6 @@ def architect_agent(state: SquadState) -> dict:
     
     feedback_section = ""
     latest_cep = state.get("latest_evidence_package")
-    tracer = get_tracer(state.get("run_id"))
-
     pkg = None
     if latest_cep and latest_cep.get("causal_owner") == "ARCHITECT":
         try:
@@ -349,14 +366,25 @@ def architect_agent(state: SquadState) -> dict:
     decision_ctx = ""
     telem_data = {}
     try:
-        from ..context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+        from ..context_hardening import (
+            build_architect_decision_context,
+            ContextTelemetry,
+            emit_context_telemetry,
+            resolve_context_budget,
+        )
     except (ImportError, ValueError):
         try:
-            from context_hardening import build_architect_decision_context, ContextTelemetry, emit_context_telemetry
+            from context_hardening import (
+                build_architect_decision_context,
+                ContextTelemetry,
+                emit_context_telemetry,
+                resolve_context_budget,
+            )
         except ImportError:
             build_architect_decision_context = None
             ContextTelemetry = None
             emit_context_telemetry = None
+            resolve_context_budget = lambda s, default=12000: int(s.get("context_budget") or s.get("max_context_chars") or default) if s else default
 
     if build_architect_decision_context:
         decision_ctx, telem_data = build_architect_decision_context(state, pkg=pkg)
@@ -398,43 +426,48 @@ def architect_agent(state: SquadState) -> dict:
         arch_fact_card = ""
     env_section = f"\n{arch_fact_card}\n" if arch_fact_card else ""
 
+    is_repair_turn = (state.get("contract_revision_count", 0) > 0) or bool(pkg) or bool(state.get("contract_feedback"))
+
     # Acceptance Oracle Obligations Ledger (Read-Only Authoritative WHAT)
     oracle_ledger_section = ""
-    try:
-        f_oracle_path = state.get("frozen_oracle_path")
-        t_files = state.get("test_files")
-        oracle_obs = extract_canonical_oracle_obligations(
-            frozen_oracle_path=f_oracle_path,
-            test_files=t_files
-        )
-        if oracle_obs:
-            ledger_text = format_authoritative_obligation_ledger(oracle_obs)
-            usage_evidence_text = format_acceptance_usage_evidence(oracle_obs)
-            sec_items = []
-            if ledger_text:
-                sec_items.append(ledger_text)
-            if usage_evidence_text:
-                sec_items.append(usage_evidence_text)
-            if sec_items:
-                oracle_ledger_section = f"\n" + "\n\n".join(sec_items) + "\n"
-    except Exception:
-        oracle_ledger_section = ""
-
-    # Acceptance Behavior & Scenarios (Read-Only Authoritative Ground Truth)
     oracle_scenario_section = ""
-    try:
-        f_oracle_path = state.get("frozen_oracle_path")
-        t_files = state.get("test_files")
-        scenarios = extract_canonical_scenarios(
-            frozen_oracle_path=f_oracle_path,
-            test_files=t_files
-        )
-        if scenarios:
-            scenario_text = format_scenarios_for_architect(scenarios)
-            if scenario_text:
-                oracle_scenario_section = f"\n{scenario_text}\n"
-    except Exception:
-        oracle_scenario_section = ""
+    # On repair turns with decision_ctx, the Repair Decision Packet in decision_ctx already contains
+    # distilled authoritative obligations & scenarios. Omitting duplicate raw ledgers saves ~15,000 chars.
+    if not (is_repair_turn and decision_ctx):
+        try:
+            f_oracle_path = state.get("frozen_oracle_path")
+            t_files = state.get("test_files")
+            oracle_obs = extract_canonical_oracle_obligations(
+                frozen_oracle_path=f_oracle_path,
+                test_files=t_files
+            )
+            if oracle_obs:
+                ledger_text = format_authoritative_obligation_ledger(oracle_obs)
+                usage_evidence_text = format_acceptance_usage_evidence(oracle_obs)
+                sec_items = []
+                if ledger_text:
+                    sec_items.append(ledger_text)
+                if usage_evidence_text:
+                    sec_items.append(usage_evidence_text)
+                if sec_items:
+                    oracle_ledger_section = f"\n" + "\n\n".join(sec_items) + "\n"
+        except Exception:
+            oracle_ledger_section = ""
+
+        # Acceptance Behavior & Scenarios (Read-Only Authoritative Ground Truth)
+        try:
+            f_oracle_path = state.get("frozen_oracle_path")
+            t_files = state.get("test_files")
+            scenarios = extract_canonical_scenarios(
+                frozen_oracle_path=f_oracle_path,
+                test_files=t_files
+            )
+            if scenarios:
+                scenario_text = format_scenarios_for_architect(scenarios)
+                if scenario_text:
+                    oracle_scenario_section = f"\n{scenario_text}\n"
+        except Exception:
+            oracle_scenario_section = ""
 
     decision_text = f"\n{decision_ctx}\n" if decision_ctx else ""
 
@@ -459,13 +492,15 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
 1. Specification -> Coverage: Apakah seluruh requirement dari spesifikasi sudah terwakili tanpa ada yang terlewat?
 2. Blueprint -> Internal Consistency: Apakah setiap simbol/decorator yang digunakan dalam blueprint/snippet memiliki sumber resolusi/impor yang jelas, dan deklarasi interface/constructor konsisten dengan pemanggilannya?
 3. Blueprint -> Contract Consistency: Apakah antarmuka yang telah ditentukan oleh spesifikasi dipertahankan secara eksak tanpa disingkat atau diimprovisasi?
-4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models` dengan bentuk pemanggilan (call-shape) yang kompatibel?
+4. Acceptance Obligations Coverage: Apakah SELURUH obligasi publik dalam [AUTHORITATIVE ACCEPTANCE OBLIGATIONS], [ACCEPTANCE USAGE EVIDENCE], dan seluruh alur [ACCEPTANCE BEHAVIOR & SCENARIOS] (jika ada) telah memiliki padanan deklarasi eksplisit di `interface_contracts` atau `data_models`? Setiap mandatory acceptance obligation harus mempunyai canonical architectural representation yang dapat ditelusuri secara deterministik.
 5. Observable Behavior: Apakah scaffold merepresentasikan perilaku observable yang disyaratkan secara memadai untuk analisis kompatibilitas deterministik?
 6. Two-Stage Synthesis & Relational Invariants: Apakah model semantik telah dirancang sebelum serialisasi, dan apakah Invariants A-H terpenuhi?
 7. Schema Fidelity as Representation Contract: Apakah format serialisasi mengikuti skema kanonikal ArchitecturalBlueprint secara presisi tanpa distorsi tipe data:
+   - `authoritative_target_file`: WAJIB str nama file target implementasi utama (harus ada di file_tree dan files).
    - `file_tree`: WAJIB List[str] berisi daftar path berkas (contoh: ["path/ke/file.ext"]). Dilarang menaruh objek/scaffold di dalam file_tree.
    - `files`: WAJIB Dict[str, dict] level teratas yang memetakan setiap berkas di file_tree ke objek scaffold-nya.
-   - `interface_contracts`: WAJIB List[dict] yang memuat field wajib identifier dan target_file.
+   - `code_scaffold`: WAJIB berupa single string atau list of strings (lines). DILARANG menggunakan nested dict/object untuk memecah kode.
+   - `interface_contracts`: WAJIB List[dict] yang memuat field wajib identifier dan target_file. Jika mendeklarasikan `parameters`, WAJIB gunakan `param_name`, `param_type`, `param_location` (PATH, QUERY, BODY, ARGUMENT, PROP). Jika mendeklarasikan `expected_return`, WAJIB gunakan objek dictionary dengan `return_type` (bukan string telanjang).
 8. Generic Repair Preservation (Anti-Field-Loss): Jika dalam giliran repair, apakah seluruh field level teratas (termasuk `files`) dan elemen valid sebelumnya dipertahankan tanpa penghapusan atau distorsi (CURRENT VALID STATE + REPAIRED ELEMENT)?
 (Catatan: Pre-seal checklist ini adalah panduan penalaran Architect; bukan Acceptance Authority dan tidak menggantikan validator deterministik).
 Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===."""
@@ -474,6 +509,85 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
         SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
         HumanMessage(content=prompt)
     ]
+
+    # Pre-invocation Delivery Gate (Section 8: Context Delivery Integrity)
+    if is_repair_turn:
+        try:
+            from ..architect_preservation import validate_architect_repair_context_delivery
+        except (ImportError, ValueError):
+            try:
+                from architect_preservation import validate_architect_repair_context_delivery
+            except ImportError:
+                validate_architect_repair_context_delivery = None
+
+        if validate_architect_repair_context_delivery:
+            final_delivered_str = messages[1].content if len(messages) > 1 else prompt
+            deliv_ok, deliv_errs = validate_architect_repair_context_delivery(final_delivered_str)
+            if not deliv_ok:
+                # Attempt deterministic recovery pass on prompt
+                if build_architect_decision_context and decision_ctx:
+                    rec_budget = resolve_context_budget(state)
+                    recovered_ctx, rec_telem = build_architect_decision_context(state, pkg=pkg, max_chars=rec_budget)
+                    if recovered_ctx:
+                        recovered_prompt = prompt.replace(decision_text, f"\n{recovered_ctx}\n")
+                        rec_ok, rec_errs = validate_architect_repair_context_delivery(recovered_prompt)
+                        if rec_ok:
+                            prompt = recovered_prompt
+                            messages = [
+                                SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
+                                HumanMessage(content=prompt)
+                            ]
+                            deliv_ok = True
+                        else:
+                            deliv_errs = rec_errs
+
+                if not deliv_ok:
+                    # Structured DELIVERY_FAILURE (Correction 1):
+                    # No LLM invocation occurs and no Architect repair turn is consumed.
+                    new_log = f"[System Architect]: DELIVERY_FAILURE — Pre-invocation context delivery check failed: {deliv_errs}"
+                    current_logs = state.get("logs", [])
+                    if tracer and ContextTelemetry and emit_context_telemetry:
+                        import dataclasses
+                        known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
+                        filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
+                        fail_telem = ContextTelemetry(
+                            agent="architect",
+                            model=str(state.get("model_name", "")),
+                            context_version="hardening_v1",
+                            context_sections=list(telem_data.get("context_sections", [])),
+                            context_size=len(prompt),
+                            authoritative_sources=["FROZEN_ORACLE"],
+                            evidence_items=telem_data.get("evidence_items", 0),
+                            locked_invariants=telem_data.get("locked_invariants", 0),
+                            current_failures=telem_data.get("current_failures", 0),
+                            repair_boundary_items=telem_data.get("repair_boundary_items", 0),
+                            delivery_valid=False,
+                            delivery_errors=deliv_errs,
+                            delivery_failure_reason="; ".join(deliv_errs),
+                            run_id=str(state.get("run_id", "")),
+                            iteration=state.get("contract_revision_count", 0),
+                            **{k: v for k, v in filtered_telem_data.items() if k not in (
+                                "agent", "model", "context_version", "context_sections", "context_size",
+                                "authoritative_sources", "evidence_items", "locked_invariants",
+                                "current_failures", "repair_boundary_items", "delivery_valid",
+                                "delivery_errors", "delivery_failure_reason", "run_id", "iteration"
+                            )}
+                        )
+                        emit_context_telemetry(tracer, "architect", fail_telem)
+
+                    return {
+                        "architecture_plan": "",
+                        "architectural_blueprint": None,
+                        "contract": state.get("contract"),
+                        "contract_status": "DELIVERY_FAILURE",
+                        "contract_validation_errors": deliv_errs,
+                        "blueprint_revision_count": state.get("blueprint_revision_count", 0),
+                        "status": "DELIVERY_FAILURE",
+                        "delivery_valid": False,
+                        "delivery_errors": deliv_errs,
+                        "delivery_failure_reason": "; ".join(deliv_errs),
+                        "logs": current_logs + [new_log]
+                    }
     
     response = llm.invoke(messages)
     arch_plan = response.content if hasattr(response, "content") else str(response)

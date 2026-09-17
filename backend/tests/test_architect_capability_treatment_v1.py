@@ -512,3 +512,257 @@ class TestTreatment181StructuralFidelityAndRepairPreservation:
         assert bp_a.interface_contracts[0].target_file in bp_a.files
         assert bp_b.interface_contracts[0].target_file in bp_b.files
 
+
+class TestTreatment181R1CanonicalSchemaPersistenceAndStatePreservation:
+    """
+    Treatment #1.8.1-R1 Mandated Testing Requirements:
+    10 Testing Properties (A–J) for Canonical Schema Persistence Across Synthesis & Repair v1.
+    """
+
+    def test_property_a_schema_constraints_present_on_turn_0(self):
+        """Property A: Canonical schema constraints must be present on Turn 0 initial synthesis."""
+        state = {
+            "task": "Build synthetic service",
+            "contract_status": "DRAFT",
+            "contract": {"interface_contracts": []},
+        }
+        ctx, _ = build_architect_decision_context(state)
+        assert "[CANONICAL BLUEPRINT SCHEMA CONSTRAINTS" in ctx
+        assert "file_tree: List[str]" in ctx
+        assert "files: Dict[str, BlueprintFileModule]" in ctx
+
+    def test_property_b_schema_constraints_present_on_repair_turns(self):
+        """Property B: Canonical schema constraints must also be present on repair turns."""
+        for rev_count in (1, 2):
+            state = {
+                "task": "Repair synthetic service",
+                "contract_status": "REJECTED",
+                "contract_revision_count": rev_count,
+                "contract_validation_errors": ["Validation error"],
+            }
+            ctx, _ = build_architect_repair_context(state)
+            assert "CANONICAL BLUEPRINT SCHEMA CONSTRAINTS" in ctx
+            assert "file_tree: List[str]" in ctx
+            assert "files: Dict[str, BlueprintFileModule]" in ctx
+
+    def test_property_c_required_fields_survive_repair(self):
+        """Property C: Required schema fields must survive repair transitions."""
+        from backend.blueprint_schema import ArchitecturalBlueprint, BlueprintFileModule
+
+        initial_bp = ArchitecturalBlueprint(
+            authoritative_target_file="module_core.py",
+            file_tree=["module_core.py"],
+            architecture_summary="Initial synthesis architecture",
+            files={
+                "module_core.py": BlueprintFileModule(
+                    file_path="module_core.py",
+                    module_role="Core",
+                    code_scaffold="def core(): pass"
+                )
+            }
+        )
+        bp_dict = initial_bp.model_dump()
+        assert "file_tree" in bp_dict and isinstance(bp_dict["file_tree"], list)
+        assert "files" in bp_dict and isinstance(bp_dict["files"], dict)
+        assert "architecture_summary" in bp_dict and len(bp_dict["architecture_summary"]) > 0
+        assert "authoritative_target_file" in bp_dict and bp_dict["authoritative_target_file"] == "module_core.py"
+        repaired_bp = ArchitecturalBlueprint.model_validate(bp_dict)
+        assert repaired_bp.file_tree == ["module_core.py"]
+        assert "module_core.py" in repaired_bp.files
+
+    def test_property_d_unrelated_valid_fields_survive_repair(self):
+        """Property D: Unrelated valid fields must survive localized repair."""
+        from backend.blueprint_schema import ArchitecturalBlueprint, BlueprintFileModule, BlueprintInterfaceContract, BlueprintDataModel
+
+        bp = ArchitecturalBlueprint(
+            authoritative_target_file="app.py",
+            file_tree=["app.py", "utils.py"],
+            architecture_summary="Multi-module architecture",
+            files={
+                "app.py": BlueprintFileModule(file_path="app.py", code_scaffold="def app(): pass"),
+                "utils.py": BlueprintFileModule(file_path="utils.py", code_scaffold="def util(): pass")
+            },
+            interface_contracts=[
+                BlueprintInterfaceContract(identifier="app_entry", target_file="app.py"),
+                BlueprintInterfaceContract(identifier="util_helper", target_file="utils.py")
+            ],
+            data_models=[
+                BlueprintDataModel(model_name="AppConfig", fields=[{"name": "env", "type": "str"}])
+            ]
+        )
+        bp_dump = bp.model_dump()
+        bp_dump["files"]["app.py"]["code_scaffold"] = "def app(config: AppConfig): pass"
+        repaired = ArchitecturalBlueprint.model_validate(bp_dump)
+
+        assert "utils.py" in repaired.files
+        assert repaired.interface_contracts[1].identifier == "util_helper"
+        assert len(repaired.data_models) == 1
+        assert repaired.data_models[0].model_name == "AppConfig"
+
+    def test_property_e_current_valid_state_represented_in_repair_context(self):
+        """Property E: Current valid state must be explicitly represented in repair context."""
+        state = {
+            "task": "Repair state",
+            "contract_status": "REJECTED",
+            "contract_revision_count": 1,
+            "architectural_blueprint": {
+                "file_tree": ["main.py", "helper.py"],
+                "files": {
+                    "main.py": {"code_scaffold": "def main(): pass"},
+                    "helper.py": {"code_scaffold": "def help(): pass"}
+                }
+            }
+        }
+        ctx, _ = build_architect_repair_context(state)
+        assert "[5] CURRENT SCAFFOLD & VALIDATED STRUCTURAL STATE" in ctx
+        assert "Established File Collection (file_tree): ['main.py', 'helper.py']" in ctx
+        assert "VALID MUST BE PRESERVED" in ctx
+
+    def test_property_f_repair_target_distinguished_from_preserved_state(self):
+        """Property F: Repair target is distinguished from preserved state using the repair formula."""
+        state = {
+            "task": "Repair state",
+            "contract_status": "REJECTED",
+            "contract_revision_count": 1,
+            "contract_validation_errors": ["Interface 'missing_func' not implemented"]
+        }
+        ctx, _ = build_architect_repair_context(state)
+        assert "[6] REPAIR TARGET" in ctx
+        assert "REPAIR FORMULA:" in ctx
+        assert "CURRENT VALID STATE + REPAIRED ELEMENT = EXPECTED POST-REPAIR STATE" in ctx
+        assert "VALID != REPAIR TARGET" in ctx
+
+    def test_property_g_canonical_schema_is_single_structural_source_of_truth(self):
+        """Property G: Canonical schema is the single structural source of truth."""
+        from backend.context_hardening import format_canonical_blueprint_schema_constraints
+        from backend.blueprint_schema import ArchitecturalBlueprint
+
+        constraints_text = format_canonical_blueprint_schema_constraints()
+        for fname in ArchitecturalBlueprint.model_fields.keys():
+            if fname not in ("schema_version", "task_id", "target_language"):
+                assert f"- {fname}:" in constraints_text
+
+    def test_property_h_serialization_does_not_introduce_structural_field_loss(self):
+        """Property H: Serialization and deserialization preserve all canonical fields."""
+        from backend.blueprint_schema import ArchitecturalBlueprint, BlueprintFileModule, BlueprintInterfaceContract
+        import json
+
+        bp = ArchitecturalBlueprint(
+            authoritative_target_file="service.py",
+            file_tree=["service.py"],
+            architecture_summary="Serialization fidelity test",
+            files={
+                "service.py": BlueprintFileModule(
+                    file_path="service.py",
+                    module_role="Main",
+                    code_scaffold="def service(): pass"
+                )
+            },
+            interface_contracts=[
+                BlueprintInterfaceContract(identifier="service", target_file="service.py")
+            ]
+        )
+        json_str = json.dumps(bp.model_dump())
+        data = json.loads(json_str)
+        bp_restored = ArchitecturalBlueprint.model_validate(data)
+        assert bp_restored.file_tree == bp.file_tree
+        assert bp_restored.architecture_summary == bp.architecture_summary
+        assert bp_restored.authoritative_target_file == bp.authoritative_target_file
+        assert bp_restored.files.keys() == bp.files.keys()
+        assert len(bp_restored.interface_contracts) == len(bp.interface_contracts)
+
+    def test_property_i_generic_relational_links_survive_repair(self):
+        """Property I: Generic relational links (file_tree <-> files, interface -> target_file) survive repair."""
+        from backend.blueprint_schema import ArchitecturalBlueprint, BlueprintFileModule, BlueprintInterfaceContract
+
+        with pytest.raises(ValueError, match="File dideklarasikan di 'file_tree' tetapi tidak memiliki modul scaffold di 'files'"):
+            ArchitecturalBlueprint(
+                authoritative_target_file="a.py",
+                file_tree=["a.py", "b.py"],
+                architecture_summary="Inconsistent files",
+                files={
+                    "a.py": BlueprintFileModule(file_path="a.py", code_scaffold="pass")
+                }
+            )
+
+        with pytest.raises(ValueError, match="tidak eksis dalam blueprint files"):
+            ArchitecturalBlueprint(
+                authoritative_target_file="a.py",
+                file_tree=["a.py"],
+                architecture_summary="Inconsistent target_file",
+                files={
+                    "a.py": BlueprintFileModule(file_path="a.py", code_scaffold="pass")
+                },
+                interface_contracts=[
+                    BlueprintInterfaceContract(identifier="call_b", target_file="b.py")
+                ]
+            )
+
+    def test_property_j_zero_task_specific_solver_branches(self):
+        """Property J: Zero task-specific solver branches exist in decision and repair contexts."""
+        import ast
+        import inspect
+        import backend.context_hardening as ch
+
+        source = inspect.getsource(ch.build_architect_decision_context) + inspect.getsource(ch.build_architect_repair_context)
+        tree = ast.parse(source)
+
+        forbidden_tasks = ("is_fastapi", "is_flutter", "is_cli", "python_solver", "dart_solver")
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If):
+                test_str = ast.dump(node.test).lower()
+                for task in forbidden_tasks:
+                    assert task not in test_str, f"Forbidden task-specific branch detected: {task} in {test_str}"
+
+    def test_property_k_authoritative_target_file_cross_archetype_resolution(self):
+        """Property K: Missing authoritative_target_file raises ValidationError; explicit non-Python targets succeed."""
+        from pydantic import ValidationError
+        from backend.blueprint_schema import ArchitecturalBlueprint, BlueprintFileModule
+
+        # Dart / Flutter single module without explicit authoritative_target_file must be rejected
+        dart_data_missing = {
+            "file_tree": ["lib/card_metric.dart"],
+            "files": {
+                "lib/card_metric.dart": {
+                    "file_path": "lib/card_metric.dart",
+                    "code_scaffold": "class CardMetric extends StatelessWidget {}"
+                }
+            }
+        }
+        with pytest.raises(ValidationError):
+            ArchitecturalBlueprint.model_validate(dart_data_missing)
+
+        # Explicit non-Python target is accepted without language-specific default crash
+        dart_data_explicit = {
+            "authoritative_target_file": "lib/card_metric.dart",
+            "file_tree": ["lib/card_metric.dart"],
+            "files": {
+                "lib/card_metric.dart": {
+                    "file_path": "lib/card_metric.dart",
+                    "code_scaffold": "class CardMetric extends StatelessWidget {}"
+                }
+            }
+        }
+        bp_dart = ArchitecturalBlueprint.model_validate(dart_data_explicit)
+        assert bp_dart.authoritative_target_file == "lib/card_metric.dart"
+
+        # Multi-file non-Python project where main.py is absent
+        multi_data = {
+            "authoritative_target_file": "src/server.rs",
+            "file_tree": ["src/server.rs", "src/models.rs"],
+            "files": {
+                "src/server.rs": {
+                    "file_path": "src/server.rs",
+                    "code_scaffold": "fn main() {}"
+                },
+                "src/models.rs": {
+                    "file_path": "src/models.rs",
+                    "code_scaffold": "struct Model;"
+                }
+            }
+        }
+        bp_multi = ArchitecturalBlueprint.model_validate(multi_data)
+        assert bp_multi.authoritative_target_file == "src/server.rs"
+
+
+

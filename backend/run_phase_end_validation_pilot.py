@@ -25,7 +25,7 @@ import hashlib
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional, Union
 
 # Setup project root and backend dir
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -119,6 +119,89 @@ TASKS = [
         "authoritative_file": "lib/card_metric.dart"
     },
 ]
+
+PIPELINE_VERSION = "1.8.3"
+GOVERNANCE_VERSION = "1.6"
+
+TASK_ALIASES: Dict[str, str] = {
+    "fastapi": "fastapi_t1",
+    "fastapi_t1": "fastapi_t1",
+    "cli": "cli_t1",
+    "cli_t1": "cli_t1",
+    "flutter": "flutter_t1",
+    "flutter_t1": "flutter_t1",
+}
+
+
+def resolve_selected_tasks(
+    selected_tasks: Optional[Any] = None,
+    available_tasks: Optional[List[dict]] = None
+) -> Tuple[List[dict], str, List[str], List[str], List[str]]:
+    """
+    Menyelesaikan task yang dipilih secara generik dan deterministik.
+
+    Returns:
+        (active_tasks, experiment_mode, selected_task_ids, available_task_ids, skipped_task_ids)
+    """
+    tasks_pool = available_tasks if available_tasks is not None else TASKS
+    all_available_ids = [t["task_id"] for t in tasks_pool]
+
+    # Mode default: None atau omitted -> Jalankan seluruh matriks
+    if selected_tasks is None:
+        return (
+            list(tasks_pool),
+            "full_matrix",
+            list(all_available_ids),
+            list(all_available_ids),
+            []
+        )
+
+    # Parsing input jika string (misal comma-separated atau single task)
+    if isinstance(selected_tasks, str):
+        raw_items = [s.strip() for s in selected_tasks.replace(",", " ").split() if s.strip()]
+    elif isinstance(selected_tasks, (list, tuple, set)):
+        raw_items = list(selected_tasks)
+    else:
+        raise ValueError(
+            f"selected_tasks must be None, string, or list/tuple of strings, got {type(selected_tasks).__name__}"
+        )
+
+    if len(raw_items) == 0:
+        raise ValueError(
+            "selected_tasks cannot be empty list. Specify at least one valid task ID/alias or omit/None for full matrix."
+        )
+
+    resolved_ids: List[str] = []
+    for item in raw_items:
+        if not isinstance(item, str):
+            raise ValueError(f"Task identifier must be string, got {type(item).__name__}: {item}")
+        clean_key = item.strip().lower()
+        if clean_key not in TASK_ALIASES:
+            valid_choices = sorted(list(set(list(TASK_ALIASES.keys()) + all_available_ids)))
+            raise ValueError(
+                f"Invalid task identifier '{item}'. Available tasks and aliases: {valid_choices}"
+            )
+        canon_id = TASK_ALIASES[clean_key]
+        if canon_id not in all_available_ids:
+            raise ValueError(
+                f"Task '{canon_id}' (from '{item}') is not registered in available tasks: {all_available_ids}"
+            )
+        if canon_id not in resolved_ids:
+            resolved_ids.append(canon_id)
+
+    # Filter tasks in pool preserving pool order
+    active_tasks = [t for t in tasks_pool if t["task_id"] in resolved_ids]
+    skipped_ids = [tid for tid in all_available_ids if tid not in resolved_ids]
+
+    experiment_mode = "single_case" if len(active_tasks) == 1 else ("full_matrix" if len(skipped_ids) == 0 else "subset")
+
+    return (
+        active_tasks,
+        experiment_mode,
+        resolved_ids,
+        list(all_available_ids),
+        skipped_ids
+    )
 
 
 def verify_explicit_oracle_sha(task: dict) -> Tuple[bool, str, str]:
@@ -294,7 +377,16 @@ def run_preflight_gates() -> bool:
 # 3-Run Pilot Execution
 # ==============================================================================
 
-def execute_single_pilot_run(task: dict, run_index: int, rep_index: int = 1, total_runs: int = 3) -> dict:
+def execute_single_pilot_run(
+    task: dict,
+    run_index: int,
+    rep_index: int = 1,
+    total_runs: int = 3,
+    experiment_mode: str = "full_matrix",
+    selected_tasks: Optional[List[str]] = None,
+    available_tasks: Optional[List[str]] = None,
+    skipped_tasks: Optional[List[str]] = None
+) -> dict:
     """Menjalankan 1 run eksperimen terkontrol dengan graph phase-validated."""
     task_id = task["task_id"]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -330,7 +422,13 @@ def execute_single_pilot_run(task: dict, run_index: int, rep_index: int = 1, tot
             "max_blueprint_revisions": MAX_BLUEPRINT_REVISIONS,
             "oracle_path": task["oracle_path"],
             "oracle_sha256": act_sha,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "experiment_mode": experiment_mode,
+            "selected_tasks": selected_tasks if selected_tasks is not None else [task_id],
+            "available_tasks": available_tasks if available_tasks is not None else [t["task_id"] for t in TASKS],
+            "skipped_tasks": skipped_tasks if skipped_tasks is not None else [],
+            "pipeline_version": PIPELINE_VERSION,
+            "governance_version": GOVERNANCE_VERSION,
         }
     )
 
@@ -434,7 +532,13 @@ def execute_single_pilot_run(task: dict, run_index: int, rep_index: int = 1, tot
         "tester_agent_invocations": 0,
         "otrr": otrr_info.get("otrr", 0.0),
         "otrr_percent": otrr_info.get("otrr_percent", 0.0),
-        "otrr_details": otrr_info
+        "otrr_details": otrr_info,
+        "experiment_mode": experiment_mode,
+        "selected_tasks": selected_tasks if selected_tasks is not None else [task_id],
+        "available_tasks": available_tasks if available_tasks is not None else [t["task_id"] for t in TASKS],
+        "skipped_tasks": skipped_tasks if skipped_tasks is not None else [],
+        "pipeline_version": PIPELINE_VERSION,
+        "governance_version": GOVERNANCE_VERSION,
     }
 
     tracer.log_event(
@@ -451,6 +555,7 @@ def execute_single_pilot_run(task: dict, run_index: int, rep_index: int = 1, tot
 def run_full_pilot(
     start_from: int = 1,
     single_task_id: Optional[str] = None,
+    selected_tasks: Optional[Union[List[str], str]] = None,
     model_name: Optional[str] = None,
     summary_file_path: Optional[str] = None,
     num_predict: Optional[int] = None,
@@ -460,19 +565,27 @@ def run_full_pilot(
     if model_name or num_predict:
         configure_squad_model(model_name, num_predict)
 
-    total_tasks = len(TASKS) if not single_task_id else 1
+    # Generic task resolution
+    raw_selection = selected_tasks if selected_tasks is not None else single_task_id
+    active_tasks, exp_mode, sel_ids, avail_ids, skip_ids = resolve_selected_tasks(raw_selection)
+
+    total_tasks = len(active_tasks)
     total_planned = total_tasks * repetitions
 
     print("\n" + "=" * 70)
-    print("PHASE-END VALIDATION PILOT EXPERIMENT")
+    print(f"PHASE-END VALIDATION PILOT EXPERIMENT [{exp_mode.upper()}]")
     print(f"Active Model: {ALL_AGENTS_MODEL}")
     print(f"Active Num Predict: {os.environ.get('OLLAMA_NUM_PREDICT', '3000')}")
+    print(f"Selected Tasks: {sel_ids}")
+    print(f"Skipped Tasks: {skip_ids}")
     print(f"Repetitions per task: {repetitions} (Total Planned Runs: {total_planned})")
     print(f"Resuming from Run Index: {start_from}" if start_from > 1 else "Starting from Run 1")
     print("=" * 70)
 
     if summary_file_path:
         summary_file = Path(summary_file_path)
+    elif exp_mode == "single_case":
+        summary_file = PROJECT_ROOT / f"backend/output/single_case_{sel_ids[0]}_summary.json"
     elif model_name and model_name != "qwen2.5-coder:7b":
         safe_model = model_name.replace(":", "_").replace("/", "_")
         summary_file = PROJECT_ROOT / f"dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary_{safe_model}.json"
@@ -480,7 +593,7 @@ def run_full_pilot(
         summary_file = PROJECT_ROOT / "dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary.json"
 
     results = []
-    if summary_file.exists() and (start_from > 1 or single_task_id):
+    if summary_file.exists() and start_from > 1:
         try:
             existing = json.loads(summary_file.read_text(encoding="utf-8"))
             results = existing.get("runs", [])
@@ -490,15 +603,22 @@ def run_full_pilot(
     tasks_to_run = []
     run_counter = 1
     for rep in range(1, repetitions + 1):
-        for task in TASKS:
-            if single_task_id and task["task_id"] != single_task_id:
-                continue
+        for task in active_tasks:
             if run_counter >= start_from:
                 tasks_to_run.append((run_counter, task, rep))
             run_counter += 1
 
     for idx, task, rep in tasks_to_run:
-        summary = execute_single_pilot_run(task, idx, rep_index=rep, total_runs=total_planned)
+        summary = execute_single_pilot_run(
+            task,
+            idx,
+            rep_index=rep,
+            total_runs=total_planned,
+            experiment_mode=exp_mode,
+            selected_tasks=sel_ids,
+            available_tasks=avail_ids,
+            skipped_tasks=skip_ids
+        )
         # Update or append matching (task_id, rep_index)
         existing_idx = next(
             (i for i, r in enumerate(results) if r.get("task_id") == task["task_id"] and r.get("rep_index", 1) == rep),
@@ -516,6 +636,12 @@ def run_full_pilot(
 
         summary_data = {
             "experiment": "phase_end_validation_pilot",
+            "experiment_mode": exp_mode,
+            "selected_tasks": sel_ids,
+            "available_tasks": avail_ids,
+            "skipped_tasks": skip_ids,
+            "pipeline_version": PIPELINE_VERSION,
+            "governance_version": GOVERNANCE_VERSION,
             "date": datetime.now().isoformat(),
             "total_runs_planned": total_planned,
             "runs_completed": len(results),
@@ -526,6 +652,7 @@ def run_full_pilot(
             "aggregate_otrr_percent": round(aggregate_otrr * 100.0, 2),
             "runs": results
         }
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
         summary_file.write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
         print(f"\nCheckpoint written to: {summary_file}")
 
@@ -533,18 +660,23 @@ def run_full_pilot(
         print("\n" + "=" * 70)
         print(f"STOP RULE REACHED: ALL {total_planned} PILOT RUNS COMPLETED. STOPPING SYSTEM.")
         print("=" * 70)
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Phase-End Validation Pilot Runner")
     parser.add_argument("--preflight-only", action="store_true", help="Run only Pre-Flight Gates A-I without pilot execution")
     parser.add_argument("--start-from", type=int, default=1, help="Start from run index (1-3)")
-    parser.add_argument("--task-id", type=str, default=None, help="Run specific task ID only")
+    parser.add_argument("--task-id", type=str, default=None, help="Run specific task ID only (legacy alias for --selected-tasks)")
+    parser.add_argument("--selected-tasks", "--task", "--tasks", dest="selected_tasks", nargs="*", default=None, help="Run selected task IDs or aliases (e.g. --tasks fastapi or --tasks fastapi cli)")
     parser.add_argument("--model", type=str, default=None, help="Unified squad model override (e.g. qwen3:8b)")
     parser.add_argument("--num-predict", type=int, default=None, help="Ollama num_predict token limit override (default: 3000)")
     parser.add_argument("--summary-file", type=str, default=None, help="Custom summary output path")
     parser.add_argument("--reps", "--repetitions", dest="repetitions", type=int, default=1, help="Number of repetitions per task (default: 1, e.g. 3 for 3x3)")
     args = parser.parse_args()
+
+    # Consolidate selection: if --selected-tasks was passed, use it; else fallback to --task-id
+    target_tasks = args.selected_tasks if args.selected_tasks is not None else args.task_id
 
     if args.model or args.num_predict:
         configure_squad_model(args.model, args.num_predict)
@@ -559,7 +691,7 @@ if __name__ == "__main__":
             sys.exit(1)
         run_full_pilot(
             start_from=args.start_from,
-            single_task_id=args.task_id,
+            selected_tasks=target_tasks,
             model_name=args.model,
             summary_file_path=args.summary_file,
             num_predict=args.num_predict,

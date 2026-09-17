@@ -355,7 +355,7 @@ def test_gate_11_context_priority_preserved():
     assert pos_ground != -1
     assert pos_diag != -1
 
-    assert pos_auth < pos_ledger < pos_fail < pos_lock < pos_scaff < pos_targ < pos_bound < pos_post < pos_ground < pos_diag
+    assert pos_auth < pos_fail < pos_targ < pos_bound < pos_scaff < pos_lock < pos_post < pos_ledger < pos_ground < pos_diag
 
 
 # Gate 12: Context truncation detected
@@ -365,8 +365,8 @@ def test_gate_12_context_truncation_detected():
         "[2] ACCEPTANCE OBLIGATION LEDGER\n[IMMUTABLE ACCEPTANCE OBLIGATIONS]\n"
         "[3] CURRENT COMPATIBILITY FAILURES\nNo active repair targets\n"
         "[4] LOCKED/PROVEN STATE\n[CURRENT ARCHITECT STATE]\nPRESERVED=TRUE\n"
-        "[6] REPAIR TARGET\n[REPAIR TARGETS]\nNo active repair targets\n"
-        "[7] REPAIR BOUNDARY\nALLOWED:\nFORBIDDEN:\n"
+        "[6] REPAIR TARGET\nWHAT: All\nWHERE: main.py\nOBSERVED: No active repair targets\nEXPECTED: Valid\n"
+        "[7] REPAIR BOUNDARY\nPRESERVE: Invariants\nALLOWED:\nFORBIDDEN:\n"
     )
     is_v, errs = validate_architect_repair_context_delivery(valid_context)
     assert is_v is True
@@ -436,6 +436,7 @@ def test_gate_16_output_completeness():
     raw_bp = json.dumps({
         "blueprint_version": "1.0.0",
         "task_name": "Test Task",
+        "authoritative_target_file": "main.py",
         "files": {
             "main.py": {
                 "module_name": "main",

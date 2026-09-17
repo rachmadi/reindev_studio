@@ -237,6 +237,19 @@ def route_after_pm_validator(state: SquadState) -> str:
 
 def architect_validator_node(state: SquadState) -> Dict[str, Any]:
     """V2: Gerbang tunggal terpadu konsolidasi Contract Gate dan Architect Phase Validator."""
+    if state.get("status") == "DELIVERY_FAILURE":
+        logs = list(state.get("logs") or [])
+        logs.append("[V2 Architect Validator]: Halted due to pre-invocation DELIVERY_FAILURE (repair turn NOT consumed).")
+        return {
+            "status": "DELIVERY_FAILURE",
+            "contract_status": "DELIVERY_FAILURE",
+            "contract_validation_errors": state.get("contract_validation_errors", []),
+            "delivery_valid": False,
+            "delivery_errors": state.get("delivery_errors", []),
+            "delivery_failure_reason": state.get("delivery_failure_reason", ""),
+            "logs": logs
+        }
+
     count = _get_repair_count(state, "architect")
     max_repairs = _get_max_repairs(state)
     tracer = get_tracer(state.get("run_id"))
@@ -378,6 +391,9 @@ def architect_validator_node(state: SquadState) -> Dict[str, Any]:
 
 def route_after_architect_validator(state: SquadState) -> str:
     """Routing V2: Zero downstream leakage on FAIL."""
+    if state.get("status") == "DELIVERY_FAILURE":
+        return END
+
     contract = state.get("architect_validator_contract") or {}
     verdict = contract.get("verdict")
     status = state.get("contract_status")

@@ -297,4 +297,63 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 ### Severity Drift Keseluruhan:
 **Critical & Fundamental (Architectural Authority Realignment)** — Penemuan struktural paling berharga pada Iterasi 7: membuktikan bahwa end-phase validation pada Gate V2 bukan sekadar alat linter, melainkan benteng pencegah klaim arsitektur spekulatif menjadi immutable authority sebelum konsistensinya terhadap Acceptance Authority terbukti secara deterministik.
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI TREATMENT #1.7 & #1.8 (PM & ARCHITECT CAPABILITY) — 2026-09-16
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Penegakan Stratifikasi Epistemik V0 pada PM (D-117) | Positif (Menghilangkan fenomena empty completion collapse FP-002 pada PM tanpa sintesis fallback Python) | Intent Architect |
+| Artifact Purity Mandate pada Architect (D-118) | Positif (Menjamin Architect hanya menghasilkan kode implementasi murni tanpa mencemari workspace dengan berkas test) | Intent Architect |
+| 5-Layer Stratified Input Grounding pada Architect (D-118) | Positif (Menghubungkan blueprint secara deterministik dengan Acceptance Authority) | Intent Architect & Agen |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Penyusunan static audit suite komprehensif (`test_pm_static_audit_v1.py` & `test_architect_static_audit_v1.py`) untuk memverifikasi ketiadaan solver kondisional atau simbol ter-hardcode.
+- **B2 (Keputusan Teknis):**
+  - Ekstraksi telemetri 9-run replikasi 3x3 untuk memetakan dinamika konvergensi call-shape constructor Dart pada Flutter.
+
+### Ringkasan Distribusi Sumber Drift:
+- **Intent Architect:** 60.0%
+- **Agen:** 40.0%
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Major (Constructive Architectural Hardening)** — Mengubah strategi perbaikan dari tambal-sulam parsial menjadi penguatan berjenjang pada kapabilitas agen hulu (PM dan Architect).
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI TREATMENT #1.8.1 s.d. #1.8.4 & SINGLE-CASE HARNESS — 2026-09-16 s.d. 2026-09-17
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Context Delivery Integrity (D-119) | Positif (Menjamin batasan skema Pydantic sampai secara deterministik ke prompt Architect) | Agen & IA |
+| Context Semantic Distillation < 800 Karakter (D-120) | Positif (Mereduksi token footprint dan mencegah cognitive overload pada model 7B) | Agen & IA |
+| Deterministic Pydantic Representation Repair Guidance (D-121) | Positif (Menyediakan panduan perbaikan representasi relasional tanpa mengubah skema kanonikal) | Agen & IA |
+| Single-Case Execution Support v1 pada Experiment Harness (D-122) | Positif (Memungkinkan targeted probing terisolasi tanpa memicu eksekusi matriks penuh yang mahal) | Intent Architect |
+| Universal Canonical Contract Grounding v1 (D-123) | Positif (Two-stage synthesis dan contrastive grounding tanpa custom enum atau solver domain) | Intent Architect & Agen |
+| Stop Rule & Penetapan Batas Kognitif Model 7B (D-123) | Positif (Menghentikan pengujian terkontrol setelah batas penalaran model terbukti secara ilmiah tanpa mengorbankan kontrol) | Intent Architect |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Pembuatan skrip forensik telemetri mendalam (`scratch/deep_dive_events.py` dan `scratch/forensic_investigation_extractor.py`) untuk mengekstrak struktur prompt dan respons mentah model pada setiap turn.
+  - Penyusunan suite 15 pengujian cross-domain sintetis (`test_architect_contract_grounding_v1.py`) dan 13 unit test runner harness (`test_single_case_runner_v1.py`).
+- **B2 (Keputusan Teknis):**
+  - Identifikasi fenomena *repair hysteresis* (over-correction collapse) dan *field cross-talk* (`identifier` vs `model_name`) sebagai batas representasional intrinsik model 7B.
+
+### Ringkasan Distribusi Sumber Drift:
+- **Intent Architect:** 65.0% (Mandat single-case harness, penolakan enum baru di prompt, penegakan Stop Rule 1x3, penetapan kriteria evaluasi kontrol)
+- **Agen:** 35.0% (Implementasi harness runner, dynamic sub-model inspection, contrastive grounding, audit forensik telemetri, sinkronisasi dokumentasi IIDD)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Major (Clean Scientific Boundary Determination)** — Keberhasilan metodologis mutlak dalam membedakan keandalan arsitektur tata kelola deterministik (yang berhasil 100% fail-closed tanpa kebocoran downstream) dari batas kapasitas representasional intrinsik model parameter kecil (`qwen2.5-coder:7b`).
+
+
 

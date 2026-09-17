@@ -774,3 +774,84 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
 - **Cakupan Perubahan:**
   - `dokumentasi-pengembangan/experiments/treatment1_8_architect_synthesis_replication_3x3_v1.md`: Laporan riset formal komprehensif replikasi 3x3 Treatment #1.8.
   - `dokumentasi-pengembangan/experiments/treatment1_8_replication_3x3_summary.json`: Arsip telemetri kuantitatif 9 run replikasi.
+
+---
+
+### [16 September 2026] Treatment #1.8.1 — Context Hardening v1 & Pipeline Delivery Integrity
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `fix(pipeline)` / `feat(context)`
+- **Waktu**: 2026-09-16 19:40 WIB
+- **Status**: TERVERIFIKASI PENUH (Unit tests PASS, Pilot 1x3 executed)
+- **Cakupan Perubahan**:
+  - `backend/graph.py`: Memperbaiki saluran transmisi konteks prompt Architect pada Turn 0 dan Repair turns agar `schema_constraints` diteruskan secara deterministik.
+  - `backend/context_hardening.py`: Penguatan `format_canonical_blueprint_schema_constraints`.
+  - `backend/tests/test_blueprint_schema_pipeline_fix.py`: Unit test verifikasi perbaikan pipeline schema.
+  - `backend/tests/test_context_delivery_integrity_v1.py`: Unit test verifikasi integritas pengiriman konteks ke prompt model.
+
+---
+
+### [16 September 2026] Treatment #1.8.2 — Context Semantic Distillation v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(context)` / `docs(experiment)`
+- **Waktu**: 2026-09-16 20:55 WIB
+- **Status**: TERVERIFIKASI PENUH (Unit tests PASS, Pilot 1x3 executed)
+- **Cakupan Perubahan**:
+  - `backend/context_hardening.py`: Implementasi `distill_canonical_schema_semantic` (< 800 karakter) untuk merampingkan representasi skema Pydantic kanonikal.
+  - `backend/tests/test_context_semantic_distillation_v1.py`: Unit test suite verifikasi batas panjang dan kelengkapan semantik.
+  - `dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary_treatment1_8_2.json`: Arsip hasil telemetri Pilot 1x3.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_2_context_semantic_distillation_pilot_1x3_v1.md`: Laporan evaluasi pilot.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_2_context_semantic_distillation_walkthrough_v1.md`: Walkthrough implementasi.
+
+---
+
+### [16 September 2026] Treatment #1.8.3 — Deterministic Pydantic Representation Repair v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(architect)` / `docs(forensic)`
+- **Waktu**: 2026-09-16 22:00 WIB
+- **Status**: TERVERIFIKASI PENUH (Unit tests PASS, Pilot 1x3 executed, Forensics deep dive)
+- **Cakupan Perubahan**:
+  - `backend/context_hardening.py` & `backend/architect_preservation.py`: Bimbingan deterministik perbaikan struktur dictionary Pydantic pada `interface_contracts` dan `data_models`.
+  - `backend/tests/test_pydantic_representation_repair_v1.py`: Suite pengujian bimbingan perbaikan representasi.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_3_deterministic_pydantic_representation_repair_pilot_1x3_v1.md`: Laporan evaluasi empiris pilot dan identifikasi repair hysteresis.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_3_deterministic_pydantic_representation_repair_walkthrough_v1.md`: Walkthrough teknis.
+
+---
+
+### [16 September 2026] Experiment Harness — Single-Case Execution Support v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(runner)`
+- **Waktu**: 2026-09-16 22:45 WIB
+- **Status**: TERVERIFIKASI PENUH (13/13 tests PASS, Targeted Single-Case Probe Executed)
+- **Cakupan Perubahan**:
+  - `backend/run_phase_end_validation_pilot.py`: Menambahkan argumen CLI `--tasks` untuk menjalankan single task secara terisolasi tanpa mengubah topologi, tata kelola, atau agen.
+  - `backend/tests/test_single_case_runner_v1.py`: 13 test cases (Tests A–M) menguji validasi argumen, parsing task tunggal/ganda, eksekusi selektif, dan isolasi invariansi.
+
+---
+
+### [16 September 2026] Treatment #1.8.4 — Universal Canonical Contract Grounding v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(architect)` / `test` / `docs(experiment)`
+- **Waktu**: 2026-09-16 23:35 WIB (Pilot run: 23:16:24 s.d. 23:30:32 WIB)
+- **Status**: TERVERIFIKASI PENUH (822 tests PASS, Gates A–I PASS, Pilot 1x3 Completed, Stop Rule Enforced)
+- **Cakupan Perubahan**:
+  - `backend/context_hardening.py`: Dynamic sub-model inspection untuk `InterfaceParameter` & `ExpectedReturn`, Contrastive Representation Grounding (VALID vs INVALID examples), Two-Stage Synthesis (Stage A Semantic Mapping $\to$ Stage B Canonical Serialization), dan aturan deterministik kewajiban peliputan interface.
+  - `backend/agents/architect.py`: Pembaruan `ARCHITECT_SYSTEM_PROMPT` dengan template kontrak kanonikal abstrak universal (`operation_a`, `main.py`, `param_1`, `TypeA`, `ARGUMENT`) dan checklist pre-seal review.
+  - `backend/tests/test_architect_contract_grounding_v1.py`: Suite 15 pengujian cross-domain sintetis (Tests A–O).
+  - `dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary.json`: Ringkasan checkpoint Pilot 1x3 Treatment #1.8.4.
+  - `dokumentasi-pengembangan/experiments/treatment1_8_4_universal_canonical_contract_grounding_pilot_1x3_v1.md`: Laporan riset formal komprehensif penentuan batas kognitif model 7B.
+
+---
+
+### [17 September 2026] Pemutakhiran Menyeluruh Dokumen Tata Kelola IIDD & Log Realisasi
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `docs(governance)`
+- **Waktu**: 2026-09-17 14:35 WIB
+- **Status**: TERVERIFIKASI PENUH (Sinkronisasi timestamp riil di seluruh repositori)
+- **Cakupan Perubahan**:
+  - `dokumentasi-pengembangan/decision_log.md`: Penambahan D-119 s.d. D-123.
+  - `dokumentasi-pengembangan/conversation_log.md`: Sinkronisasi dialog Treatment #1.8.1 s.d. #1.8.4.
+  - `dokumentasi-pengembangan/durasi_per_fitur.md`: Penambahan Sesi 5, 6, 7 dengan pembagian durasi presisi dan pembaharuan Grand Total (79.96 jam).
+  - `dokumentasi-pengembangan/error_log.md`: Penambahan Kasus E-069, E-070, E-071 dan pemutakhiran rasio penanganan galat.
+  - `dokumentasi-pengembangan/commit_history.md`: Pemutakhiran riwayat commit formal.
+  - `dokumentasi-pengembangan/context_drift_log.md`: Evaluasi context drift dan kepatuhan batasan arsitektur.
+
