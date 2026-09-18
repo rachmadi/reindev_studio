@@ -1366,3 +1366,23 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
 * **Laporan Pilot**: `dokumentasi-pengembangan/experiments/treatment1_8_9_b2_compact_packet_pilot_1x3_report.md`
 * **Laporan Forensik Independen**: `dokumentasi-pengembangan/experiments/forensic_investigation_treatment1_8_9_v1.md`
 
+---
+
+### [VAL-T190] Pilot Evaluation 1x3 — Pipeline Repair v1 (Contract Gate → Developer Boundary Integrity) (2026-09-18)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Pipeline Repair v1 (Defect #1 Atomic Repair Boundary Delivery & Defect #2 Outer Blueprint Wrapper Verification)
+* **Pre-Flight Gates A–I**: 1.017 unit tests passed (100% PASS, 0 regresi, SHA-256 Oracle identik)
+* **Unit Tests Perbaikan**:
+  - `test_repair_boundary_atomic_delivery_v1.py`: 9/9 PASS
+  - `test_canonical_architecture_plan_wrapper_v1.py`: 12/12 PASS
+* **Hasil Pengujian Pilot (Controlled Runs)**:
+  - `fastapi_t1`: Scaffold kode 3.336 karakter tervalidasi bersih dengan 0 AST error (Defect #2 terbukti tuntas). Contract Gate menolak awal (REJECTED) karena coverage route `/products` belum lengkap. Durasi: 1.789,98s (~29,8 m).
+  - `cli_t1`: Scaffold kode 5.995 karakter tervalidasi bersih dengan 0 AST error (Defect #2 terbukti tuntas). Seksi atomik `sec_07_repair_boundary` (`ALLOWED`, `FORBIDDEN`, `PRESERVE`) terkirim 100% utuh tanpa terpotong (`delivery_valid: True`, Defect #1 terbukti tuntas). Model dipanggil pada Turn 1 dan Turn 2, mencoba merevisi signature sebelum kuota perbaikan habis (`contract_status: REJECTED`). Durasi: 2.267,15s (~37,8 m).
+  - `flutter_t1`: Dihentikan secara terkendali atas arahan eksplisit pengguna (*User Intervention*) akibat batas inferensi CPU model 7B (utilisasi GPU 0% karena alokasi 8k token melebihi 6GB VRAM laptop), menghemat ~40 menit komputasi.
+* **Metrik Integritas Pipeline**:
+  - Defect #1 Resolution: **TERBUKTI EMPIRIS (PASS)** (Zero character slicing pada komponen atomik).
+  - Defect #2 Resolution: **TERBUKTI EMPIRIS (PASS)** (Zero false rejection pada markdown code fences dalam scaffold).
+  - Frozen Oracle SHA-256 Checksum: 100% Intact.
+  - QA Tester Bypassed: 100%.
+* **Summary File**: `backend/output/phase_validation_pilot/summary_pipeline_repair_boundary_integrity_1x3.json`
+* **Laporan Forensik**: `dokumentasi-pengembangan/experiments/forensic_investigation_pipeline_repair_boundary_integrity_v1.md`

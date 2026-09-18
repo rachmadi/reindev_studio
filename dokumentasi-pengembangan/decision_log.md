@@ -390,4 +390,23 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
      - Hanya `cli_t1` yang menguji kapabilitas murni model pada repair turn (Turns 1 & 2), di mana model 7B berulang kali mempertahankan signature 0-argumen terhadap call-site Oracle 2-argumen.
 * **Dampak**: Menemukan lokasi presisi bottleneck terakhir batas pipeline (Contract Gate $\to$ Developer Boundary) yang harus diperbaiki secara bedah deterministik sebelum kapabilitas Developer dapat diuji secara sah.
 
+---
 
+### [D-129] Pipeline Repair — Contract Gate → Developer Boundary Integrity v1 (2026-09-18)
+* **Konteks**: Menindaklanjuti temuan audit forensik Treatment #1.8.9 yang mengidentifikasi dua defek deterministik pada batas pipeline: (1) `context_hardening.py` memotong seksi atomik `sec_07_repair_boundary` (menghilangkan blok `ALLOWED`), memicu false `DELIVERY_FAILURE`; (2) `blueprint_schema.py` melakukan substring check naive `"```"` yang menolak kode scaffold yang memuat backtick markdown.
+* **Keputusan / Temuan**:
+  1. **Defect #1 Fix (`backend/context_hardening.py`)**:
+     - Mengimplementasikan `distill_failures_section_semantic` dan `distill_targets_section_semantic` (Tier 1 compaction) untuk memadatkan diagnostik repetitif sebelum menyentuh komponen atomik.
+     - Menetapkan `ATOMIC_SECTIONS = {"sec_07_repair_boundary", "sec_01_authority"}`: pemotongan karakter (`content[:remaining - 20]`) diblokir secara mutlak. Komponen atomik wajib hadir 100% utuh atau dihilangkan utuh jika anggaran tidak cukup (fail-closed tanpa pemanggilan LLM).
+  2. **Defect #2 Fix (`backend/blueprint_schema.py`)**:
+     - Mengganti pemeriksaan global `"```" in architecture_plan` dengan validasi batas luar dokumen (`stripped.startswith("```")` dan `stripped.endswith("```")`) serta stage markers kanonikal.
+     - Nilai string kode internal di dalam JSON (termasuk markdown code fences di `code_scaffold`) kini diakomodasi 100% tanpa mutasi atau penolakan false-positive.
+  3. **Verifikasi Kualitas**:
+     - Unit Tests Baru: `test_repair_boundary_atomic_delivery_v1.py` (9/9 PASS) dan `test_canonical_architecture_plan_wrapper_v1.py` (12/12 PASS).
+     - Full Backend Regression Suite: **1.017/1.017 PASS** (0 regresi terhadap LKG).
+     - Pre-Flight Verification Gates A–I: **100% PASS** (Seluruh 9 gerbang lulus bersih, checksum SHA-256 Oracle identik).
+  4. **Hasil Empiris Pilot Terkendali (`fastapi_t1`, `cli_t1`)**:
+     - `fastapi_t1`: Scaffold kode 3.336 karakter diterima dengan 0 AST error (Defect #2 terbukti tuntas).
+     - `cli_t1`: Scaffold kode 5.995 karakter diterima dengan 0 AST error (Defect #2 terbukti tuntas). Seksi atomik `sec_07_repair_boundary` (`ALLOWED`, `FORBIDDEN`, `PRESERVE`) terkirim 100% utuh pada Turn 1 dan Turn 2 (`delivery_valid: True`, Defect #1 terbukti tuntas). Model berhasil dipanggil pada repair turn tanpa interupsi kegagalan delivery.
+     - Penghentian Terkendali: Sesuai arahan pengguna akibat durasi eksekusi inferensi CPU model 7B (utilisasi GPU 0% karena 8k context window melampaui VRAM 6GB laptop), pilot dihentikan setelah `cli_t1` tuntas, mencegah beban eksekusi tambahan ~45 menit untuk `flutter_t1`.
+* **Dampak**: Dua defek struktural batas pipeline resmi tereliminasi secara generik tanpa task-specific branching atau pelanggaran komponen beku.

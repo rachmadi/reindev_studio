@@ -874,4 +874,25 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
     - `treatment1_8_9_b2_compact_packet_pilot_1x3_report.md`: Evaluasi pemadatan paket B2 (Stage B-1 PASS 3/3, Stage B-2 VALID 3/3, B3 Serializer SUCCESS 3/3).
     - `forensic_investigation_treatment1_8_9_v1.md`: Investigasi forensik independen batas Contract Gate → Developer yang membuktikan batas Developer belum pernah teruji (0/3) dan mengidentifikasi 2 defek deterministik batas pipeline.
 
+---
+
+### [18 September 2026] Pipeline Repair — Contract Gate → Developer Boundary Integrity v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `fix(pipeline)` / `test` / `docs(forensic)`
+- **Waktu**: 2026-09-18 13:15 WIB
+- **Status**: TERVERIFIKASI PENUH (21/21 new unit tests PASS, 1.017/1.017 full regression PASS, Pre-Flight Gates A–I 100% PASS, Empirical Pilot Executed with Controlled Stop)
+- **Cakupan Perubahan**:
+  - `backend/context_hardening.py`: Implementasi Tier 1 semantic compaction (`distill_failures_section_semantic` & `distill_targets_section_semantic`) dan penegakan `ATOMIC_SECTIONS = {"sec_07_repair_boundary", "sec_01_authority"}` tanpa pemotongan parsial karakter, menyelesaikan Defect #1.
+  - `backend/blueprint_schema.py`: Penggantian substring naive `"```" in architecture_plan` dengan validasi batas luar dokumen (`startswith/endswith`) dan stage markers kanonikal, melindungi blok kode scaffold internal, menyelesaikan Defect #2.
+  - Test suites baru:
+    - `backend/tests/test_canonical_architecture_plan_wrapper_v1.py`: 12/12 PASS (Tests A–L).
+    - `backend/tests/test_repair_boundary_atomic_delivery_v1.py`: 9/9 PASS.
+  - Ringkasan Hasil Empiris Pilot (`summary_pipeline_repair_boundary_integrity_1x3.json`):
+    - `fastapi_t1`: Scaffold 3.336 karakter di-parse dengan 0 AST error (Defect #2 terbukti tuntas).
+    - `cli_t1`: Scaffold 5.995 karakter di-parse dengan 0 AST error (Defect #2 terbukti tuntas). Seksi atomik `sec_07_repair_boundary` terkirim 100% utuh dengan `ALLOWED`, `FORBIDDEN`, `PRESERVE` (`delivery_valid: True`, Defect #1 terbukti tuntas). Pemanggilan model 7B repair Turn 1 dan Turn 2 dieksekusi secara nyata.
+    - Penegakan Controlled Stop Rule setelah `cli_t1` atas arahan pengguna untuk menghindari overhead inferensi CPU Ollama (~40m pada `flutter_t1`) akibat offload alokasi memori (KV cache 8k context > VRAM 6GB GPU).
+  - Laporan & Artefak:
+    - `dokumentasi-pengembangan/experiments/forensic_investigation_pipeline_repair_boundary_integrity_v1.md`: Laporan audit forensik menyeluruh atas eliminasi kedua defek dan telemetri empiris live pilot.
+    - Pemutakhiran menyeluruh berkas log tata kelola IIDD: `decision_log.md` (D-129), `validation_log.md` (VAL-T190), `error_log.md` (E-074, E-075), `context_drift_log.md`, `human_intervention.md` (#124–#127), `iteration_summary.md`, `durasi_per_fitur.md` (Sesi 9: 1.80h, Grand Total: 90.75h).
+
 

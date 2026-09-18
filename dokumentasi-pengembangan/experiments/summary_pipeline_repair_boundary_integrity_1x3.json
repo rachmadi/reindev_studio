@@ -1,0 +1,149 @@
+{
+  "experiment": "phase_end_validation_pilot",
+  "experiment_mode": "full_matrix",
+  "selected_tasks": [
+    "fastapi_t1",
+    "cli_t1",
+    "flutter_t1"
+  ],
+  "available_tasks": [
+    "fastapi_t1",
+    "cli_t1",
+    "flutter_t1"
+  ],
+  "skipped_tasks": [],
+  "pipeline_version": "1.8.3",
+  "governance_version": "1.6",
+  "date": "2026-09-18T13:10:16.211979",
+  "total_runs_planned": 3,
+  "runs_completed": 2,
+  "status": "PAUSED_AT_RUN_2",
+  "pass_count": 0,
+  "convergent_within_3_loops_count": 0,
+  "aggregate_otrr": 0.0,
+  "aggregate_otrr_percent": 0.0,
+  "runs": [
+    {
+      "run_id": "pv_pilot_fastapi_t1_rep1_20260918_120238",
+      "task_id": "fastapi_t1",
+      "rep_index": 1,
+      "target_language": "python",
+      "model": "qwen2.5-coder:7b",
+      "final_verdict": "FAIL",
+      "review_verdict": "FAIL",
+      "loops_consumed": 0,
+      "converged_within_3_loops": false,
+      "tests_passed": 0,
+      "tests_failed": 0,
+      "tests_total": 5,
+      "contract_status": "DELIVERY_FAILURE",
+      "trajectory": "divergent",
+      "failure_classification": "C. Contract Failure",
+      "duration_sec": 1789.98,
+      "oracle_sha256": "a1db9bb1f6eaf47d5cf56e102c4a0f6e1f49d757e9faa1485b36f2972a152d63",
+      "oracle_sha_intact": true,
+      "tester_agent_invocations": 0,
+      "otrr": 0.0,
+      "otrr_percent": 0.0,
+      "otrr_details": {
+        "otrr": 0.0,
+        "otrr_percent": 0.0,
+        "total_failures_with_repair": 0,
+        "first_turn_successes": 0,
+        "repair_records": []
+      },
+      "staged_metrics": {
+        "stage_a_coverage": 1.0,
+        "stage_a_valid": true,
+        "stage_a_repair_count": 0,
+        "stage_b_completeness": 1.0,
+        "stage_b_repair_count": 0,
+        "stage_b1_valid": true,
+        "stage_b1_repair_count": 0,
+        "stage_b2_valid": true,
+        "stage_b2_repair_count": 0,
+        "serialization_success": true,
+        "first_divergence": null,
+        "decoder_mode": "DECOMPOSED_B1_B2_B3",
+        "parse_success": true,
+        "parse_failure_type": null,
+        "stage": "STAGE_B"
+      },
+      "experiment_mode": "full_matrix",
+      "selected_tasks": [
+        "fastapi_t1",
+        "cli_t1",
+        "flutter_t1"
+      ],
+      "available_tasks": [
+        "fastapi_t1",
+        "cli_t1",
+        "flutter_t1"
+      ],
+      "skipped_tasks": [],
+      "pipeline_version": "1.8.3",
+      "governance_version": "1.6"
+    },
+    {
+      "run_id": "pv_pilot_cli_t1_rep1_20260918_123229",
+      "task_id": "cli_t1",
+      "rep_index": 1,
+      "target_language": "python",
+      "model": "qwen2.5-coder:7b",
+      "final_verdict": "FAIL",
+      "review_verdict": "FAIL",
+      "loops_consumed": 0,
+      "converged_within_3_loops": false,
+      "tests_passed": 0,
+      "tests_failed": 0,
+      "tests_total": 5,
+      "contract_status": "REJECTED",
+      "trajectory": "divergent",
+      "failure_classification": "C. Contract Failure",
+      "duration_sec": 2267.15,
+      "oracle_sha256": "0bd5b598afa7ae4c9cdf0e269d13136b51d35a4e0b1ac6548f0a2cf8a8eba124",
+      "oracle_sha_intact": true,
+      "tester_agent_invocations": 0,
+      "otrr": 0.0,
+      "otrr_percent": 0.0,
+      "otrr_details": {
+        "otrr": 0.0,
+        "otrr_percent": 0.0,
+        "total_failures_with_repair": 0,
+        "first_turn_successes": 0,
+        "repair_records": []
+      },
+      "staged_metrics": {
+        "stage_a_coverage": 1.0,
+        "stage_a_valid": true,
+        "stage_a_repair_count": 0,
+        "stage_b_completeness": 1.0,
+        "stage_b_repair_count": 0,
+        "stage_b1_valid": true,
+        "stage_b1_repair_count": 0,
+        "stage_b2_valid": true,
+        "stage_b2_repair_count": 0,
+        "serialization_success": true,
+        "first_divergence": null,
+        "decoder_mode": "DECOMPOSED_B1_B2_B3",
+        "parse_success": true,
+        "parse_failure_type": null,
+        "stage": "STAGE_B"
+      },
+      "experiment_mode": "full_matrix",
+      "selected_tasks": [
+        "fastapi_t1",
+        "cli_t1",
+        "flutter_t1"
+      ],
+      "available_tasks": [
+        "fastapi_t1",
+        "cli_t1",
+        "flutter_t1"
+      ],
+      "skipped_tasks": [],
+      "pipeline_version": "1.8.3",
+      "governance_version": "1.6"
+    }
+  ]
+}

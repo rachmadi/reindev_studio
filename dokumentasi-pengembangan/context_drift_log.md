@@ -386,6 +386,31 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 ### Severity Drift Keseluruhan:
 **Major (Clean Boundary Resolution & Confounder Elimination)** — Pergeseran ilmiah yang sangat krusial: berhasil mengisolasi 2 defek deterministik batas pipeline terakhir (`context_assembler` truncation dan `blueprint_schema` false positive) yang sebelumnya mengaburkan evaluasi kapabilitas Developer.
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI PIPELINE REPAIR v1 (BOUNDARY INTEGRITY & CONTROLLED PILOT) — 2026-09-18
+## ═══════════════════════════════════════════════════════════════════════════
 
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Atomic Repair Boundary Preservation & Tier 1 Compaction (D-129) | Positif (Memproteksi `sec_07_repair_boundary` dari karakter slicing dan memadatkan diagnostik kegagalan repetitif) | Intent Architect & Agen |
+| Outer Boundary Wrapper Validation on Canonical Blueprint (D-129) | Positif (Menghapus false positive substring check `"```"` dan mengizinkan kode scaffold memuat markdown backticks murni) | Intent Architect & Agen |
+| Controlled Stop Rule on 1x3 Pilot at Run 2 (`cli_t1`) | Positif (Menghentikan inferensi CPU model 7B tepat waktu atas persetujuan pengguna, menghemat 40+ menit komputasi) | Pengguna / Intent Architect |
 
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Implementasi fungsi kompaksi Tier 1 `distill_failures_section_semantic` dan `distill_targets_section_semantic` di `backend/context_hardening.py`.
+  - Pembentukan 2 suite pengujian baru: `test_repair_boundary_atomic_delivery_v1.py` (9 tests) dan `test_canonical_architecture_plan_wrapper_v1.py` (12 tests).
+- **B2 (Keputusan Teknis):**
+  - Menghindari pemotongan karakter parsial pada seluruh komponen berstatus atomik (`ATOMIC_SECTIONS`).
+  - Observational validation murni pada outer boundary dokumen JSON tanpa mutasi atau kode stripping.
+
+### Ringkasan Distribusi Sumber Drift Sesi 2026-09-18:
+- **Intent Architect / User:** 65.0% (Instruksi GO Pipeline Repair, persetujuan Stop Rule setelah CLI, pemeliharaan komponen beku)
+- **Agen:** 35.0% (Implementasi surgical code, pemadatan Tier 1 semantik, penulisan 21 unit tests, eksekusi pre-flight, analisis telemetri pilot)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Minor (Surgical Quality Assurance & Positive Boundary Hardening)** — Perbaikan murni pada infrastruktur deterministik tanpa modifikasi prompt, tanpa task-specific solver, dan tanpa drift pada komponen inti yang dibekukan.

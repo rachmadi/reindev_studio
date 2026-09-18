@@ -1115,8 +1115,14 @@ def validate_canonical_architecture_plan_state(
     if not stripped:
         return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan is empty"]
 
-    # Criterion E: No Stage A/B delimiters or narrative markdown code fences
-    forbidden_markers = [
+    # Outer wrapper detection: detect forbidden markdown fences only at the document boundary
+    if stripped.startswith("```"):
+        return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '```'"]
+    if stripped.endswith("```"):
+        return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '```'"]
+
+    # Outer stage markers at document boundary
+    outer_forbidden_markers = [
         "=== STAGE A",
         "=== STAGE B",
         "=== STAGE A OUTPUT ===",
@@ -1126,13 +1132,11 @@ def validate_canonical_architecture_plan_state(
         "=== BLUEPRINT JSON ===",
         "=== END BLUEPRINT JSON ===",
         "=== SEMANTIC DECISION JSON ===",
-        "```json",
-        "```"
+        "=== END SEMANTIC DECISION JSON ===",
     ]
-    for marker in forbidden_markers:
-        if marker in architecture_plan:
-            errors.append(f"STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '{marker}'")
-            return False, errors
+    for marker in outer_forbidden_markers:
+        if stripped.startswith(marker) or stripped.endswith(marker):
+            return False, [f"STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '{marker}'"]
 
     # Criterion A & B & D: Valid JSON, exactly one root object, no concatenated JSON
     decoder = json.JSONDecoder()

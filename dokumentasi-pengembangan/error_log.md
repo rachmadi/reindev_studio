@@ -923,10 +923,13 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 - **Waktu:** 2026-09-18 ~07:20 WIB (Pilot `fastapi_t1` Treatment #1.8.9 Turn 1)
 - **Tingkat Keparahan:** Critical (Deterministic Pipeline Boundary Defect)
 - **Gejala:** Eksekusi Turn 1 Architect repair langsung gagal tanpa memanggil LLM: `ARCHITECT_CONTEXT_DELIVERY_FAILURE: Repair boundary atomic payload incomplete (missing: ALLOWED)`.
-- **Akar Masalah:** Logika kompresi konteks pada `context_assembler.py` memotong seksi `sec_07_repair_boundary` di tengah-tengah untuk mengejar kuota 12.000 karakter, sehingga blok `ALLOWED` terpotong. Validator pengiriman deterministik `validate_delivery_payload()` mendeteksi ketiadaan blok wajib tersebut dan melakukan fail-closed sebelum model diinisiasi.
-- **Tindakan Korektif:** Teridentifikasi secara definitif dalam Laporan Forensik #1.8.9. Rekomendasi perbaikan: melindungi `sec_07_repair_boundary` dari pemotongan parsial atau mengunci blok `ALLOWED`.
-- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9.
-- **Status:** Teridentifikasi Secara Presisi (Menunggu Surgical Pipeline Repair).
+- **Akar Masalah:** Logika kompresi konteks pada `context_hardening.py` memotong seksi `sec_07_repair_boundary` menggunakan slicing karakter mentah (`content[:remaining - 20]`) saat kuota tertekan oleh kegagalan/target diagnostik yang panjang, memotong blok `ALLOWED`.
+- **Tindakan Korektif (Pipeline Repair v1):**
+  1. Menambahkan Tier 1 semantic compaction (`distill_failures_section_semantic` dan `distill_targets_section_semantic`) untuk memadatkan diagnostik repetitif sebelum menyentuh batas kritis.
+  2. Menetapkan `ATOMIC_SECTIONS = {"sec_07_repair_boundary", "sec_01_authority"}`: pelarangan mutlak pemotongan karakter parsial. Komponen atomik wajib hadir 100% utuh atau dihilangkan utuh (fail-closed cleanly).
+  3. Memvalidasi 9 unit tests pada `test_repair_boundary_atomic_delivery_v1.py` (PASS) dan membuktikan secara empiris pada `cli_t1` di mana Turn 1 & 2 terkirim 100% utuh tanpa pemotongan.
+- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9 & PIPELINE REPAIR v1.
+- **Status:** Tuntas (Resolved).
 
 ---
 
@@ -934,18 +937,22 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 - **Waktu:** 2026-09-18 ~07:30 WIB (Pilot `flutter_t1` Treatment #1.8.9)
 - **Tingkat Keparahan:** Critical (Deterministic State Validator Defect)
 - **Gejala:** State kontrak dibatalkan sebelum evaluasi Contract Gate: `STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '```'`.
-- **Akar Masalah:** Fungsi `validate_canonical_architecture_plan_state` di `blueprint_schema.py` melakukan pencarian substring global `if "```" in architecture_plan:`. Ketika scaffold kode Dart di dalam `bp.files["lib/card_metric.dart"].code_scaffold` memuat code fence markdown (````dart`) atau docstring backtick, validator salah mengidentifikasi seluruh dokumen JSON sebagai terkontaminasi markdown luar.
-- **Tindakan Korektif:** Teridentifikasi secara definitif dalam Laporan Forensik #1.8.9. Rekomendasi perbaikan: membatasi pengecekan code fence hanya pada wrapper terluar dokumen JSON.
-- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9.
-- **Status:** Teridentifikasi Secara Presisi (Menunggu Surgical Pipeline Repair).
+- **Akar Masalah:** Fungsi `validate_canonical_architecture_plan_state` di `blueprint_schema.py` melakukan pencarian substring global naive `if "```" in architecture_plan:`. Ketika scaffold kode Dart/Python di dalam `code_scaffold` memuat code fence markdown (````dart` atau ````python`) atau docstring backtick, validator salah menolak seluruh dokumen JSON sebagai terkontaminasi wrapper markdown.
+- **Tindakan Korektif (Pipeline Repair v1):**
+  1. Mengganti pemeriksaan substring global dengan pemeriksaan batas terluar dokumen (`stripped.startswith("```")` dan `stripped.endswith("```")`) serta stage markers kanonikal.
+  2. Mempertahankan nilai string internal kode scaffold tanpa pemotongan atau mutasi.
+  3. Memvalidasi 12 unit tests pada `test_canonical_architecture_plan_wrapper_v1.py` (PASS) dan membuktikan secara empiris pada `fastapi_t1` (scaffold 3.336 char) dan `cli_t1` (scaffold 5.995 char) yang diterima bersih dengan 0 AST error.
+- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9 & PIPELINE REPAIR v1.
+- **Status:** Tuntas (Resolved).
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Treatment #1.8.9):
-- **Diselesaikan Mandiri oleh Agen:** 32 kasus (termasuk E-065, E-068, E-072, E-073)
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Pipeline Repair v1):
+- **Diselesaikan Mandiri oleh Agen:** 34 kasus (termasuk E-065, E-068, E-072, E-073, E-074, E-075)
 - **Diselesaikan atas Intervensi IA:** 7 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
-- **Kasus Forensik & Rekomendasi Terbuka:** 9 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071, E-074, E-075)
+- **Kasus Forensik & Rekomendasi Terbuka:** 7 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071)
 - **Total Galat Terdokumentasi:** 75 kasus (E-001 s/d E-075)
+
 
 

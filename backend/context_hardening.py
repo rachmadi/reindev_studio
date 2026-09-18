@@ -478,6 +478,58 @@ def compress_valid_state_semantic(text: str, max_chars: int = 1400) -> str:
     return res
 
 
+def distill_failures_section_semantic(text: str, max_chars: int = 2000) -> str:
+    """
+    Deterministic Failure Section Compaction (Pipeline Repair v1):
+    Deduplicates repeated failure prose and diagnostics while preserving
+    all causal violation facts (criterion, location, observed, required) at line boundaries.
+    """
+    lines = text.splitlines()
+    if not lines:
+        return ""
+    header = lines[:2]
+    res_lines = list(header)
+    cur_len = sum(len(l) + 1 for l in res_lines)
+    seen = set()
+    for ln in lines[2:]:
+        cleaned = ln.strip()
+        if not cleaned:
+            continue
+        if cleaned in seen and len(cleaned) > 25:
+            continue
+        if cur_len + len(ln) + 1 <= max_chars:
+            res_lines.append(ln)
+            seen.add(cleaned)
+            cur_len += len(ln) + 1
+        else:
+            break
+    return "\n".join(res_lines).strip()
+
+
+def distill_targets_section_semantic(text: str, max_chars: int = 2000) -> str:
+    """
+    Deterministic Target Section Compaction (Pipeline Repair v1):
+    Preserves atomic repair target components (WHAT, WHERE, OBSERVED, EXPECTED)
+    and compacts repeated ledger items within max_chars.
+    """
+    lines = text.splitlines()
+    if not lines:
+        return ""
+    header = lines[:2]
+    atomic_prefixes = ("WHAT", "WHERE", "OBSERVED", "EXPECTED", "ACTIVE TARGET", "REPAIR FORMULA")
+    atomic_parts = [ln for ln in lines[2:] if ln.strip().startswith(atomic_prefixes)]
+    other_parts = [ln for ln in lines[2:] if not ln.strip().startswith(atomic_prefixes)]
+    res_lines = list(header) + atomic_parts
+    cur_len = sum(len(l) + 1 for l in res_lines)
+    for ln in other_parts:
+        if cur_len + len(ln) + 1 <= max_chars:
+            res_lines.append(ln)
+            cur_len += len(ln) + 1
+        else:
+            break
+    return "\n".join(res_lines).strip()
+
+
 def compress_context_semantic_detailed(
     sections: Dict[str, str],
     max_chars: int,
@@ -578,6 +630,31 @@ def compress_context_semantic_detailed(
                         working_sections[k] = orig[:450] + "\n...(dipotong)"
                         sections_truncated.append(k)
 
+        # Recalculate size after Tier 2
+        cur_parts = [working_sections[k] for k in ordered_keys if working_sections.get(k)]
+        cur_size = sum(len(p) for p in cur_parts) + max(0, len(cur_parts) - 1) * 2
+
+        # ===================================================================
+        # TIER 1 COMPACTION: Verbose Repeated Failure & Target Prose
+        # Ensures atomic repair boundary is not crowded out by repetitive diagnostics
+        # ===================================================================
+        if cur_size > max_chars:
+            if "sec_03_current_failures" in working_sections:
+                orig = working_sections["sec_03_current_failures"]
+                if len(orig) > 2500:
+                    comp = distill_failures_section_semantic(orig, max_chars=2000)
+                    if len(comp) < len(orig):
+                        working_sections["sec_03_current_failures"] = comp
+                        sections_truncated.append("sec_03_current_failures")
+
+            if "sec_06_repair_target" in working_sections:
+                orig = working_sections["sec_06_repair_target"]
+                if len(orig) > 2500:
+                    comp = distill_targets_section_semantic(orig, max_chars=2000)
+                    if len(comp) < len(orig):
+                        working_sections["sec_06_repair_target"] = comp
+                        sections_truncated.append("sec_06_repair_target")
+
     # =======================================================================
     # ASSEMBLY & ATOMIC SECTION PRESERVATION
     # =======================================================================
@@ -586,6 +663,8 @@ def compress_context_semantic_detailed(
     sections_omitted: List[str] = []
     total = 0
 
+    ATOMIC_SECTIONS = {"sec_07_repair_boundary", "sec_01_authority"}
+
     for k in ordered_keys:
         content = working_sections.get(k, "")
         if not content:
@@ -593,20 +672,45 @@ def compress_context_semantic_detailed(
 
         sep_len = 2 if result_parts else 0
         is_critical = (k in REPAIR_CRITICAL_KEYS or any(k.startswith(cp) for cp in CRITICAL_PREFIXES))
+        is_atomic = (k in ATOMIC_SECTIONS or "repair_boundary" in k)
 
         if total + sep_len + len(content) <= max_chars:
             result_parts.append(content)
             sections_present.append(k)
             total += sep_len + len(content)
+        elif is_atomic:
+            # ATOMIC SEMANTIC PAYLOAD INVARIANT (Pipeline Repair v1):
+            # The repair boundary (and atomic P0 components) must NEVER be character-sliced.
+            # A boundary is valid only when its complete semantic payload exists (ALLOWED, FORBIDDEN, PRESERVE).
+            # If it cannot fit intact within the remaining budget, it must NOT be partially truncated.
+            sections_omitted.append(k)
         elif is_critical:
-            # Critical sections MUST be preserved atomically within max_chars.
+            # Critical sections MUST be preserved within max_chars.
             remaining = max_chars - total - sep_len
-            if remaining > 250:
-                comp_content = compress_valid_state_semantic(content, max_chars=remaining - 20) if "valid_state" in k else content[:remaining - 20]
+            if "valid_state" in k and remaining > 250:
+                comp_content = compress_valid_state_semantic(content, max_chars=remaining - 20)
                 result_parts.append(comp_content)
                 sections_present.append(k)
                 sections_truncated.append(k)
                 total += sep_len + len(comp_content)
+            elif remaining > 250 and not is_atomic:
+                # Softly truncate non-atomic critical content at line boundary
+                truncated_lines = []
+                t_len = 0
+                for line in content.splitlines(True):
+                    if t_len + len(line) <= remaining - 40:
+                        truncated_lines.append(line)
+                        t_len += len(line)
+                    else:
+                        break
+                if truncated_lines:
+                    comp_content = "".join(truncated_lines).rstrip() + "\n...(dipotong)"
+                    result_parts.append(comp_content)
+                    sections_present.append(k)
+                    sections_truncated.append(k)
+                    total += sep_len + len(comp_content)
+                else:
+                    sections_omitted.append(k)
             else:
                 sections_omitted.append(k)
         else:
@@ -623,7 +727,14 @@ def compress_context_semantic_detailed(
 
     result = "\n\n".join(result_parts)
     if len(result) > max_chars:
-        result = result[:max_chars]
+        # If joining exceeded max_chars, do NOT slice through an atomic section
+        if result_parts and (sections_present[-1] in ATOMIC_SECTIONS or "repair_boundary" in sections_present[-1]):
+            omitted_atomic = sections_present.pop()
+            sections_omitted.append(omitted_atomic)
+            result_parts.pop()
+            result = "\n\n".join(result_parts)
+        else:
+            result = result[:max_chars]
 
     repair_critical_present = [k for k in REPAIR_CRITICAL_KEYS if k in sections_present]
 

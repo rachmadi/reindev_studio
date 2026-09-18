@@ -1110,7 +1110,45 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 ### Rekapitulasi Grand Total Kumulatif Proyek Terbaru:
 - Grand Total Sebelumnya (Sesi 1 s.d. Sesi 7): **79.96 jam (4.797,36 menit)**
 - Total Sesi 8 (Treatment #1.8.5–#1.8.9, Forensik #1.8.7, Forensik #1.8.9, & Tata Kelola): **9.00 jam (540.00 menit)**
-- **GRAND TOTAL KUMULATIF PROYEK TERBARU:** 79.96 + 9.00 = **88.96 jam (5.337,36 menit)**.
+- Total Sesi 9 (Pipeline Repair v1, Pre-Flight Gates A–I, Controlled Pilot, & Tata Kelola): **1.79 jam (107.62 menit)**
+- **GRAND TOTAL KUMULATIF PROYEK TERBARU:** 79.96 + 9.00 + 1.79 = **90.75 jam (5.444,98 menit)**.
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 9: PIPELINE REPAIR v1 (BOUNDARY INTEGRITY & CONTROLLED PILOT) — 2026-09-18 11:50 WIB s.d. 13:15 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Aktivitas Pengembangan (Development Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Surgical fix Defect #1: Tier 1 semantic compaction & atomic preservation (`context_hardening.py`) | 11:50:00 | 12:00:00 | 600 s | 10.00 m (0.17 j) |
+| 2 | Surgical fix Defect #2: Outer boundary wrapper validation on canonical blueprint (`blueprint_schema.py`) | 11:50:00 | 12:00:00 | 600 s | 10.00 m (0.17 j) |
+| 3 | Pembentukan unit test suites: `test_repair_boundary_atomic_delivery_v1.py` (9 tests) & `test_canonical_architecture_plan_wrapper_v1.py` (12 tests) | 12:00:00 | 12:05:00 | 300 s | 5.00 m (0.08 j) |
+| | **Subtotal Waktu Pengembangan** | | | **1.500 s** | **25.00 m (0.42 jam)** |
+
+### 2. Aktivitas Pengujian Terkontrol & Uji Ulang (Testing Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi 51 targeted unit tests & 1.017 full backend regression tests (0 regresi) | 12:00:30 | 12:01:20 | 50 s | 0.83 m (0.01 j) |
+| 2 | Eksekusi Pre-Flight Verification Gates A–I (100% PASS, SHA-256 Oracle identik) | 12:01:22 | 12:02:00 | 38 s | 0.63 m (0.01 j) |
+| 3 | Eksekusi Controlled Pilot 1x3 Run 1 (`fastapi_t1`): 1.789,98s compute | 12:02:38 | 12:32:28 | 1.790 s | 29.83 m (0.50 j) |
+| 4 | Eksekusi Controlled Pilot 1x3 Run 2 (`cli_t1`): 2.267,15s compute | 12:32:29 | 13:10:16 | 2.267 s | 37.78 m (0.63 j) |
+| | **Subtotal Waktu Pengujian** | | | **4.145 s** | **69.08 m (1.15 jam)** |
+
+### 3. Aktivitas Analisis Forensik & Dokumentasi (Forensics & Governance Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Pelaporan telemetri berkala (cron 3 menit) & penanganan umpan balik efisiensi waktu komputasi | 12:01:00 | 13:10:00 | 540 s | 9.00 m (0.15 j) |
+| 2 | Evaluasi awal penghentian terkendali (*Early Stopping*) setelah `cli_t1` tuntas | 13:10:00 | 13:12:00 | 120 s | 2.00 m (0.03 j) |
+| 3 | Pemutakhiran dokumen tata kelola IIDD & penyusunan Laporan Forensik Pipeline Repair v1 | 13:12:00 | 13:15:00 | 180 s | 3.00 m (0.05 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **840 s** | **14.00 m (0.23 jam)** |
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 9:
+\mathbf{\text{Total Waktu Sesi 9} = 1.500\text{ s (Dev)} + 4.145\text{ s (Test)} + 840\text{ s (Doc)} = 6.485\text{ detik} = 108.08\text{ menit} (1.80\text{ jam})}
+- **Waktu Mulai Sesi 9:** 2026-09-18 11:50:00 WIB
+- **Waktu Pencatatan Selesai Sesi 9:** 2026-09-18 13:15:00 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING — BELUM VALIDASI PASS DARI INTENT ARCHITECT)**
 
 

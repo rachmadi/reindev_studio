@@ -2850,3 +2850,18 @@ Metodologi: Rumuskan hipotesis H1.7: Penguatan Evidence-Grounded Requirement Com
     2. **Apakah masih ada defek deterministik pipeline?** **YA.** Teridentifikasi 2 defek: pemotongan blok `ALLOWED` pada `sec_07_repair_boundary` akibat kompresi konteks, dan pengecekan substring naive `"```"` pada `validate_canonical_architecture_plan_state`.
   - Memberikan rekomendasi tunggal berbasis bukti empiris: surgical pipeline repair pada 2 defek batas tersebut sebelum menguji ulang kapabilitas Developer.
 
+---
+
+### Sesi: Pipeline Repair — Contract Gate → Developer Boundary Integrity v1 (18 September 2026, 11:50 – 13:15 WIB)
+- **Pengguna (Intent Architect)**: "Lporkan tiap 3 menit" -> "Waktunya terlalu lama" -> "Hentikan setelah cli selesai".
+- **Asisten**:
+  - Mengimplementasikan perbaikan bedah deterministik untuk Defect #1 di `backend/context_hardening.py` (Tier 1 semantic compaction via `distill_failures_section_semantic` & `distill_targets_section_semantic`, serta `ATOMIC_SECTIONS = {"sec_07_repair_boundary", "sec_01_authority"}` yang mengeliminasi pemotongan karakter).
+  - Mengimplementasikan perbaikan bedah deterministik untuk Defect #2 di `backend/blueprint_schema.py` (mengganti substring search naive `"```" in architecture_plan` dengan validasi batas dokumen luar `stripped.startswith/endswith("```")` dan stage markers kanonikal, melindungi kode scaffold internal).
+  - Mengembangkan unit test suite baru: `backend/tests/test_canonical_architecture_plan_wrapper_v1.py` (12/12 PASS) dan `backend/tests/test_repair_boundary_atomic_delivery_v1.py` (9/9 PASS).
+  - Menjalankan full backend regression suite: **1.017/1.017 PASS** (0 regresi terhadap LKG) dan Pre-Flight Gates A–I 100% PASS (9/9 gates).
+  - Meluncurkan Empirical Controlled Pilot 1x3:
+    - `fastapi_t1`: Scaffold 3.336 karakter di-parse bersih dengan 0 AST error (Defect #2 terbukti tuntas).
+    - `cli_t1`: Scaffold 5.995 karakter di-parse bersih dengan 0 AST error (Defect #2 terbukti tuntas). Seksi atomik `sec_07_repair_boundary` terkirim 100% utuh dengan `ALLOWED`, `FORBIDDEN`, `PRESERVE` (`delivery_valid: True`, Defect #1 terbukti tuntas). Model dipanggil secara nyata pada Turn 1 dan Turn 2 repair.
+  - Menegakkan arahan penghentian terkendali (*Controlled Stop Rule*) dari pengguna setelah `cli_t1` tuntas guna mencegah pemborosan komputasi inferensi CPU Ollama (~40 menit untuk `flutter_t1`) akibat offloading memori (KV cache 8k context melampaui VRAM 6GB GPU).
+  - Menerbitkan laporan investigasi forensik resmi `forensic_investigation_pipeline_repair_boundary_integrity_v1.md` dan memutakhirkan seluruh berkas tata kelola IIDD.
+

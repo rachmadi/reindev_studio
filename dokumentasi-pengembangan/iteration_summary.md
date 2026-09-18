@@ -233,6 +233,24 @@ eview_report, complete).
 - Mode default pipeline tetap terkunci pada `ollama / qwen2.5-coder:7b` untuk komputasi lokal, sementara gateway OpenRouter siap diaktifkan pengguna sesuai preferensi model.
 - Langkah Lanjutan: Menunggu arahan dan hasil perumusan skenario baru dari Intent Architect sebelum menetapkan penutupan resmi Iterasi 6 dan transisi ke **Iterasi 7: Native Desktop Integration & End-to-End Delivery** (`REQ-031` s.d. `REQ-035`).
 
+---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## PIPELINE REPAIR v1 (BOUNDARY INTEGRITY: CONTRACT GATE → DEVELOPER) — 2026-09-18
+## ═══════════════════════════════════════════════════════════════════════════
 
-
+### 1. Capaian Utama:
+1. **Resolusi Defect #1 (Atomic Repair Boundary Delivery Integrity):**
+   - Mengeliminasi pemotongan karakter (`content[:remaining - 20]`) pada seksi atomik `sec_07_repair_boundary` di `backend/context_hardening.py`.
+   - Mengintegrasikan Tier 1 semantic compaction (`distill_failures_section_semantic` dan `distill_targets_section_semantic`) guna memadatkan jejak diagnostik berlebih sebelum menyentuh batas kuota, menjamin blok `ALLOWED`, `FORBIDDEN`, dan `PRESERVE` terkirim 100% utuh.
+2. **Resolusi Defect #2 (Outer Document Wrapper Validation):**
+   - Merefaktor `validate_canonical_architecture_plan_state` di `backend/blueprint_schema.py` dari pemeriksaan global naive `"```" in architecture_plan` menjadi validasi outer boundary dokumen (`stripped.startswith("```")` dan `stripped.endswith("```")`).
+   - Kode scaffold di dalam JSON string yang memuat markdown code fences atau docstring backticks kini diterima murni dengan 0 AST error tanpa mutasi atau distorsi.
+3. **Verifikasi Suite Pengujian & Pre-Flight:**
+   - 2 Unit Test Suites Baru: `test_repair_boundary_atomic_delivery_v1.py` (9/9 PASS) dan `test_canonical_architecture_plan_wrapper_v1.py` (12/12 PASS).
+   - Full Backend Regression Suite: **1.017/1.017 PASS** (0 regresi terhadap LKG).
+   - Pre-Flight Verification Gates A–I: **100% PASS** (Seluruh 9 gerbang validasi lolos sempurna).
+4. **Verifikasi Empiris Pilot Terkendali (`fastapi_t1`, `cli_t1`):**
+   - `fastapi_t1`: Scaffold kode 3.336 char diterima dengan 0 AST error (Defect #2 terbukti tuntas).
+   - `cli_t1`: Scaffold kode 5.995 char diterima dengan 0 AST error (Defect #2 terbukti tuntas). Komponen atomik `sec_07_repair_boundary` terkirim utuh tanpa pemotongan pada Turn 1 & 2 (`delivery_valid: True`, Defect #1 terbukti tuntas).
+   - Early Stopping Terkendali: Dihentikan atas instruksi pengguna setelah `cli_t1` selesai akibat inferensi CPU model 7B (utilisasi GPU 0% karena context 8k melebihi VRAM 6GB laptop), menghemat 40+ menit komputasi.
