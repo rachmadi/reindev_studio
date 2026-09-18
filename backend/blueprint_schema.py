@@ -628,6 +628,47 @@ def classify_blueprint_error(err_str: Optional[str]) -> BlueprintErrorClass:
     return BlueprintErrorClass.REPRESENTATION_ERROR
 
 
+def decode_canonical_architectural_json(
+    json_str: str,
+    stage: str = "BLUEPRINT"
+) -> Tuple[Optional[Dict[str, Any]], Optional[str], Dict[str, Any]]:
+    """
+    Kanonikal JSON decoding untuk seluruh representasi JSON arsitektur (Blueprint dan Stage-B Assembly).
+    Menerapkan toleransi strict=False untuk karakter kontrol (misal newline/tab pada string scaffold multiline),
+    disertai pembersihan deterministik trailing comma jika terjadi JSONDecodeError awal.
+
+    Mengembalikan (data_dict, error_message, telemetry).
+    """
+    telemetry: Dict[str, Any] = {
+        "decoder_mode": "CANONICAL_STRICT_FALSE",
+        "parse_success": False,
+        "parse_failure_type": None,
+        "stage": stage
+    }
+
+    if not json_str or not str(json_str).strip():
+        telemetry["parse_failure_type"] = "EMPTY_INPUT"
+        return None, "Input JSON kosong", telemetry
+
+    try:
+        data = json.loads(json_str, strict=False)
+    except json.JSONDecodeError as e:
+        cleaned = re.sub(r",\s*([\]}])", r"\1", json_str)
+        try:
+            data = json.loads(cleaned, strict=False)
+            telemetry["decoder_mode"] = "CANONICAL_STRICT_FALSE_TRAILING_COMMA_CLEANED"
+        except Exception:
+            telemetry["parse_failure_type"] = "UNRECOVERABLE_JSON_DECODE_ERROR"
+            return None, f"Gagal mendekode JSON arsitektur: {e}", telemetry
+
+    if not isinstance(data, dict):
+        telemetry["parse_failure_type"] = "NON_OBJECT_ROOT"
+        return None, "Format data bukan berupa JSON object/dictionary", telemetry
+
+    telemetry["parse_success"] = True
+    return data, None, telemetry
+
+
 def parse_blueprint_json_classified(
     raw_text: str
 ) -> Tuple[Optional[ArchitecturalBlueprint], Optional[str], Optional[BlueprintErrorClass]]:
@@ -641,19 +682,8 @@ def parse_blueprint_json_classified(
         err_cls = BlueprintErrorClass.UNRECOVERABLE_REPRESENTATION_ERROR
         return None, f"[{err_cls.value}] {err}", err_cls
 
-    try:
-        data = json.loads(json_str, strict=False)
-    except json.JSONDecodeError as e:
-        cleaned = re.sub(r",\s*([\]}])", r"\1", json_str)
-        try:
-            data = json.loads(cleaned, strict=False)
-        except Exception:
-            err = f"Gagal mendekode JSON blueprint: {e}"
-            err_cls = BlueprintErrorClass.UNRECOVERABLE_REPRESENTATION_ERROR
-            return None, f"[{err_cls.value}] {err}", err_cls
-
-    if not isinstance(data, dict):
-        err = "Format data blueprint bukan berupa JSON object/dictionary"
+    data, err, _ = decode_canonical_architectural_json(json_str, stage="BLUEPRINT")
+    if err or data is None:
         err_cls = BlueprintErrorClass.UNRECOVERABLE_REPRESENTATION_ERROR
         return None, f"[{err_cls.value}] {err}", err_cls
 
@@ -1032,3 +1062,150 @@ def blueprint_to_narrative_markdown(bp: ArchitecturalBlueprint) -> str:
             lines.append(f"```{lang}\n{mod.code_scaffold.strip()}\n```\n")
 
     return "\n".join(lines)
+
+
+def serialize_blueprint_to_canonical_json(
+    bp: Union[ArchitecturalBlueprint, Dict[str, Any]]
+) -> str:
+    """
+    Serialisasi kanonikal deterministik ArchitecturalBlueprint ke format JSON tunggal.
+    Menghasilkan string JSON murni tanpa delimiter eksternal atau pembungkus markdown.
+    Invarian:
+    - Root berupa tepat satu objek JSON valid.
+    - Tidak memuat delimiter eksternal ('=== BLUEPRINT JSON ===', '=== STAGE A', dsb.).
+    - Tidak memuat markdown code fence (```json ... ```).
+    - Preservasi byte-for-byte multiline scaffold.
+    """
+    if isinstance(bp, ArchitecturalBlueprint):
+        if hasattr(bp, "model_dump_json"):
+            return bp.model_dump_json(indent=2)
+        elif hasattr(bp, "model_dump"):
+            return json.dumps(bp.model_dump(), indent=2)
+        elif hasattr(bp, "dict"):
+            return json.dumps(bp.dict(), indent=2)
+    elif isinstance(bp, dict):
+        return json.dumps(bp, indent=2)
+    raise ValueError(f"Cannot serialize object of type {type(bp)} to canonical blueprint JSON")
+
+
+def validate_canonical_architecture_plan_state(
+    architecture_plan: str,
+    canonical_blueprint: Optional[Union[ArchitecturalBlueprint, Dict[str, Any]]] = None,
+    contract: Optional[Dict[str, Any]] = None
+) -> Tuple[bool, List[str]]:
+    """
+    Validasi invarian representasi state kanonikal untuk state["architecture_plan"]:
+    A. valid JSON
+    B. exactly one root object (tidak ada trailing/extra data)
+    C. canonical Blueprint schema valid (conforms to ArchitecturalBlueprint)
+    D. no concatenated JSON blocks
+    E. no Stage A/B delimiters or markdown wrappers
+    F. semantic equivalence with the structured canonical blueprint
+    G. no information loss (scaffold, files, interfaces preserved)
+    H. no obligation loss (interfaces cover expected identifiers)
+    I. no modification of frozen contract semantics
+
+    Mengembalikan (is_valid, error_list). Jika gagal, error bertipe STATE_REPRESENTATION_FAILURE.
+    """
+    errors: List[str] = []
+    if not isinstance(architecture_plan, str):
+        return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan must be a string"]
+
+    stripped = architecture_plan.strip()
+    if not stripped:
+        return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan is empty"]
+
+    # Criterion E: No Stage A/B delimiters or narrative markdown code fences
+    forbidden_markers = [
+        "=== STAGE A",
+        "=== STAGE B",
+        "=== STAGE A OUTPUT ===",
+        "=== STAGE B OUTPUT ===",
+        "=== STAGE A REPAIR OUTPUT ===",
+        "=== STAGE B REPAIR OUTPUT ===",
+        "=== BLUEPRINT JSON ===",
+        "=== END BLUEPRINT JSON ===",
+        "=== SEMANTIC DECISION JSON ===",
+        "```json",
+        "```"
+    ]
+    for marker in forbidden_markers:
+        if marker in architecture_plan:
+            errors.append(f"STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '{marker}'")
+            return False, errors
+
+    # Criterion A & B & D: Valid JSON, exactly one root object, no concatenated JSON
+    decoder = json.JSONDecoder()
+    try:
+        decoded_obj, end_idx = decoder.raw_decode(stripped)
+    except Exception as exc:
+        return False, [f"STATE_REPRESENTATION_FAILURE: architecture_plan is not valid JSON: {exc}"]
+
+    if not isinstance(decoded_obj, dict):
+        return False, ["STATE_REPRESENTATION_FAILURE: architecture_plan root is not a JSON object/dictionary"]
+
+    remaining = stripped[end_idx:].strip()
+    if remaining:
+        return False, [f"STATE_REPRESENTATION_FAILURE: architecture_plan contains extra trailing data or concatenated JSON: '{remaining[:60]}'"]
+
+    # Criterion C: Canonical Blueprint schema valid
+    try:
+        parsed_bp = ArchitecturalBlueprint.model_validate(decoded_obj)
+    except Exception as exc:
+        return False, [f"STATE_REPRESENTATION_FAILURE: architecture_plan violates ArchitecturalBlueprint schema: {exc}"]
+
+    # Criterion F, G, H: Semantic equivalence, no info loss, no obligation loss
+    if canonical_blueprint is not None:
+        expected_dict = canonical_blueprint.model_dump() if hasattr(canonical_blueprint, "model_dump") else (
+            canonical_blueprint if isinstance(canonical_blueprint, dict) else {}
+        )
+
+        # 1. Authoritative target file
+        if decoded_obj.get("authoritative_target_file") != expected_dict.get("authoritative_target_file"):
+            errors.append(
+                f"STATE_REPRESENTATION_FAILURE: authoritative_target_file mismatch: "
+                f"observed '{decoded_obj.get('authoritative_target_file')}' != expected '{expected_dict.get('authoritative_target_file')}'"
+            )
+
+        # 2. File tree
+        obs_tree = sorted(decoded_obj.get("file_tree") or [])
+        exp_tree = sorted(expected_dict.get("file_tree") or [])
+        if obs_tree != exp_tree:
+            errors.append(f"STATE_REPRESENTATION_FAILURE: file_tree mismatch: {obs_tree} != {exp_tree}")
+
+        # 3. Files and scaffolds byte-for-byte preservation
+        obs_files = decoded_obj.get("files") or {}
+        exp_files = expected_dict.get("files") or {}
+        if set(obs_files.keys()) != set(exp_files.keys()):
+            errors.append(f"STATE_REPRESENTATION_FAILURE: files keys mismatch: {set(obs_files.keys())} != {set(exp_files.keys())}")
+        else:
+            for fpath, exp_m in exp_files.items():
+                obs_m = obs_files.get(fpath) or {}
+                exp_scaff = exp_m.get("code_scaffold", "") if isinstance(exp_m, dict) else getattr(exp_m, "code_scaffold", "")
+                obs_scaff = obs_m.get("code_scaffold", "") if isinstance(obs_m, dict) else getattr(obs_m, "code_scaffold", "")
+                if exp_scaff != obs_scaff:
+                    errors.append(f"STATE_REPRESENTATION_FAILURE: code_scaffold corrupted or altered for file '{fpath}'")
+
+        # 4. Interface contracts count and identifiers
+        obs_ifaces = [ifc.get("identifier") for ifc in decoded_obj.get("interface_contracts") or [] if isinstance(ifc, dict)]
+        exp_ifaces = [ifc.get("identifier") for ifc in expected_dict.get("interface_contracts") or [] if isinstance(ifc, dict)]
+        if sorted(obs_ifaces) != sorted(exp_ifaces):
+            errors.append(f"STATE_REPRESENTATION_FAILURE: interface_contracts identifiers mismatch: {obs_ifaces} != {exp_ifaces}")
+
+        # 5. Data models count and names
+        obs_models = [m.get("model_name") for m in decoded_obj.get("data_models") or [] if isinstance(m, dict)]
+        exp_models = [m.get("model_name") for m in expected_dict.get("data_models") or [] if isinstance(m, dict)]
+        if sorted(obs_models) != sorted(exp_models):
+            errors.append(f"STATE_REPRESENTATION_FAILURE: data_models names mismatch: {obs_models} != {exp_models}")
+
+    # Criterion I: No modification of frozen contract semantics
+    if contract and isinstance(contract, dict):
+        if contract.get("status") == "FROZEN":
+            c_ifaces = [ifc.get("identifier") for ifc in contract.get("interface_contracts") or [] if isinstance(ifc, dict)]
+            bp_ifaces = [ifc.get("identifier") for ifc in decoded_obj.get("interface_contracts") or [] if isinstance(ifc, dict)]
+            missing = set(c_ifaces) - set(bp_ifaces)
+            if missing:
+                errors.append(f"STATE_REPRESENTATION_FAILURE: architecture_plan dropped frozen contract interfaces: {sorted(missing)}")
+
+    return len(errors) == 0, errors
+

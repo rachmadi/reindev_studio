@@ -93,6 +93,10 @@ class CanonicalScenario:
     metadata: Dict[str, Any] = field(default_factory=dict)
     confidence: str = "DETERMINISTIC"
 
+    # Test-Harness Adapter Fields (Treatment #1.8.8)
+    is_harness_adapter: bool = False
+    adapter_target_symbols: List[str] = field(default_factory=list)
+
     def __post_init__(self):
         if not self.scenario_id:
             raise CanonicalScenarioIntegrityError("scenario_id cannot be empty")
@@ -122,6 +126,8 @@ class CanonicalScenario:
             "expected_exception": self.expected_exception,
             "confidence": self.confidence,
             "metadata": dict(self.metadata),
+            "is_harness_adapter": self.is_harness_adapter,
+            "adapter_target_symbols": list(self.adapter_target_symbols),
         }
 
     @classmethod
@@ -141,6 +147,8 @@ class CanonicalScenario:
             expected_exception=d.get("expected_exception"),
             confidence=d.get("confidence", "DETERMINISTIC"),
             metadata=dict(d.get("metadata") or {}),
+            is_harness_adapter=bool(d.get("is_harness_adapter", False)),
+            adapter_target_symbols=list(d.get("adapter_target_symbols") or []),
         )
 
     def to_prompt_line(self) -> str:
@@ -150,6 +158,8 @@ class CanonicalScenario:
         if doc:
             parts.append(f" (context: \"{doc}\")")
         parts.append(f"\n    Stimulus: {self.stimulus}")
+        if self.is_harness_adapter and self.adapter_target_symbols:
+            parts.append(f"\n    Adapter Target Symbols: {', '.join(self.adapter_target_symbols)}")
         if self.precondition and self.precondition != "NONE":
             parts.append(f"\n    Precondition: {self.precondition}")
         if self.expected_exception:
@@ -241,20 +251,88 @@ class PythonAstScenarioExtractor:
             return scenarios
 
         fname = Path(file_path).name
+        helper_targets = self._analyze_harness_helpers(tree)
 
         for node in tree.body:
             if isinstance(node, ast.FunctionDef) and (node.name.startswith("test_") or node.name.endswith("_test")):
-                sc = self._extract_function_scenario(fname, node, source_code)
+                sc = self._extract_function_scenario(fname, node, source_code, helper_targets=helper_targets)
                 if sc:
                     scenarios.extend(sc)
 
         return scenarios
 
+    def _analyze_harness_helpers(self, tree: ast.AST) -> Dict[str, List[str]]:
+        """
+        Identifies test-harness helper / adapter functions defined at the module level in a test file
+        and resolves the application target symbols they inspect or delegate to.
+        This allows generic resolution of test-harness adapters without task-specific branching or hardcoding.
+        """
+        imported_names: Set[str] = set()
+        for node in getattr(tree, "body", []):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported_names.add(alias.asname or alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    imported_names.add(alias.asname or alias.name)
+
+        helper_nodes: Dict[str, ast.FunctionDef] = {}
+        for node in getattr(tree, "body", []):
+            if isinstance(node, ast.FunctionDef) and not (node.name.startswith("test_") or node.name.endswith("_test")):
+                helper_nodes[node.name] = node
+
+        if not helper_nodes:
+            return {}
+
+        helper_targets: Dict[str, List[str]] = {name: [] for name in helper_nodes}
+        helper_calls: Dict[str, Set[str]] = {name: set() for name in helper_nodes}
+
+        for name, func_node in helper_nodes.items():
+            targets: Set[str] = set()
+            for n in ast.walk(func_node):
+                # Check hasattr(..., 'Symbol')
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "hasattr":
+                    if len(n.args) >= 2:
+                        val = None
+                        if isinstance(n.args[1], ast.Constant) and isinstance(n.args[1].value, str):
+                            val = n.args[1].value
+                        elif isinstance(n.args[1], ast.Str):
+                            val = n.args[1].s
+                        if val and not val.startswith("__") and val not in ("data", "status_code", "text", "content"):
+                            targets.add(val)
+                # Check imported_mod.Symbol
+                elif isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+                    if n.value.id in imported_names:
+                        sym = n.attr
+                        if not sym.startswith("__"):
+                            targets.add(sym)
+                # Check calls to other helpers
+                elif isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
+                    called = n.func.id
+                    if called in helper_nodes and called != name:
+                        helper_calls[name].add(called)
+
+            helper_targets[name] = sorted(list(targets))
+
+        # Propagate targets across helper call chains
+        changed = True
+        while changed:
+            changed = False
+            for name, called_set in helper_calls.items():
+                for called in called_set:
+                    for t in helper_targets.get(called, []):
+                        if t not in helper_targets[name]:
+                            helper_targets[name].append(t)
+                            changed = True
+
+        return helper_targets
+
     def _extract_function_scenario(
         self,
         source_file: str,
         func_node: ast.FunctionDef,
-        source_code: str
+        source_code: str,
+        helper_targets: Optional[Dict[str, List[str]]] = None
     ) -> List[CanonicalScenario]:
         caller = func_node.name
         # Koreksi 1: Docstring disimpan sebagai contextual metadata, BUKAN acceptance authority
@@ -301,6 +379,19 @@ class PythonAstScenarioExtractor:
                 if c:
                     action_calls.append(c)
 
+        # Test-Harness Adapter Detection (Treatment #1.8.8)
+        helper_targets = helper_targets or {}
+        is_harness_adapter = False
+        adapter_target_symbols: List[str] = []
+
+        for call_repr, _, _ in action_calls:
+            call_fn = call_repr.split("(", 1)[0].strip()
+            if call_fn in helper_targets:
+                is_harness_adapter = True
+                for sym in helper_targets[call_fn]:
+                    if sym not in adapter_target_symbols:
+                        adapter_target_symbols.append(sym)
+
         # 2. Sintesis skenario dari temuan executable
         # Kasus A: with pytest.raises (Explicit Exception Expectation)
         if expected_exceptions:
@@ -321,6 +412,8 @@ class PythonAstScenarioExtractor:
                     observable_output=f"raises {exc_type}",
                     expected_exception=exc_type,
                     metadata=metadata,
+                    is_harness_adapter=is_harness_adapter,
+                    adapter_target_symbols=list(adapter_target_symbols),
                 ))
             return results
 
@@ -342,6 +435,13 @@ class PythonAstScenarioExtractor:
                 stimulus = f"hasattr({hasattr_out})"
             else:
                 stimulus = f"expression in {caller}"
+
+        stim_fn = stimulus.split("(", 1)[0].strip()
+        if stim_fn in helper_targets:
+            is_harness_adapter = True
+            for sym in helper_targets[stim_fn]:
+                if sym not in adapter_target_symbols:
+                    adapter_target_symbols.append(sym)
 
         # Gabungkan outcomes dan observable output
         combined_outcome: Dict[str, Any] = {}
@@ -382,6 +482,8 @@ class PythonAstScenarioExtractor:
             observable_output=obs_output,
             expected_exception=None,
             metadata=metadata,
+            is_harness_adapter=is_harness_adapter,
+            adapter_target_symbols=list(adapter_target_symbols),
         )]
 
     def _find_action_call_in_stmt(self, stmt: ast.AST) -> Optional[Tuple[str, Dict[str, Any], int]]:
@@ -1356,7 +1458,8 @@ def evaluate_scaffold_scenario_compatibility(
                 f.name in sc.stimulus or
                 f.name in sc.caller or
                 f.name in sc.observable_output or
-                f.name in str(sc.expected_outcome)
+                f.name in str(sc.expected_outcome) or
+                (getattr(sc, "is_harness_adapter", False) and f.name in getattr(sc, "adapter_target_symbols", []))
             ):
                 matched_facts.append(f)
 
@@ -1365,6 +1468,11 @@ def evaluate_scaffold_scenario_compatibility(
             expected_repr["expected_exception"] = sc.expected_exception
 
         if not matched_facts:
+            evidence_msg = (
+                f"Scaffold does not define callable matching adapter target symbols {sc.adapter_target_symbols} for adapter '{sc.stimulus}'."
+                if (getattr(sc, "is_harness_adapter", False) and getattr(sc, "adapter_target_symbols", None))
+                else f"Scaffold does not define callable, constructor, or endpoint matching scenario stimulus '{sc.stimulus}'."
+            )
             items.append(ScaffoldScenarioCompatibilityItem(
                 scenario_id=sc.scenario_id,
                 compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
@@ -1372,7 +1480,7 @@ def evaluate_scaffold_scenario_compatibility(
                 source_reference=sc.source_reference,
                 observed_scaffold_facts={},
                 expected_behavior=expected_repr,
-                evidence=f"Scaffold does not define callable, constructor, or endpoint matching scenario stimulus '{sc.stimulus}'.",
+                evidence=evidence_msg,
                 causal_status=CausalStatus.VIOLATED.value
             ))
             continue

@@ -855,3 +855,23 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - `dokumentasi-pengembangan/commit_history.md`: Pemutakhiran riwayat commit formal.
   - `dokumentasi-pengembangan/context_drift_log.md`: Evaluasi context drift dan kepatuhan batasan arsitektur.
 
+---
+
+### [18 September 2026] Treatments #1.8.5 s.d. #1.8.9 & Forensic Investigation Contract Gate → Developer Boundary v1
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(architect)` / `test` / `docs(experiment)`
+- **Waktu**: 2026-09-18 11:45 WIB
+- **Status**: TERVERIFIKASI PENUH (174/174 treatment tests PASS, Pre-Flight Gates A–I 996/996 tests PASS, 1x3 Pilot Executed, Formal Forensic Audit v1 Complete)
+- **Cakupan Perubahan**:
+  - `backend/architect_staged.py` & `backend/semantic_serializer.py`: Implementasi Dekomposisi Stage B (Stage A Semantic Mapping, Stage B-1 Element Realization, Stage B-2 Relationship Bindings, Stage B-3 Serializer).
+  - `backend/blueprint_schema.py`: Penegakan invarian representasi kanonikal `validate_canonical_architecture_plan_state` dan serialisasi deterministik `serialize_blueprint_to_canonical_json`.
+  - `backend/agents/architect.py`: Integrasi decomposed synthesis, selective unfreeze, isolated retry loop, dan decoupling scaffold payload.
+  - `backend/context_assembler.py` & `backend/b2_repair_delivery.py`: Implementasi Compact Semantic Repair Packet v1 untuk mereduksi bloat konteks pada Stage B-2 (< 12.000 karakter).
+  - Test suites: `test_architect_decoder_consistency_v1.py`, `test_architect_semantic_grounding_v1.py`, `test_architect_semantic_serializer_v1.py`, `test_architect_staged_decision_v1.py`, `test_b2_compact_packet_v1.py`, `test_b2_repair_delivery_v2.py`, `test_canonical_architecture_plan_state_v1.py`, `test_decomposed_stage_b_decision_v1.py`, `test_decoupled_stage_b_assembly_v1.py`, `test_staged_repair_lifecycle_v1.py` (174 passed).
+  - Laporan Riset & Forensik:
+    - `forensic_investigation_treatment1_8_7_v1.md`: Audit forensik 100% peliputan semantik Stage A vs JSON syntax escape failure.
+    - `treatment1_8_8_decoupled_stage_b_scaffold_assembly_pilot_1x3_v1.md`: Evaluasi eliminasi error delimiter JSON melalui pemisahan artefak kode mentah.
+    - `treatment1_8_9_b2_compact_packet_pilot_1x3_report.md`: Evaluasi pemadatan paket B2 (Stage B-1 PASS 3/3, Stage B-2 VALID 3/3, B3 Serializer SUCCESS 3/3).
+    - `forensic_investigation_treatment1_8_9_v1.md`: Investigasi forensik independen batas Contract Gate → Developer yang membuktikan batas Developer belum pernah teruji (0/3) dan mengidentifikasi 2 defek deterministik batas pipeline.
+
+

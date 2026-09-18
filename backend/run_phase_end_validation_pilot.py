@@ -510,6 +510,10 @@ def execute_single_pilot_run(
     trace_file = getattr(tracer, "trace_file", None)
     otrr_info = calculate_trace_otrr(trace_file) if trace_file else {}
 
+    final_contract = final_state.get("contract") or {}
+    contract_prov = final_contract.get("provenance", {}) if isinstance(final_contract, dict) else {}
+    staged_metrics = contract_prov.get("staged_metrics", {}) if isinstance(contract_prov, dict) else {}
+
     run_summary = {
         "run_id": run_id,
         "task_id": task_id,
@@ -533,6 +537,7 @@ def execute_single_pilot_run(
         "otrr": otrr_info.get("otrr", 0.0),
         "otrr_percent": otrr_info.get("otrr_percent", 0.0),
         "otrr_details": otrr_info,
+        "staged_metrics": staged_metrics,
         "experiment_mode": experiment_mode,
         "selected_tasks": selected_tasks if selected_tasks is not None else [task_id],
         "available_tasks": available_tasks if available_tasks is not None else [t["task_id"] for t in TASKS],

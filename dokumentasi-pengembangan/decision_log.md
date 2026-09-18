@@ -334,3 +334,60 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
   5. Menetapkan batas kapabilitas kognitif (*clean cognitive capability ceiling*) model `qwen2.5-coder:7b`: model 7B mengalami interferensi representasi (*field cross-talk*) dan *repair collapse* saat menangani skema Pydantic relasional multi-entitas yang padat.
 * **Dampak**: Membuktikan batas pemisahan arsitektur tata kelola vs batas kapasitas penalaran intrinsik model koding 7B, mengunci eksperimen Treatment #1.8.4 secara definitif sesuai Stop Rule.
 
+---
+
+### [D-124] Treatment #1.8.5 — Universal Semantic Decision Architecture (2026-09-17)
+* **Konteks**: Model 7B kerap terbebani oleh sintaks formal field Pydantic tingkat rendah saat merancang arsitektur.
+* **Keputusan / Temuan**:
+  1. Memisahkan secara tegas tanggung jawab pemikiran arsitektural semantik abstrak dari serialisasi representasi teknis JSON/Pydantic.
+  2. Agen Architect hanya diminta memancarkan format semantik kanonikal `SemanticArchitecturalPlan` (`semantic_decisions`).
+  3. Serializer Python deterministik (`backend/semantic_serializer.py`) memetakan keputusan semantik menjadi `ArchitecturalBlueprint` yang presisi secara matematis.
+* **Dampak**: Menghilangkan kegagalan validasi skema Pydantic pada level parsing dasar model dan menjaga integritas 4 pilar arsitektur.
+
+---
+
+### [D-125] Treatment #1.8.6 — Decomposed Stage B Decisions & Canonical Architecture Plan Invariant (2026-09-17)
+* **Konteks**: Sintesis monolitik Stage B sering memicu konflik antara pemetaan elemen (identitas & peran) vs penyambungan relasi/binding (route, signature, dependensi).
+* **Keputusan / Temuan**:
+  1. Mendekomposisi Stage B menjadi dua sub-tahap diskrit: Stage B-1 (Element Realization) dan Stage B-2 (Relationship Bindings).
+  2. Menerapkan serialisasi deterministik Stage B-3 (`assemble_decomposed_stage_b_blueprint`) untuk menggabungkan state tersegel Stage A, Stage B-1, dan Stage B-2.
+  3. Menegakkan invarian representasi kanonikal `validate_canonical_architecture_plan_state` untuk menjamin `architecture_plan` pada state graf berformat JSON kanonikal tunggal tanpa kontaminasi delimiter markdown naratif.
+* **Dampak**: Menghadirkan modularitas representasi arsitektur bertingkat yang terisolasi dan mudah diverifikasi per komponen.
+
+---
+
+### [D-126] Treatment #1.8.7 — Semantic Grounding Prompt Fidelity & Forensic Investigation #1.8.7 (2026-09-17)
+* **Konteks**: Perlu pembuktian apakah kegagalan kontrak disebabkan oleh model melupakan acceptance obligations atau murni masalah representasi.
+* **Keputusan / Temuan**:
+  1. Memperkuat hierarki bukti epistemik (Acceptance Authority > Authoritative Obligations > Canonical Scenarios > Requirements) pada prompt Stage A dan Stage B.
+  2. Audit forensik terhadap Pilot 1x3 membuktikan 100% obligations terpenuhi di Stage A (3/3), namun `fastapi_t1` tertahan oleh `STAGE_B_JSON_PARSE_ERROR` akibat unescaped newline pada kode Python di dalam JSON string.
+* **Dampak**: Menemukan akar masalah krusial pembebanan kode scaffold multiline di dalam field JSON string dan menginisiasi arsitektur decoupled scaffold.
+
+---
+
+### [D-127] Treatment #1.8.8 — Decoupled Stage B Scaffold Assembly (2026-09-17)
+* **Konteks**: Pemyematan kode implementasi multiline ke dalam JSON string (`"scaffold_code": "..."`) memicu error delimiter JSON secara berulang pada model 7B.
+* **Keputusan / Temuan**:
+  1. Memisahkan artefak kode scaffold mentah dari blok JSON keputusan relasional menggunakan pembungkus deterministik `=== FILE: <path> === ... === END FILE ===`.
+  2. Parser deterministik Python `extract_stage_b_scaffold_payload()` mengekstrak berkas kode dengan preservasi karakter 100%.
+  3. Hasil Pilot 1x3: Mengeliminasi error parsing JSON secara total (0 kejadian). Namun, pada task `flutter_t1`, volume konteks yang terlalu besar memicu error `BUDGET_EXCEEDED` (> 12.000 karakter).
+* **Dampak**: Berhasil memisahkan representasi kode mentah dari logika relasional arsitektur secara bersih.
+
+---
+
+### [D-128] Treatment #1.8.9 — B2 Compact Semantic Repair Packet v1 & Forensic Investigation v1 (2026-09-18)
+* **Konteks**: Mengatasi bottleneck kepadatan konteks Stage B-2 dan menguji apakah model dapat memperbaiki keputusan arsitektural yang salah hingga mencapai Developer.
+* **Keputusan / Temuan**:
+  1. Merancang B2 Compact Semantic Repair Packet v1 yang memadatkan konteks Stage B-2 agar berada di bawah batas 12.000 karakter dengan tetap menjaga integritas semantik yang dilindungi.
+  2. Hasil Pilot 1x3:
+     - Stage B-1: 3/3 PASS (100%)
+     - Stage B-2: 3/3 VALID (100%)
+     - B-completeness: 3/3 = 1.0 (100%)
+     - B3 Serialization: 3/3 SUCCESS (100%)
+  3. Investigasi Forensik Independen membuktikan:
+     - **Batas Developer BELUM PERNAH TERUJI**: 0 dari 3 run (0/3) berhasil mencapai admission Developer.
+     - Ditemukan dua defek deterministik batas pipeline: (a) pemotongan blok `ALLOWED` pada `sec_07_repair_boundary` akibat kompresi konteks di `context_assembler.py` yang memicu false `DELIVERY_FAILURE` pada Turn 1 `fastapi_t1`; (b) pengecekan substring naive `"```"` pada `validate_canonical_architecture_plan_state` yang menggugurkan blueprint valid `flutter_t1` karena kode scaffold di dalamnya memuat backtick markdown.
+     - Hanya `cli_t1` yang menguji kapabilitas murni model pada repair turn (Turns 1 & 2), di mana model 7B berulang kali mempertahankan signature 0-argumen terhadap call-site Oracle 2-argumen.
+* **Dampak**: Menemukan lokasi presisi bottleneck terakhir batas pipeline (Contract Gate $\to$ Developer Boundary) yang harus diperbaiki secara bedah deterministik sebelum kapabilitas Developer dapat diuji secara sah.
+
+

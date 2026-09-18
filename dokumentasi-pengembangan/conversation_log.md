@@ -2822,3 +2822,31 @@ Metodologi: Rumuskan hipotesis H1.7: Penguatan Evidence-Grounded Requirement Com
 - **Asisten**:
   - Menyinkronkan seluruh dokumen tata kelola IIDD sesuai timestamp riil: `decision_log.md` (D-119 s.d. D-123), `conversation_log.md`, `durasi_per_fitur.md` (Sesi 5 dengan durasi Dev, Test, Forensics/Doc presisi serta kalkulasi Grand Total), `error_log.md` (Kasus E-069, E-070, E-071), `commit_history.md`, dan `context_drift_log.md`.
   - Menyiapkan working tree untuk commit git dan push ke repositori GitHub.
+
+---
+
+### Sesi: Treatments #1.8.5 s.d. #1.8.8 — Decomposed Stage B Decisions & Decoupled Scaffolding (17 September 2026, 14:45 – 22:00 WIB)
+- **Pengguna (Intent Architect)**: Menginstruksikan pemisahan arsitektur keputusan semantik abstrak dari serialisasi Pydantic (#1.8.5), dekomposisi Stage B menjadi Stage B-1 (Realization) dan Stage B-2 (Bindings) (#1.8.6), penguatan fidelitas grounding semantik (#1.8.7) dan investigasi forensik terhadap kegagalan sintaks escape multiline Python, serta decoupling scaffold payload (#1.8.8) untuk memisahkan berkas kode implementasi dari blok JSON relasional.
+- **Asisten**:
+  - Mengimplementasikan `backend/semantic_serializer.py` dan `backend/architect_staged.py`.
+  - Menegakkan invarian representasi kanonikal `validate_canonical_architecture_plan_state` di `backend/blueprint_schema.py`.
+  - Melakukan audit forensik empiris 1x3 (#1.8.7) yang membuktikan 100% obligation coverage pada Stage A dan mengungkap akar masalah malformasi escape string JSON pada kode multiline.
+  - Mengembangkan parser deterministik `extract_stage_b_scaffold_payload()` pada Treatment #1.8.8 yang berhasil mengeliminasi error JSON 100%, namun mendeteksi bottleneck kepadatan konteks pada task Flutter (`BUDGET_EXCEEDED` > 12.000 karakter).
+
+---
+
+### Sesi: Treatment #1.8.9 — B2 Compact Semantic Repair Packet & Forensic Investigation v1 (18 September 2026, 00:30 – 11:45 WIB)
+- **Pengguna (Intent Architect)**: Menginstruksikan implementasi Treatment #1.8.9 (B2 Compact Semantic Repair Packet v1) untuk memangkas bloat konteks Stage B-2 di bawah batas 12.000 karakter. Setelah eksekusi Pilot 1x3, menginstruksikan investigasi forensik independen murni (FORENSIC ONLY, NO CODE, NO PROMPT, NO RERUN) untuk melacak titik divergensi pertama pada batas Contract Gate $\to$ Developer.
+- **Asisten**:
+  - Mengimplementasikan pemadatan paket semantik pada `backend/b2_repair_delivery.py` dan `backend/context_assembler.py` (174 unit tests PASS).
+  - Menjalankan Pre-Flight Gates A–I (996 passed) dan Controlled Pilot 1x3:
+    - Stage B-1: 3/3 PASS (100%)
+    - Stage B-2: 3/3 VALID (100%)
+    - B-completeness: 3/3 = 1.0 (100%)
+    - B3 Serialization: 3/3 SUCCESS (100%)
+  - Melakukan investigasi forensik menyeluruh terhadap trace ketiga run dan menerbitkan laporan formal di `dokumentasi-pengembangan/experiments/forensic_investigation_treatment1_8_9_v1.md`.
+  - Menjawab pertanyaan kunci IA secara tegas:
+    1. **Apakah kapabilitas Developer teruji?** **TIDAK. 0 dari 3 run mencapai Developer admission.**
+    2. **Apakah masih ada defek deterministik pipeline?** **YA.** Teridentifikasi 2 defek: pemotongan blok `ALLOWED` pada `sec_07_repair_boundary` akibat kompresi konteks, dan pengecekan substring naive `"```"` pada `validate_canonical_architecture_plan_state`.
+  - Memberikan rekomendasi tunggal berbasis bukti empiris: surgical pipeline repair pada 2 defek batas tersebut sebelum menguji ulang kapabilitas Developer.
+

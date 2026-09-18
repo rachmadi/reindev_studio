@@ -355,5 +355,37 @@ Dokumen ini melacak perbedaan antara intensi awal dan implementasi teknis aktual
 ### Severity Drift Keseluruhan:
 **Major (Clean Scientific Boundary Determination)** — Keberhasilan metodologis mutlak dalam membedakan keandalan arsitektur tata kelola deterministik (yang berhasil 100% fail-closed tanpa kebocoran downstream) dari batas kapasitas representasional intrinsik model parameter kecil (`qwen2.5-coder:7b`).
 
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI TREATMENTS #1.8.5 s.d. #1.8.9 & FORENSIC INVESTIGATION v1 — 2026-09-17 s.d. 2026-09-18
+## ═══════════════════════════════════════════════════════════════════════════
+
+### Bagian A: Perubahan Scope dan Pendekatan
+| Deskripsi Perubahan | Dampak terhadap Scope | Sumber |
+|---|---|---|
+| Universal Semantic Decision Architecture (D-124) | Positif (Memisahkan penalaran arsitektur semantik dari serialisasi sintaks Pydantic) | Intent Architect & Agen |
+| Decomposed Stage B Decisions B1/B2/B3 & Invariant Lock (D-125) | Positif (Mendekomposisi pemetaan elemen vs relasi binding serta menjamin kemurnian representasi) | Intent Architect & Agen |
+| Epistemic Evidence Hierarchy & Prompt Fidelity Rules (D-126) | Positif (Menjamin 100% peliputan semantik Stage A dan mencegah halusinasi penamaan) | Intent Architect & Agen |
+| Decoupled Raw Scaffold Assembly (D-127) | Positif (Mengeliminasi error delimiter JSON kode multiline dengan pemisahan berkas mentah) | Intent Architect & Agen |
+| B2 Compact Semantic Repair Packet v1 (D-128) | Positif (Mengatasi bottleneck kepadatan konteks Stage B-2 < 12.000 karakter) | Intent Architect & Agen |
+| Investigasi Forensik Independen Contract Gate $\to$ Developer (D-128) | Positif (Melacak batas divergensi pertama dan membuktikan batas Developer belum teruji) | Intent Architect & Agen |
+
+### Bagian B: Keputusan Mandiri Agen
+- **B1 (Penambahan di luar spesifikasi):**
+  - Implementasi 10 suite unit test spesifik (`test_architect_staged_decision_v1.py`, `test_decomposed_stage_b_decision_v1.py`, `test_decoupled_stage_b_assembly_v1.py`, `test_b2_compact_packet_v1.py`, dsb., 174 tests total).
+  - Ekstraksi jejak telemetri mendalam per event untuk mengidentifikasi akar masalah kompresi konteks `sec_07_repair_boundary` dan substring check `"```"` pada `validate_canonical_architecture_plan_state`.
+- **B2 (Keputusan Teknis):**
+  - Penegakan disiplin forensik mutlak: zero code change, zero prompt modification, zero rerun sebelum laporan forensik diserahkan kepada Intent Architect.
+
+### Ringkasan Distribusi Sumber Drift Sesi 2026-09-17 s.d. 2026-09-18:
+- **Intent Architect:** 70.0% (Mandat dekomposisi Stage B, decoupled scaffold, compact repair packet, audit forensik murni, penegakan Stop Rule)
+- **Agen:** 30.0% (Implementasi arsitektur bertingkat, serializer semantik, suite 174 unit tests, rekonstruksi forensik matematis)
+- **Eksternal:** 0.0%
+
+### Severity Drift Keseluruhan:
+**Major (Clean Boundary Resolution & Confounder Elimination)** — Pergeseran ilmiah yang sangat krusial: berhasil mengisolasi 2 defek deterministik batas pipeline terakhir (`context_assembler` truncation dan `blueprint_schema` false positive) yang sebelumnya mengaburkan evaluasi kapabilitas Developer.
+
+
 
 

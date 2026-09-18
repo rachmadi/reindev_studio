@@ -897,10 +897,55 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Treatment #1.8.4):
-- **Diselesaikan Mandiri oleh Agen:** 30 kasus (termasuk E-065, E-068)
+### Kasus E-072: JSON String Scaffolding Delimiter Failure in Monolithic Stage B (FastAPI T1 Pilot #1.8.7)
+- **Waktu:** 2026-09-17 ~20:15 WIB (Pilot `fastapi_t1` Treatment #1.8.7)
+- **Tingkat Keparahan:** High (Syntax/Serialization Crash)
+- **Gejala:** Blueprint gagal diparsing dengan error: `STAGE_B_JSON_PARSE_ERROR: Invalid JSON in Stage B output: Gagal mendekode JSON arsitektur: Expecting ',' delimiter: line 23 column 14 (char 489)`.
+- **Akar Masalah:** Model menempatkan kode scaffold Python multiline langsung ke dalam properti JSON string `"scaffold_code"`. Karakter newline dan kutip tidak ter-escape secara sempurna oleh model 7B, memicu kegagalan fatal parser `json.loads()`.
+- **Tindakan Korektif:** Arsitektur Decoupled Scaffold (#1.8.8) memisahkan payload kode implementasi ke dalam blok deterministik `=== FILE: <path> ===`.
+- **Sumber Solusi:** REINDEV ARCHITECTURE ENGINE.
+- **Status:** Tuntas Terselesaikan via Treatment #1.8.8.
+
+---
+
+### Kasus E-073: Context Budget Exceeded in Uncompacted Stage B-2 Packet (Flutter T1 Pilot #1.8.8)
+- **Waktu:** 2026-09-17 ~21:30 WIB (Pilot `flutter_t1` Treatment #1.8.8)
+- **Tingkat Keparahan:** High (Context Density Bottleneck)
+- **Gejala:** Eksekusi Stage B-2 task Flutter melebihi anggaran karakter maksimum: `BUDGET_EXCEEDED: 12948 chars > 12000 chars`.
+- **Akar Masalah:** Penyertaan seluruh artefak kode scaffold dan diagnostik lengkap tanpa kompresi semantik menyebabkan prompt Stage B-2 membengkak melampaui kapasitas jendela konteks.
+- **Tindakan Korektif:** Implementasi B2 Compact Semantic Repair Packet v1 (#1.8.9) yang memangkas redundansi dan membatasi ukuran konteks di bawah 12.000 karakter.
+- **Sumber Solusi:** REINDEV CONTEXT ASSEMBLER.
+- **Status:** Tuntas Terselesaikan via Treatment #1.8.9.
+
+---
+
+### Kasus E-074: Repair Context Atomic Boundary Truncation in Context Compression (FastAPI T1 Turn 1 Pilot #1.8.9)
+- **Waktu:** 2026-09-18 ~07:20 WIB (Pilot `fastapi_t1` Treatment #1.8.9 Turn 1)
+- **Tingkat Keparahan:** Critical (Deterministic Pipeline Boundary Defect)
+- **Gejala:** Eksekusi Turn 1 Architect repair langsung gagal tanpa memanggil LLM: `ARCHITECT_CONTEXT_DELIVERY_FAILURE: Repair boundary atomic payload incomplete (missing: ALLOWED)`.
+- **Akar Masalah:** Logika kompresi konteks pada `context_assembler.py` memotong seksi `sec_07_repair_boundary` di tengah-tengah untuk mengejar kuota 12.000 karakter, sehingga blok `ALLOWED` terpotong. Validator pengiriman deterministik `validate_delivery_payload()` mendeteksi ketiadaan blok wajib tersebut dan melakukan fail-closed sebelum model diinisiasi.
+- **Tindakan Korektif:** Teridentifikasi secara definitif dalam Laporan Forensik #1.8.9. Rekomendasi perbaikan: melindungi `sec_07_repair_boundary` dari pemotongan parsial atau mengunci blok `ALLOWED`.
+- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9.
+- **Status:** Teridentifikasi Secara Presisi (Menunggu Surgical Pipeline Repair).
+
+---
+
+### Kasus E-075: Naive Outer Backtick Check on Serialized JSON Containing Embedded Scaffolds (Flutter T1 Pilot #1.8.9)
+- **Waktu:** 2026-09-18 ~07:30 WIB (Pilot `flutter_t1` Treatment #1.8.9)
+- **Tingkat Keparahan:** Critical (Deterministic State Validator Defect)
+- **Gejala:** State kontrak dibatalkan sebelum evaluasi Contract Gate: `STATE_REPRESENTATION_FAILURE: architecture_plan contains forbidden delimiter or wrapper '```'`.
+- **Akar Masalah:** Fungsi `validate_canonical_architecture_plan_state` di `blueprint_schema.py` melakukan pencarian substring global `if "```" in architecture_plan:`. Ketika scaffold kode Dart di dalam `bp.files["lib/card_metric.dart"].code_scaffold` memuat code fence markdown (````dart`) atau docstring backtick, validator salah mengidentifikasi seluruh dokumen JSON sebagai terkontaminasi markdown luar.
+- **Tindakan Korektif:** Teridentifikasi secara definitif dalam Laporan Forensik #1.8.9. Rekomendasi perbaikan: membatasi pengecekan code fence hanya pada wrapper terluar dokumen JSON.
+- **Sumber Solusi:** INVESTIGASI FORENSIK #1.8.9.
+- **Status:** Teridentifikasi Secara Presisi (Menunggu Surgical Pipeline Repair).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Treatment #1.8.9):
+- **Diselesaikan Mandiri oleh Agen:** 32 kasus (termasuk E-065, E-068, E-072, E-073)
 - **Diselesaikan atas Intervensi IA:** 7 kasus
 - **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
-- **Kasus Forensik & Rekomendasi Terbuka:** 7 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071)
-- **Total Galat Terdokumentasi:** 71 kasus (E-001 s/d E-071)
+- **Kasus Forensik & Rekomendasi Terbuka:** 9 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071, E-074, E-075)
+- **Total Galat Terdokumentasi:** 75 kasus (E-001 s/d E-075)
+
 

@@ -70,3 +70,9 @@ class SquadState(TypedDict):
     reviewer_output_classification: Optional[Dict[str, Any]]  # Hasil classify_reviewer_output(): classification, terminal_status, evidence_markers_found, dll.
     reviewer_retry_count: Optional[int]    # Jumlah retry Reviewer yang sudah dilakukan karena output INVALID (default 0)
     reviewer_retry_budget: Optional[int]   # Budget retry Reviewer terkontrol (default 1 → total 2 Reviewer attempts max)
+
+    # Treatment #1.8.6 Canonical Architecture Plan State (v1)
+    canonical_blueprint: Optional[Dict[str, Any]]    # Structured canonical ArchitecturalBlueprint dictionary
+    stage_a_semantic: Optional[Dict[str, Any]]       # Structured Stage A semantic state (Obligation mappings)
+    stage_b_semantic: Optional[Dict[str, Any]]       # Structured Stage B semantic state (Assembly)
+

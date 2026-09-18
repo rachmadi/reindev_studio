@@ -1291,3 +1291,78 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
   - Tester LLM Invocations: 0 (100% bypassed)
 * **Summary File**: `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_summary.json`
 * **Laporan Evaluasi**: `dokumentasi-pengembangan/experiments/treatment1_6_ornith9b_pilot_evaluation_report.md`
+
+---
+
+### [VAL-T184] Pilot Evaluation 1x3 — Treatment #1.8.4 (2026-09-16)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.4 Universal Canonical Contract Grounding v1
+* **Test Suite Baseline**: 822 passed (100% PASS)
+* **Hasil Pengujian**:
+  - `fastapi_t1`: FAIL (0/5 PASS, 0 loops, schema dict mismatch, durasi 310.47s)
+  - `cli_t1`: FAIL (0/5 PASS, 0 loops, downstream helper mismatch, durasi 275.86s)
+  - `flutter_t1`: FAIL (0/2 PASS, 0 loops, field cross-talk, durasi 261.32s)
+* **Metrik Integritas**: Oracle SHA-256 Intact 3/3, Downstream Leakage 0, QA Bypassed 100%.
+* **Laporan Lengkap**: `dokumentasi-pengembangan/experiments/treatment1_8_4_universal_canonical_contract_grounding_pilot_1x3_v1.md`
+
+---
+
+### [VAL-T185] Pilot Evaluation 1x3 — Treatment #1.8.5 (2026-09-17)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.5 Universal Semantic Decision v1
+* **Hasil Pengujian**:
+  - Semantic decision parsing sukses memetakan kebutuhan abstrak ke blueprint, namun membuktikan kelemahan pada pembagian monolithic output Stage B.
+* **Laporan Lengkap**: `dokumentasi-pengembangan/experiments/treatment1_8_5_universal_semantic_decision_pilot_1x3_v1.md`
+
+---
+
+### [VAL-T186] Pilot Evaluation 1x3 — Treatment #1.8.6 (2026-09-17)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.6 Staged Architectural Decision v1
+* **Hasil Pengujian**:
+  - Stage B didekomposisi menjadi B-1 dan B-2. Memverifikasi invarian representasi `validate_canonical_architecture_plan_state`.
+* **Laporan Lengkap**: `dokumentasi-pengembangan/experiments/treatment1_8_6_staged_architectural_decision_pilot_1x3_v1.md`
+
+---
+
+### [VAL-T187] Pilot Evaluation 1x3 — Treatment #1.8.7 & Forensic Audit v1 (2026-09-17)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.7 Semantic Grounding Prompt Fidelity v1
+* **Hasil Pengujian**:
+  - Stage A membuktikan 100% obligation coverage (3/3). `fastapi_t1` tertahan oleh syntax escape failure kode multiline Python di dalam JSON string.
+* **Laporan Lengkap**: `dokumentasi-pengembangan/experiments/treatment1_8_7_semantic_grounding_prompt_fidelity_pilot_1x3_v1.md`
+* **Laporan Forensik**: `dokumentasi-pengembangan/experiments/forensic_investigation_treatment1_8_7_v1.md`
+
+---
+
+### [VAL-T188] Pilot Evaluation 1x3 — Treatment #1.8.8 (2026-09-17)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.8 Decoupled Stage B Scaffold Assembly v1
+* **Hasil Pengujian**:
+  - Eliminasi 100% error escape JSON. Teridentifikasi bottleneck baru pada task Flutter: kepadatan konteks Stage B-2 melebihi batas (BUDGET_EXCEEDED).
+* **Laporan Lengkap**: `dokumentasi-pengembangan/experiments/treatment1_8_8_decoupled_stage_b_scaffold_assembly_pilot_1x3_v1.md`
+
+---
+
+### [VAL-T189] Pilot Evaluation 1x3 — Treatment #1.8.9 & Forensic Investigation v1 (2026-09-18)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Treatment #1.8.9 B2 Compact Semantic Repair Packet v1
+* **Pre-Flight Gates A–I**: 996 passed (100% PASS)
+* **Hasil Pengujian**:
+  - `fastapi_t1`: DELIVERY_FAILURE (0/5 PASS, 0 loops, context compression atomic truncation, durasi 280.70s)
+  - `cli_t1`: REJECTED (0/5 PASS, 0 loops, 0-arg call-shape persisted in Turns 0-2, durasi 363.84s)
+  - `flutter_t1`: STATE_REPRESENTATION_FAILURE (0/2 PASS, 0 loops, false positive backtick check, durasi 214.05s)
+* **Metrik Staged**:
+  - Stage A Valid: 3/3 (100%)
+  - Stage B-1 Valid: 3/3 (100%)
+  - Stage B-2 Valid: 3/3 (100%)
+  - Stage B Completeness: 3/3 = 1.0 (100%)
+  - B3 Serialization Success: 3/3 (100%)
+* **Metrik Integritas**:
+  - Oracle SHA-256 Intact: 3/3 (100%)
+  - Developer Reached: 0/3 (0% — Belum teruji)
+  - QA Tester Bypassed: 100%
+* **Summary File**: `dokumentasi-pengembangan/experiments/summary_treatment1_8_9_b2_compact_packet_pilot_1x3.json`
+* **Laporan Pilot**: `dokumentasi-pengembangan/experiments/treatment1_8_9_b2_compact_packet_pilot_1x3_report.md`
+* **Laporan Forensik Independen**: `dokumentasi-pengembangan/experiments/forensic_investigation_treatment1_8_9_v1.md`
+

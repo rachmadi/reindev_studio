@@ -1068,11 +1068,49 @@ orecursedirs) | 19:39:20 | 19:40:33 | 73 s | 1.22 m (0.02 j) |
 
 ---
 
+## ═══════════════════════════════════════════════════════════════════════════
+## SESI 8: TREATMENT #1.8.5 s.d. #1.8.9 & FORENSIC CONTRACT GATE AUDIT — 2026-09-17 14:45 WIB s.d. 2026-09-18 11:45 WIB
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Aktivitas Pengembangan (Development Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Implementasi Universal Semantic Decision Architecture Treatment #1.8.5 (`backend/semantic_serializer.py`) | 14:45:00 | 15:45:00 | 3.600 s | 60.00 m (1.00 j) |
+| 2 | Dekomposisi Stage B (B-1 Realization, B-2 Bindings, B-3 Serializer) Treatment #1.8.6 & Invarian Kanonikal (`architect_staged.py`, `blueprint_schema.py`) | 16:00:00 | 17:00:00 | 3.600 s | 60.00 m (1.00 j) |
+| 3 | Implementasi Decoupled Stage B Scaffold Assembly Treatment #1.8.8 (`extract_stage_b_scaffold_payload()`) | 20:30:00 | 21:15:00 | 2.700 s | 45.00 m (0.75 j) |
+| 4 | Implementasi B2 Compact Semantic Repair Packet v1 Treatment #1.8.9 (`backend/b2_repair_delivery.py`, `context_assembler.py`) | 00:30:00 | 01:15:00 | 2.700 s | 45.00 m (0.75 j) |
+| | **Subtotal Waktu Pengembangan** | | | **12.600 s** | **210.00 m (3.50 jam)** |
+
+### 2. Aktivitas Pengujian Terkontrol & Uji Ulang (Testing Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.5 (Verifikasi pemetaan semantik abstrak) | 15:45:00 | 16:15:00 | 1.800 s | 30.00 m (0.50 j) |
+| 2 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.6 (Verifikasi dekomposisi B1/B2/B3 & decoder) | 17:15:00 | 17:45:00 | 1.800 s | 30.00 m (0.50 j) |
+| 3 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.7 (Evaluasi fidelitas prompt semantik) | 20:00:00 | 20:35:00 | 2.100 s | 35.00 m (0.58 j) |
+| 4 | Eksekusi Unit Tests & Pilot 1x3 Treatment #1.8.8 (Verifikasi decoupling scaffold & isolasi konteks) | 21:15:00 | 21:45:00 | 1.800 s | 30.00 m (0.50 j) |
+| 5 | Eksekusi Test Suites Treatment (174 tests), Pre-Flight Gates A–I (996 tests), & Controlled Pilot 1x3 Treatment #1.8.9 (858.59s compute) | 07:15:00 | 07:55:00 | 2.400 s | 40.00 m (0.67 j) |
+| | **Subtotal Waktu Pengujian** | | | **9.900 s** | **165.00 m (2.75 jam)** |
+
+### 3. Aktivitas Analisis Forensik & Dokumentasi (Forensics & Governance Time):
+| No | Aktivitas / Komponen | Waktu Mulai | Waktu Selesai | Durasi (Detik) | Durasi (Menit / Jam) |
+|---|---|---|---|---|---|
+| 1 | Investigasi Forensik Komprehensif Treatment #1.8.7 (`forensic_investigation_treatment1_8_7_v1.md`) | 20:35:00 | 21:35:00 | 3.600 s | 60.00 m (1.00 j) |
+| 2 | Investigasi Forensik Independen Contract Gate $\to$ Developer Boundary v1 Treatment #1.8.9 (`forensic_investigation_treatment1_8_9_v1.md`) | 08:00:00 | 09:15:00 | 4.500 s | 75.00 m (1.25 j) |
+| 3 | Pemutakhiran Menyeluruh Dokumen Tata Kelola IIDD Sesuai Timestamp Riil (`commit_history.md`, `decision_log.md`, `error_log.md`, `validation_log.md`, `durasi_per_fitur.md`, `conversation_log.md`, `context_drift_log.md`) | 11:15:00 | 11:45:00 | 1.800 s | 30.00 m (0.50 j) |
+| | **Subtotal Waktu Analisis & Dokumentasi** | | | **9.900 s** | **165.00 m (2.75 jam)** |
+
+### Rekapitulasi Formula Waktu Realisasi Sesi 8:
+\mathbf{\text{Total Waktu Sesi 8} = 12.600\text{ s (Dev)} + 9.900\text{ s (Test)} + 9.900\text{ s (Doc)} = 32.400\text{ detik} = 540.00\text{ menit} (9.00\text{ jam})}
+- **Waktu Mulai Sesi 8:** 2026-09-17 14:45:00 WIB
+- **Waktu Pencatatan Checkpoint Sesi 8:** 2026-09-18 11:45:00 WIB
+- **Status Iterasi 6:** **MASIH BERJALAN (OPEN / ONGOING — BELUM VALIDASI PASS DARI INTENT ARCHITECT)**
+
+---
+
 ### Rekapitulasi Grand Total Kumulatif Proyek Terbaru:
-- Grand Total Sebelumnya (Sesi 1 s.d. Sesi 4): **63.90 jam (3.834,0 menit)**
-- Total Sesi 5 (Treatment #1.6 & #1.7): **6.70 jam (401.77 menit)**
-- Total Sesi 6 (Treatment #1.8 & Replikasi 3x3): **2.28 jam (137.00 menit)**
-- Total Sesi 7 (Treatment #1.8.1–#1.8.4, Harness, & Tata Kelola): **7.08 jam (424.59 menit)**
-- **GRAND TOTAL KUMULATIF PROYEK TERBARU:** 63.90 + 6.70 + 2.28 + 7.08 = **79.96 jam (4.797,36 menit)**.
+- Grand Total Sebelumnya (Sesi 1 s.d. Sesi 7): **79.96 jam (4.797,36 menit)**
+- Total Sesi 8 (Treatment #1.8.5–#1.8.9, Forensik #1.8.7, Forensik #1.8.9, & Tata Kelola): **9.00 jam (540.00 menit)**
+- **GRAND TOTAL KUMULATIF PROYEK TERBARU:** 79.96 + 9.00 = **88.96 jam (5.337,36 menit)**.
 - **Akurasi Pencatatan Formula:** 100% konsisten dengan formula IIDD baku dan timestamp aktual.
+
 

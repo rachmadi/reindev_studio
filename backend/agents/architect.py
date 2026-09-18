@@ -10,6 +10,7 @@ Self-Healing Revision Loop (max 2 revisions).
 
 import re
 import json
+from dataclasses import asdict
 from typing import Any, Optional, Dict, List, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -86,7 +87,9 @@ try:
         parse_blueprint_json,
         extract_blueprint_json_text,
         blueprint_to_narrative_markdown,
-        normalize_blueprint_data_models
+        normalize_blueprint_data_models,
+        serialize_blueprint_to_canonical_json,
+        validate_canonical_architecture_plan_state
     )
 except (ImportError, ValueError):
     try:
@@ -95,7 +98,9 @@ except (ImportError, ValueError):
             parse_blueprint_json,
             extract_blueprint_json_text,
             blueprint_to_narrative_markdown,
-            normalize_blueprint_data_models
+            normalize_blueprint_data_models,
+            serialize_blueprint_to_canonical_json,
+            validate_canonical_architecture_plan_state
         )
     except ImportError:
         ArchitecturalBlueprint = None
@@ -103,12 +108,220 @@ except (ImportError, ValueError):
         extract_blueprint_json_text = lambda t: None
         blueprint_to_narrative_markdown = lambda b: ""
         normalize_blueprint_data_models = lambda m, **kw: (m, [])
+        serialize_blueprint_to_canonical_json = lambda b: "{}"
+        validate_canonical_architecture_plan_state = lambda p, *args, **kw: (True, [])
+try:
+    from ..semantic_serializer import (
+        parse_semantic_architectural_plan,
+        serialize_semantic_decision_to_blueprint,
+        check_semantic_obligation_coverage,
+        merge_preservative_semantic_decisions
+    )
+except (ImportError, ValueError):
+    try:
+        from semantic_serializer import (
+            parse_semantic_architectural_plan,
+            serialize_semantic_decision_to_blueprint,
+            check_semantic_obligation_coverage,
+            merge_preservative_semantic_decisions
+        )
+    except ImportError:
+        parse_semantic_architectural_plan = None
+        serialize_semantic_decision_to_blueprint = None
+        check_semantic_obligation_coverage = None
+        merge_preservative_semantic_decisions = None
+try:
+    from ..architect_staged import (
+        StageAObligationMapping,
+        FrozenStageAMappings,
+        StageARevisionRequest,
+        StageBAssemblyOutput,
+        StageB1ElementRealization,
+        StageB1Output,
+        FrozenStageB1State,
+        StageB2BindingDecision,
+        StageB2Output,
+        FrozenStageB2State,
+        parse_stage_a_mappings,
+        validate_stage_a_mappings,
+        parse_stage_b_assembly,
+        validate_stage_b_preservation,
+        convert_stage_b_to_semantic_plan,
+        assemble_stage_b_blueprint,
+        parse_stage_b1_output,
+        validate_stage_b1_realization,
+        parse_stage_b2_output,
+        validate_stage_b2_bindings,
+        assemble_decomposed_stage_b_blueprint,
+        build_stage_a_prompt,
+        build_stage_b_prompt,
+        build_stage_b1_prompt,
+        build_stage_b2_prompt,
+        STAGE_A_SYSTEM_PROMPT,
+        STAGE_B_SYSTEM_PROMPT,
+        STAGE_B1_SYSTEM_PROMPT,
+        STAGE_B2_SYSTEM_PROMPT
+    )
+except (ImportError, ValueError):
+    try:
+        from architect_staged import (
+            StageAObligationMapping,
+            FrozenStageAMappings,
+            StageARevisionRequest,
+            StageBAssemblyOutput,
+            StageB1ElementRealization,
+            StageB1Output,
+            FrozenStageB1State,
+            StageB2BindingDecision,
+            StageB2Output,
+            FrozenStageB2State,
+            parse_stage_a_mappings,
+            validate_stage_a_mappings,
+            parse_stage_b_assembly,
+            validate_stage_b_preservation,
+            convert_stage_b_to_semantic_plan,
+            assemble_stage_b_blueprint,
+            parse_stage_b1_output,
+            validate_stage_b1_realization,
+            parse_stage_b2_output,
+            validate_stage_b2_bindings,
+            assemble_decomposed_stage_b_blueprint,
+            build_stage_a_prompt,
+            build_stage_b_prompt,
+            build_stage_b1_prompt,
+            build_stage_b2_prompt,
+            STAGE_A_SYSTEM_PROMPT,
+            STAGE_B_SYSTEM_PROMPT,
+            STAGE_B1_SYSTEM_PROMPT,
+            STAGE_B2_SYSTEM_PROMPT
+        )
+    except ImportError:
+        StageAObligationMapping = None
+        FrozenStageAMappings = None
+        StageARevisionRequest = None
+        StageBAssemblyOutput = None
+        StageB1ElementRealization = None
+        StageB1Output = None
+        FrozenStageB1State = None
+        StageB2BindingDecision = None
+        StageB2Output = None
+        FrozenStageB2State = None
+        parse_stage_a_mappings = None
+        validate_stage_a_mappings = None
+        parse_stage_b_assembly = None
+        validate_stage_b_preservation = None
+        convert_stage_b_to_semantic_plan = None
+        assemble_stage_b_blueprint = None
+        parse_stage_b1_output = None
+        validate_stage_b1_realization = None
+        parse_stage_b2_output = None
+        validate_stage_b2_bindings = None
+        assemble_decomposed_stage_b_blueprint = None
+        build_stage_a_prompt = None
+        build_stage_b_prompt = None
+        build_stage_b1_prompt = None
+        build_stage_b2_prompt = None
+        STAGE_A_SYSTEM_PROMPT = ""
+        STAGE_B_SYSTEM_PROMPT = ""
+        STAGE_B1_SYSTEM_PROMPT = ""
+        STAGE_B2_SYSTEM_PROMPT = ""
+
+try:
+    from ..staged_repair import (
+        classify_contract_failure_owner,
+        compute_stage_lifecycle,
+        apply_lifecycle_to_frozen_states,
+        verify_stage_preservation,
+        build_repair_telemetry,
+    )
+except (ImportError, ValueError):
+    try:
+        from staged_repair import (
+            classify_contract_failure_owner,
+            compute_stage_lifecycle,
+            apply_lifecycle_to_frozen_states,
+            verify_stage_preservation,
+            build_repair_telemetry,
+        )
+    except ImportError:
+        classify_contract_failure_owner = None
+        compute_stage_lifecycle = None
+        apply_lifecycle_to_frozen_states = None
+        verify_stage_preservation = None
+        build_repair_telemetry = None
+
+try:
+    from ..b2_repair_delivery import (
+        assemble_and_distill_b2_repair_prompt,
+        validate_b2_repair_context_delivery,
+        snapshot_b2_repair_pre_state,
+        verify_stage_preservation as verify_b2_stage_preservation,
+        resolve_context_budget as resolve_b2_context_budget,
+    )
+except (ImportError, ValueError):
+    try:
+        from b2_repair_delivery import (
+            assemble_and_distill_b2_repair_prompt,
+            validate_b2_repair_context_delivery,
+            snapshot_b2_repair_pre_state,
+            verify_stage_preservation as verify_b2_stage_preservation,
+            resolve_context_budget as resolve_b2_context_budget,
+        )
+    except ImportError:
+        assemble_and_distill_b2_repair_prompt = None
+        validate_b2_repair_context_delivery = None
+        snapshot_b2_repair_pre_state = None
+        verify_b2_stage_preservation = None
+        resolve_b2_context_budget = None
+
+
 
 ARCHITECT_SYSTEM_PROMPT = """Anda adalah Senior Software & System Architect dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah menerima spesifikasi dari Product Manager dan merancang struktur arsitektur perangkat lunak yang modular, terpisah dengan jelas (Separation of Concerns), dan mudah diuji.
 
 FORMAT LUARAN YANG WAJIB ANDA HASILKAN:
-Anda WAJIB menghasilkan blok cetak biru arsitektur terstruktur dalam format JSON kanonikal di dalam penanda persis seperti berikut:
+Anda dapat menghasilkan blok keputusan arsitektur semantik terstruktur di dalam penanda === SEMANTIC DECISION JSON === (format penalaran semantik utama):
+
+=== SEMANTIC DECISION JSON ===
+{
+  "target_file": "main.py",
+  "scaffold_code": "class EntityA:\n    def __init__(self, attribute_a: str = ''):\n        self.attribute_a = attribute_a\n\ndef operation_a(param_1: str) -> EntityA:\n    pass\n",
+  "semantic_decisions": [
+    {
+      "obligation_id": "OBL-01",
+      "target_structure": "INTERFACE_CONTRACT",
+      "identifier": "operation_a",
+      "target_file": "main.py",
+      "parameters": [
+        {
+          "name": "param_1",
+          "type": "TypeA",
+          "location": "ARGUMENT",
+          "required": true
+        }
+      ],
+      "return_semantics": {
+        "type": "TypeA"
+      }
+    },
+    {
+      "obligation_id": "OBL-02",
+      "target_structure": "DATA_MODEL",
+      "identifier": "EntityA",
+      "target_file": "main.py",
+      "fields": [
+        {
+          "name": "attribute_a",
+          "type": "str",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
+=== END SEMANTIC DECISION JSON ===
+
+Atau sebagai representasi kanonikal langsung di dalam penanda:
 
 === BLUEPRINT JSON ===
 {
@@ -503,7 +716,7 @@ Lakukan audit mandiri singkat terhadap rancangan arsitektur Anda:
    - `interface_contracts`: WAJIB List[dict] yang memuat field wajib identifier dan target_file. Jika mendeklarasikan `parameters`, WAJIB gunakan `param_name`, `param_type`, `param_location` (PATH, QUERY, BODY, ARGUMENT, PROP). Jika mendeklarasikan `expected_return`, WAJIB gunakan objek dictionary dengan `return_type` (bukan string telanjang).
 8. Generic Repair Preservation (Anti-Field-Loss): Jika dalam giliran repair, apakah seluruh field level teratas (termasuk `files`) dan elemen valid sebelumnya dipertahankan tanpa penghapusan atau distorsi (CURRENT VALID STATE + REPAIRED ELEMENT)?
 (Catatan: Pre-seal checklist ini adalah panduan penalaran Architect; bukan Acceptance Authority dan tidak menggantikan validator deterministik).
-Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===."""
+Tuliskan output JSON keputusan semantik arsitektur Anda di dalam penanda === SEMANTIC DECISION JSON === ... === END SEMANTIC DECISION JSON === (atau penanda === BLUEPRINT JSON === ... === END BLUEPRINT JSON ===)."""
 
     messages = [
         SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
@@ -523,10 +736,24 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
         if validate_architect_repair_context_delivery:
             final_delivered_str = messages[1].content if len(messages) > 1 else prompt
             deliv_ok, deliv_errs = validate_architect_repair_context_delivery(final_delivered_str)
+            rec_budget = resolve_b2_context_budget(state) if resolve_b2_context_budget else 12000
             if not deliv_ok:
                 # Attempt deterministic recovery pass on prompt
-                if build_architect_decision_context and decision_ctx:
-                    rec_budget = resolve_context_budget(state)
+                if assemble_and_distill_b2_repair_prompt:
+                    b2_deliv = assemble_and_distill_b2_repair_prompt(state, budget_override=rec_budget)
+                    if b2_deliv.delivery_valid and len(b2_deliv.prompt) <= rec_budget:
+                        recovered_prompt = prompt.replace(decision_text, f"\n{b2_deliv.prompt}\n") if decision_text else f"{prompt}\n\n{b2_deliv.prompt}"
+                        rec_ok, rec_errs = validate_architect_repair_context_delivery(recovered_prompt)
+                        if rec_ok:
+                            prompt = recovered_prompt
+                            messages = [
+                                SystemMessage(content=ARCHITECT_SYSTEM_PROMPT),
+                                HumanMessage(content=prompt)
+                            ]
+                            deliv_ok = True
+                        else:
+                            deliv_errs = rec_errs
+                elif build_architect_decision_context and decision_ctx:
                     recovered_ctx, rec_telem = build_architect_decision_context(state, pkg=pkg, max_chars=rec_budget)
                     if recovered_ctx:
                         recovered_prompt = prompt.replace(decision_text, f"\n{recovered_ctx}\n")
@@ -541,58 +768,55 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
                         else:
                             deliv_errs = rec_errs
 
-                if not deliv_ok:
-                    # Structured DELIVERY_FAILURE (Correction 1):
-                    # No LLM invocation occurs and no Architect repair turn is consumed.
-                    new_log = f"[System Architect]: DELIVERY_FAILURE — Pre-invocation context delivery check failed: {deliv_errs}"
-                    current_logs = state.get("logs", [])
-                    if tracer and ContextTelemetry and emit_context_telemetry:
-                        import dataclasses
-                        known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
-                        filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
-                        fail_telem = ContextTelemetry(
-                            agent="architect",
-                            model=str(state.get("model_name", "")),
-                            context_version="hardening_v1",
-                            context_sections=list(telem_data.get("context_sections", [])),
-                            context_size=len(prompt),
-                            authoritative_sources=["FROZEN_ORACLE"],
-                            evidence_items=telem_data.get("evidence_items", 0),
-                            locked_invariants=telem_data.get("locked_invariants", 0),
-                            current_failures=telem_data.get("current_failures", 0),
-                            repair_boundary_items=telem_data.get("repair_boundary_items", 0),
-                            delivery_valid=False,
-                            delivery_errors=deliv_errs,
-                            delivery_failure_reason="; ".join(deliv_errs),
-                            run_id=str(state.get("run_id", "")),
-                            iteration=state.get("contract_revision_count", 0),
-                            **{k: v for k, v in filtered_telem_data.items() if k not in (
-                                "agent", "model", "context_version", "context_sections", "context_size",
-                                "authoritative_sources", "evidence_items", "locked_invariants",
-                                "current_failures", "repair_boundary_items", "delivery_valid",
-                                "delivery_errors", "delivery_failure_reason", "run_id", "iteration"
-                            )}
-                        )
-                        emit_context_telemetry(tracer, "architect", fail_telem)
+            if not deliv_ok:
+                # Structured DELIVERY_FAILURE (Correction 1):
+                # No LLM invocation occurs and no Architect repair turn is consumed.
+                new_log = f"[System Architect]: DELIVERY_FAILURE — Pre-invocation context delivery check failed: {deliv_errs}"
+                current_logs = state.get("logs", [])
+                if tracer and ContextTelemetry and emit_context_telemetry:
+                    import dataclasses
+                    known_fields = {f.name for f in dataclasses.fields(ContextTelemetry)}
+                    filtered_telem_data = {k: v for k, v in telem_data.items() if k in known_fields}
+                    fail_telem = ContextTelemetry(
+                        agent="architect",
+                        model=str(state.get("model_name", "")),
+                        context_version="hardening_v1",
+                        context_sections=list(telem_data.get("context_sections", [])),
+                        context_size=len(prompt),
+                        authoritative_sources=["FROZEN_ORACLE"],
+                        evidence_items=telem_data.get("evidence_items", 0),
+                        locked_invariants=telem_data.get("locked_invariants", 0),
+                        current_failures=telem_data.get("current_failures", 0),
+                        repair_boundary_items=telem_data.get("repair_boundary_items", 0),
+                        delivery_valid=False,
+                        delivery_errors=deliv_errs,
+                        delivery_failure_reason="; ".join(deliv_errs),
+                        run_id=str(state.get("run_id", "")),
+                        iteration=state.get("contract_revision_count", 0),
+                        **{k: v for k, v in filtered_telem_data.items() if k not in (
+                            "agent", "model", "context_version", "context_sections", "context_size",
+                            "authoritative_sources", "evidence_items", "locked_invariants",
+                            "current_failures", "repair_boundary_items", "delivery_valid",
+                            "delivery_errors", "delivery_failure_reason", "run_id", "iteration"
+                        )}
+                    )
+                    emit_context_telemetry(tracer, "architect", fail_telem)
 
-                    return {
-                        "architecture_plan": "",
-                        "architectural_blueprint": None,
-                        "contract": state.get("contract"),
-                        "contract_status": "DELIVERY_FAILURE",
-                        "contract_validation_errors": deliv_errs,
-                        "blueprint_revision_count": state.get("blueprint_revision_count", 0),
-                        "status": "DELIVERY_FAILURE",
-                        "delivery_valid": False,
-                        "delivery_errors": deliv_errs,
-                        "delivery_failure_reason": "; ".join(deliv_errs),
-                        "logs": current_logs + [new_log]
-                    }
+                return {
+                    "architecture_plan": "",
+                    "architectural_blueprint": None,
+                    "contract": state.get("contract"),
+                    "contract_status": "DELIVERY_FAILURE",
+                    "contract_validation_errors": deliv_errs,
+                    "blueprint_revision_count": state.get("blueprint_revision_count", 0),
+                    "status": "DELIVERY_FAILURE",
+                    "delivery_valid": False,
+                    "delivery_errors": deliv_errs,
+                    "delivery_failure_reason": "; ".join(deliv_errs),
+                    "logs": current_logs + [new_log]
+                }
     
-    response = llm.invoke(messages)
-    arch_plan = response.content if hasattr(response, "content") else str(response)
-
-    # P0-2: Lengkapi kontrak menjadi ALIGNED (Prioritas: Blueprint JSON -> Kontrak JSON blok -> Default Fallback)
+    # Initialize draft contract and language parameters
     draft_contract = state.get("contract")
     if not draft_contract or not isinstance(draft_contract, dict):
         draft_contract = create_draft_contract(
@@ -601,10 +825,551 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
             goal_summary=user_task[:120]
         )
 
-    # 1. Coba ekstrak dari skema ArchitecturalBlueprint JSON
-    extracted_bp, bp_err = parse_blueprint_json(arch_plan)
-    contract_errors = []
     is_dart = "dart" in target_lang.lower() or "flutter" in target_lang.lower()
+    default_auth_file = "lib/card_metric.dart" if is_dart else "main.py"
+
+    # Treatment #1.8.6: Two-Stage Execution Engine
+    # STAGE A: Acceptance Obligation Mapping (LLM) -> Deterministic Stage-A Check (Pure Python)
+    # STAGE B: Architectural Assembly (LLM) -> Stage-B Preservation Check -> Deterministic Serialization
+    use_staged = (parse_stage_a_mappings is not None and validate_stage_a_mappings is not None)
+    
+    stage_a_coverage = 0.0
+    stage_a_valid = False
+    stage_a_repairs = 0
+    stage_b_completeness = 0.0
+    stage_b_repairs = 0
+    stage_b1_valid = False
+    stage_b1_repairs = 0
+    stage_b2_valid = False
+    stage_b2_repairs = 0
+    serialization_success = False
+    b_decoder_telem = {}
+    b2_delivery_telemetry = None
+    b2_pre_snapshot = None
+
+    mappings_a = None
+    assembly_b = None
+    b1_output = None
+    b2_output = None
+    raw_stage_a_output = ""
+    raw_stage_b_output = ""
+    raw_stage_b1_output = ""
+    raw_stage_b2_output = ""
+
+    extracted_bp = None
+    bp_err = None
+    first_divergence = None
+    arch_plan = ""
+
+    # Check if Stage A is already frozen from earlier turn
+    prev_contract = state.get("contract") or {}
+    prev_prov = prev_contract.get("provenance", {}) if isinstance(prev_contract, dict) else {}
+    prev_frozen_a_dict = prev_prov.get("frozen_stage_a")
+    frozen_stage_a = None
+    if prev_frozen_a_dict and isinstance(prev_frozen_a_dict, dict) and "mappings" in prev_frozen_a_dict:
+        try:
+            m_list = [StageAObligationMapping.from_dict(d) for d in prev_frozen_a_dict["mappings"]]
+            frozen_stage_a = FrozenStageAMappings.freeze(m_list, timestamp=prev_frozen_a_dict.get("validated_at"))
+            stage_a_valid = True
+            stage_a_coverage = 1.0
+        except Exception:
+            frozen_stage_a = None
+
+    # Check if Stage B-1 is already frozen from earlier turn
+    prev_frozen_b1_dict = prev_prov.get("frozen_stage_b1")
+    frozen_stage_b1 = None
+    if prev_frozen_b1_dict and isinstance(prev_frozen_b1_dict, dict) and "elements" in prev_frozen_b1_dict:
+        try:
+            e_list = [StageB1ElementRealization.from_dict(d) for d in prev_frozen_b1_dict["elements"]]
+            frozen_stage_b1 = FrozenStageB1State.freeze(e_list, timestamp=prev_frozen_b1_dict.get("validated_at"))
+            stage_b1_valid = True
+        except Exception:
+            frozen_stage_b1 = None
+
+    # Check if Stage B-2 is already frozen from earlier turn
+    prev_frozen_b2_dict = prev_prov.get("frozen_stage_b2")
+    frozen_stage_b2 = None
+    if prev_frozen_b2_dict and isinstance(prev_frozen_b2_dict, dict) and "bindings" in prev_frozen_b2_dict:
+        try:
+            b_list = [StageB2BindingDecision.from_dict(d) for d in prev_frozen_b2_dict["bindings"]]
+            s_files = dict(prev_frozen_b2_dict.get("files", {}))
+            frozen_stage_b2 = FrozenStageB2State.freeze(b_list, s_files, timestamp=prev_frozen_b2_dict.get("validated_at"))
+            stage_b2_valid = True
+        except Exception:
+            frozen_stage_b2 = None
+
+    # ========================================================================
+    # SELECTIVE STAGE-B UNFREEZE (Treatment #1.8.9 Repair Routing v2)
+    # On a repair turn, classify which stage owns the Contract Gate failure and
+    # invalidate its lifecycle entry (plus dependents). The existing
+    # "if frozen_stage_X is None: invoke LLM" guards then fire naturally.
+    # Cache Safety Rule: a FROZEN state that is contradicted by downstream
+    # evidence must become INVALIDATED and must NOT be restored.
+    # ========================================================================
+    new_lifecycle: dict = {}
+    _repair_failure_owner: str = ""
+    _repair_invalidate_stages: list = []
+    _repair_evidence_summary: str = ""
+    _repair_causal_category: str = "NONE"
+    _repair_outer_category: str = "NONE"
+    _repair_target_owner: str = "NONE"
+    _invoked_stage: str = "NONE"
+
+    # Snapshot frozen states BEFORE lifecycle is applied (for telemetry hashes)
+    _pre_lifecycle_frozen_a = frozen_stage_a
+    _pre_lifecycle_frozen_b1 = frozen_stage_b1
+    _pre_lifecycle_frozen_b2 = frozen_stage_b2
+
+    _gate_errors_this_turn = list(state.get("contract_validation_errors") or [])
+
+    if (
+        is_repair_turn
+        and _gate_errors_this_turn
+        and classify_contract_failure_owner is not None
+        and compute_stage_lifecycle is not None
+        and apply_lifecycle_to_frozen_states is not None
+    ):
+        _clf_res = classify_contract_failure_owner(
+            gate_errors=_gate_errors_this_turn,
+            violations=[],
+            coverage_matrix={},
+        )
+        _repair_failure_owner = _clf_res.owner
+        _repair_invalidate_stages = _clf_res.invalidate_stages
+        _repair_evidence_summary = _clf_res.evidence_summary
+        _repair_causal_category = getattr(_clf_res, "causal_category", _clf_res.owner)
+        _repair_outer_category = getattr(_clf_res, "outer_category", "NONE")
+        _repair_target_owner = getattr(_clf_res, "repair_owner", "NONE")
+
+        new_lifecycle = compute_stage_lifecycle(
+            prev_lifecycle=prev_prov.get("stage_lifecycle", {}),
+            failure_owner=_repair_failure_owner,
+            invalidate_stages=_repair_invalidate_stages,
+            gate_errors=_gate_errors_this_turn,
+        )
+        frozen_stage_a, frozen_stage_b1, frozen_stage_b2 = apply_lifecycle_to_frozen_states(
+            frozen_stage_a, frozen_stage_b1, frozen_stage_b2, new_lifecycle
+        )
+        # Sync validity flags: if a state was nulled, mark its validity flag False
+        if frozen_stage_a is None:
+            stage_a_valid = False
+            stage_a_coverage = 0.0
+        if frozen_stage_b1 is None:
+            stage_b1_valid = False
+        if frozen_stage_b2 is None:
+            stage_b2_valid = False
+    else:
+        # Not a repair turn (or classifier unavailable): preserve previous lifecycle as-is
+        new_lifecycle = dict(prev_prov.get("stage_lifecycle", {}))
+
+    # Retrieve authoritative obligations
+    auth_obs_list = []
+    try:
+        f_oracle_path = state.get("frozen_oracle_path")
+        t_files = state.get("test_files")
+        auth_obs_list = extract_canonical_oracle_obligations(
+            frozen_oracle_path=f_oracle_path,
+            test_files=t_files
+        ) or []
+    except Exception:
+        auth_obs_list = []
+    if not auth_obs_list:
+        auth_obs_list = [{"obligation_id": "REQ-01", "description": user_task}]
+
+    if use_staged and (frozen_stage_a is None):
+        # ====================================================================
+        # STAGE A: ACCEPTANCE OBLIGATION MAPPING
+        # ====================================================================
+        prompt_a = build_stage_a_prompt(
+            target_lang=target_lang,
+            user_task=user_task,
+            specs=specs,
+            oracle_ledger=oracle_ledger_section,
+            oracle_scenarios=oracle_scenario_section,
+            v0_model=state.get("v0_requirement_model"),
+            existing_state=state.get("contract"),
+            repair_errors=state.get("contract_validation_errors") if (is_repair_turn and new_lifecycle.get("stage_a", {}).get("status") == "INVALIDATED") else None,
+            repair_packet=pkg,
+            authoritative_obligations=auth_obs_list,
+            current_mappings=mappings_a
+        )
+        messages_a = [
+            SystemMessage(content=STAGE_A_SYSTEM_PROMPT),
+            HumanMessage(content=prompt_a)
+        ]
+        resp_a = llm.invoke(messages_a)
+        _invoked_stage = "STAGE_A"
+        raw_a = resp_a.content if hasattr(resp_a, "content") else str(resp_a)
+        raw_stage_a_output = raw_a
+
+        # Check if model returned direct blueprint or raw mock (fallback compatibility for mock tests)
+        if ("=== STAGE A: OBLIGATION MAPPING ===" not in raw_a) and ("obligation_mappings" not in raw_a):
+            is_semantic = ("=== SEMANTIC DECISION JSON ===" in raw_a) or ("semantic_decisions" in raw_a)
+            if is_semantic and parse_semantic_architectural_plan and serialize_semantic_decision_to_blueprint:
+                sem_plan, sem_errs = parse_semantic_architectural_plan(raw_a)
+                if sem_plan and not sem_errs:
+                    extracted_bp, ser_errs = serialize_semantic_decision_to_blueprint(sem_plan)
+                    if ser_errs:
+                        bp_err = "; ".join(ser_errs)
+                        first_divergence = "SERIALIZATION_FAILURE"
+                        arch_plan = raw_a
+                    elif extracted_bp:
+                        serialization_success = True
+                        arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+                else:
+                    bp_err = "; ".join(sem_errs)
+                    first_divergence = "SEMANTIC_MAPPING_FAILURE"
+                    arch_plan = raw_a
+            if extracted_bp is None and not is_semantic:
+                extracted_bp, bp_err = parse_blueprint_json(raw_a)
+                if bp_err:
+                    first_divergence = "CONTRACT_VALIDATION_FAILURE"
+                    arch_plan = raw_a
+                elif extracted_bp:
+                    arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+            use_staged = False
+        else:
+            mappings_a, parse_errs_a = parse_stage_a_mappings(raw_a)
+            val_errs_a = []
+            if mappings_a:
+                is_valid_a, val_errs_a = validate_stage_a_mappings(mappings_a, auth_obs_list)
+            else:
+                is_valid_a = False
+                val_errs_a = parse_errs_a or ["Failed to parse Stage A mappings"]
+
+            # Isolated Stage A Repair Loop (Max 1 retry within turn if invalid)
+            if not is_valid_a:
+                stage_a_repairs += 1
+                repair_prompt_a = build_stage_a_prompt(
+                    target_lang=target_lang,
+                    user_task=user_task,
+                    specs=specs,
+                    oracle_ledger=oracle_ledger_section,
+                    oracle_scenarios=oracle_scenario_section,
+                    v0_model=state.get("v0_requirement_model"),
+                    existing_state=state.get("contract"),
+                    repair_errors=val_errs_a,
+                    repair_packet=pkg,
+                    authoritative_obligations=auth_obs_list,
+                    current_mappings=mappings_a
+                )
+                resp_a_rep = llm.invoke([
+                    SystemMessage(content=STAGE_A_SYSTEM_PROMPT),
+                    HumanMessage(content=repair_prompt_a)
+                ])
+                raw_a_rep = resp_a_rep.content if hasattr(resp_a_rep, "content") else str(resp_a_rep)
+                raw_stage_a_output += f"\n=== STAGE A REPAIR OUTPUT ===\n{raw_a_rep}\n"
+                m_rep, p_rep_errs = parse_stage_a_mappings(raw_a_rep)
+                if m_rep:
+                    is_valid_a, val_errs_a = validate_stage_a_mappings(m_rep, auth_obs_list)
+                    if is_valid_a:
+                        mappings_a = m_rep
+
+            if is_valid_a and mappings_a:
+                stage_a_valid = True
+                stage_a_coverage = 1.0
+                frozen_stage_a = FrozenStageAMappings.freeze(mappings_a)
+            else:
+                first_divergence = "STAGE_A_MAPPING_FAILURE"
+                bp_err = "; ".join(val_errs_a)
+
+    # ====================================================================
+    # STAGE B: DECOMPOSED ARCHITECTURAL DECISIONS (Treatment #1.8.9)
+    # Stage B-1: Element Realization -> Deterministic B1 Gate
+    # Stage B-2: Relationship / Binding Decisions -> Deterministic B2 Gate
+    # Stage B-3: Deterministic Artifact Assembly
+    # ====================================================================
+    if use_staged and frozen_stage_a is not None:
+        # ----------------------------------------------------------------
+        # 1. STAGE B-1: ELEMENT REALIZATION (Zero source code)
+        # ----------------------------------------------------------------
+        if frozen_stage_b1 is None:
+            prompt_b1 = build_stage_b1_prompt(
+                target_lang=target_lang,
+                user_task=user_task,
+                specs=specs,
+                frozen_stage_a=frozen_stage_a,
+                repair_errors=state.get("contract_validation_errors") if (is_repair_turn and new_lifecycle.get("stage_b1", {}).get("status") == "INVALIDATED") else None,
+                current_b1=b1_output
+            )
+            messages_b1 = [
+                SystemMessage(content=STAGE_B1_SYSTEM_PROMPT),
+                HumanMessage(content=prompt_b1)
+            ]
+            resp_b1 = llm.invoke(messages_b1)
+            _invoked_stage = "STAGE_B1"
+            raw_b1 = resp_b1.content if hasattr(resp_b1, "content") else str(resp_b1)
+            raw_stage_b1_output = raw_b1
+
+            # Fallback backward compatibility: if model emitted unified stage B directly
+            if ("=== STAGE B-1" not in raw_b1) and ("element_realizations" not in raw_b1) and (
+                ("=== STAGE B:" in raw_b1) or ("semantic_decisions" in raw_b1)
+            ):
+                raw_stage_b_output = raw_b1
+                assembly_b, parse_errs_b = parse_stage_b_assembly(raw_b1)
+                if assembly_b:
+                    b_valid, b_pres_errs, rev_requests = validate_stage_b_preservation(frozen_stage_a, assembly_b)
+                    if b_valid:
+                        stage_b_completeness = 1.0
+                        stage_b1_valid = True
+                        stage_b2_valid = True
+                        extracted_bp, asm_errs = assemble_stage_b_blueprint(
+                            frozen_stage_a=frozen_stage_a,
+                            assembly=assembly_b,
+                            task_id=user_task[:30],
+                            target_language=target_lang
+                        )
+                        if extracted_bp and not asm_errs:
+                            serialization_success = True
+                            arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+
+            if extracted_bp is None:
+                b1_output, parse_errs_b1 = parse_stage_b1_output(raw_b1)
+                is_valid_b1 = False
+                val_errs_b1 = []
+                if b1_output:
+                    is_valid_b1, val_errs_b1 = validate_stage_b1_realization(frozen_stage_a, b1_output)
+                else:
+                    val_errs_b1 = parse_errs_b1 or ["Failed to parse Stage B-1 element realization output."]
+
+                # Isolated Stage B-1 Repair Loop (Max 1 retry within turn)
+                if not is_valid_b1:
+                    stage_b1_repairs += 1
+                    repair_prompt_b1 = build_stage_b1_prompt(
+                        target_lang=target_lang,
+                        user_task=user_task,
+                        specs=specs,
+                        frozen_stage_a=frozen_stage_a,
+                        repair_errors=val_errs_b1,
+                        current_b1=b1_output
+                    )
+                    resp_b1_rep = llm.invoke([
+                        SystemMessage(content=STAGE_B1_SYSTEM_PROMPT),
+                        HumanMessage(content=repair_prompt_b1)
+                    ])
+                    raw_b1_rep = resp_b1_rep.content if hasattr(resp_b1_rep, "content") else str(resp_b1_rep)
+                    raw_stage_b1_output += f"\n=== STAGE B-1 REPAIR OUTPUT ===\n{raw_b1_rep}\n"
+                    b1_rep, p_errs_rep = parse_stage_b1_output(raw_b1_rep)
+                    if b1_rep:
+                        is_valid_b1, val_errs_b1 = validate_stage_b1_realization(frozen_stage_a, b1_rep)
+                        if is_valid_b1:
+                            b1_output = b1_rep
+
+                if is_valid_b1 and b1_output:
+                    stage_b1_valid = True
+                    frozen_stage_b1 = FrozenStageB1State.freeze(b1_output.elements)
+                else:
+                    first_divergence = "STAGE_B1_REALIZATION_FAILURE"
+                    bp_err = "; ".join(val_errs_b1)
+
+        # ----------------------------------------------------------------
+        # 2. STAGE B-2: RELATIONSHIP / BINDING DECISIONS (Only if B-1 is valid)
+        # ----------------------------------------------------------------
+        if extracted_bp is None and frozen_stage_b1 is not None and frozen_stage_b2 is None:
+            is_b2_turn_repair = bool(is_repair_turn and new_lifecycle.get("stage_b2", {}).get("status") == "INVALIDATED")
+            b2_repair_errs = state.get("contract_validation_errors") if is_b2_turn_repair else None
+
+            # B2 Repair Delivery v2: Snapshot pre-repair state and enforce delivery validation
+            if is_b2_turn_repair and snapshot_b2_repair_pre_state is not None:
+                b2_pre_snapshot = snapshot_b2_repair_pre_state(state)
+
+            if is_b2_turn_repair and assemble_and_distill_b2_repair_prompt is not None:
+                b2_deliv_res = assemble_and_distill_b2_repair_prompt(
+                    state=state,
+                    repair_errors=b2_repair_errs,
+                    repair_attempt=stage_b2_repairs + 1
+                )
+                b2_delivery_telemetry = b2_deliv_res.telemetry
+                # Section 10: Invocation Invariants
+                # repair_owner == B2, invoked_stage == B2, delivery_valid == True, repair_attempt == N
+                if not b2_deliv_res.delivery_valid:
+                    # Structured DELIVERY_FAILURE:
+                    # No LLM invocation occurs and no Architect repair turn is consumed.
+                    # Do NOT fall back to Stage A or B-1.
+                    new_log = f"[System Architect]: DELIVERY_FAILURE — Stage B-2 repair context delivery check failed: {b2_deliv_res.validation_errors}"
+                    current_logs = state.get("logs", [])
+                    return {
+                        "architecture_plan": "",
+                        "architectural_blueprint": None,
+                        "contract": state.get("contract"),
+                        "contract_status": "DELIVERY_FAILURE",
+                        "contract_validation_errors": b2_deliv_res.validation_errors,
+                        "blueprint_revision_count": state.get("blueprint_revision_count", 0),
+                        "status": "DELIVERY_FAILURE",
+                        "delivery_valid": False,
+                        "delivery_errors": b2_deliv_res.validation_errors,
+                        "delivery_failure_reason": "; ".join(b2_deliv_res.validation_errors),
+                        "b2_delivery_telemetry": b2_delivery_telemetry,
+                        "logs": current_logs + [new_log]
+                    }
+                prompt_b2 = b2_deliv_res.prompt
+            else:
+                prompt_b2 = build_stage_b2_prompt(
+                    target_lang=target_lang,
+                    user_task=user_task,
+                    specs=specs,
+                    frozen_stage_a=frozen_stage_a,
+                    frozen_b1=frozen_stage_b1,
+                    scenarios=oracle_scenario_section,
+                    repair_errors=b2_repair_errs,
+                    current_b2=b2_output,
+                    state=state,
+                    repair_attempt=stage_b2_repairs + 1
+                )
+
+            messages_b2 = [
+                SystemMessage(content=STAGE_B2_SYSTEM_PROMPT),
+                HumanMessage(content=prompt_b2)
+            ]
+            resp_b2 = llm.invoke(messages_b2)
+            _invoked_stage = "STAGE_B2"
+            raw_b2 = resp_b2.content if hasattr(resp_b2, "content") else str(resp_b2)
+            raw_stage_b2_output = raw_b2
+
+            b2_output, parse_errs_b2 = parse_stage_b2_output(raw_b2)
+            is_valid_b2 = False
+            val_errs_b2 = []
+            if b2_output:
+                is_valid_b2, val_errs_b2 = validate_stage_b2_bindings(frozen_stage_a, frozen_stage_b1, b2_output)
+            else:
+                val_errs_b2 = parse_errs_b2 or ["Failed to parse Stage B-2 relationship binding output."]
+
+            # Isolated Stage B-2 Repair Loop (Max 1 retry within turn, keeping B-1 locked)
+            if not is_valid_b2:
+                stage_b2_repairs += 1
+                if assemble_and_distill_b2_repair_prompt is not None:
+                    retry_deliv = assemble_and_distill_b2_repair_prompt(
+                        state=state,
+                        repair_errors=val_errs_b2,
+                        repair_attempt=stage_b2_repairs
+                    )
+                    b2_delivery_telemetry = retry_deliv.telemetry
+                    repair_prompt_b2 = retry_deliv.prompt if retry_deliv.delivery_valid else None
+                else:
+                    repair_prompt_b2 = build_stage_b2_prompt(
+                        target_lang=target_lang,
+                        user_task=user_task,
+                        specs=specs,
+                        frozen_stage_a=frozen_stage_a,
+                        frozen_b1=frozen_stage_b1,
+                        scenarios=oracle_scenario_section,
+                        repair_errors=val_errs_b2,
+                        current_b2=b2_output,
+                        state=state,
+                        repair_attempt=stage_b2_repairs
+                    )
+
+                if repair_prompt_b2:
+                    resp_b2_rep = llm.invoke([
+                        SystemMessage(content=STAGE_B2_SYSTEM_PROMPT),
+                        HumanMessage(content=repair_prompt_b2)
+                    ])
+                    raw_b2_rep = resp_b2_rep.content if hasattr(resp_b2_rep, "content") else str(resp_b2_rep)
+                    raw_stage_b2_output += f"\n=== STAGE B-2 REPAIR OUTPUT ===\n{raw_b2_rep}\n"
+                    b2_rep, p_errs_b2_rep = parse_stage_b2_output(raw_b2_rep)
+                    if b2_rep:
+                        is_valid_b2, val_errs_b2 = validate_stage_b2_bindings(frozen_stage_a, frozen_stage_b1, b2_rep)
+                        if is_valid_b2:
+                            b2_output = b2_rep
+
+            if is_valid_b2 and b2_output:
+                stage_b2_valid = True
+                frozen_stage_b2 = FrozenStageB2State.freeze(b2_output.bindings, b2_output.scaffold_files)
+            else:
+                first_divergence = "STAGE_B2_BINDING_FAILURE"
+                bp_err = "; ".join(val_errs_b2)
+
+            # Section 11 State Preservation Invariant Verification
+            if is_b2_turn_repair and b2_pre_snapshot is not None and verify_b2_stage_preservation is not None:
+                _b2_pres_ok, _b2_pres_errs = verify_b2_stage_preservation(b2_pre_snapshot, state)
+                if not _b2_pres_ok:
+                    contract_errors.extend(_b2_pres_errs)
+                    first_divergence = "STATE_PRESERVATION_REGRESSION"
+                    bp_err = "; ".join(_b2_pres_errs)
+                    extracted_bp = None
+                    is_valid_b2 = False
+
+            # Section 7 State Preservation Invariant
+            if is_repair_turn and verify_stage_preservation is not None:
+                _pres_ok, _pres_errs = verify_stage_preservation(
+                    pre_lifecycle_frozen_a=_pre_lifecycle_frozen_a,
+                    pre_lifecycle_frozen_b1=_pre_lifecycle_frozen_b1,
+                    post_repair_frozen_a=frozen_stage_a,
+                    post_repair_frozen_b1=frozen_stage_b1,
+                    failure_owner=_repair_failure_owner,
+                )
+                if not _pres_ok:
+                    contract_errors.extend(_pres_errs)
+                    first_divergence = "STATE_PRESERVATION_REGRESSION"
+                    bp_err = "; ".join(_pres_errs)
+                    extracted_bp = None
+
+        # ----------------------------------------------------------------
+        # 3. STAGE B-3: DETERMINISTIC ARTIFACT ASSEMBLY
+        # ----------------------------------------------------------------
+        if extracted_bp is None and frozen_stage_b1 is not None and frozen_stage_b2 is not None:
+            b2_effective = b2_output or StageB2Output(
+                bindings=list(frozen_stage_b2.bindings),
+                scaffold_files=dict(frozen_stage_b2.scaffold_files)
+            )
+            extracted_bp, asm_errs = assemble_decomposed_stage_b_blueprint(
+                frozen_stage_a=frozen_stage_a,
+                b1_state=frozen_stage_b1,
+                b2_state=b2_effective,
+                task_id=user_task[:30],
+                target_language=target_lang
+            )
+            if extracted_bp and not asm_errs:
+                stage_b_completeness = 1.0
+                serialization_success = True
+                arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+            else:
+                bp_err = "; ".join(asm_errs)
+                first_divergence = "STAGE_B3_ASSEMBLY_FAILURE"
+
+        if not raw_stage_b_output:
+            raw_stage_b_output = f"{raw_stage_b1_output}\n{raw_stage_b2_output}".strip()
+
+        b_decoder_telem = {
+            "decoder_mode": "DECOMPOSED_B1_B2_B3",
+            "b1_valid": stage_b1_valid,
+            "b1_repair_count": stage_b1_repairs,
+            "b2_valid": stage_b2_valid,
+            "b2_repair_count": stage_b2_repairs,
+            "stage": "STAGE_B"
+        }
+
+    # Legacy/Fallback direct invocation if not staged or if staged was bypassed
+    if extracted_bp is None and not use_staged:
+        response = llm.invoke(messages)
+        raw_direct = response.content if hasattr(response, "content") else str(response)
+
+        is_semantic_output = ("=== SEMANTIC DECISION JSON ===" in raw_direct) or ("semantic_decisions" in raw_direct)
+        if is_semantic_output and parse_semantic_architectural_plan and serialize_semantic_decision_to_blueprint:
+            sem_plan, sem_errs = parse_semantic_architectural_plan(raw_direct)
+            if sem_plan and not sem_errs:
+                extracted_bp, ser_errs = serialize_semantic_decision_to_blueprint(sem_plan)
+                if ser_errs:
+                    bp_err = "; ".join(ser_errs)
+                    first_divergence = "SERIALIZATION_FAILURE"
+                    arch_plan = raw_direct
+                elif extracted_bp:
+                    serialization_success = True
+                    arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+            else:
+                bp_err = "; ".join(sem_errs)
+                first_divergence = "SEMANTIC_MAPPING_FAILURE"
+                arch_plan = raw_direct
+
+        if extracted_bp is None and not is_semantic_output:
+            extracted_bp, bp_err = parse_blueprint_json(raw_direct)
+            if bp_err:
+                first_divergence = "CONTRACT_VALIDATION_FAILURE"
+                arch_plan = raw_direct
+            elif extracted_bp:
+                arch_plan = serialize_blueprint_to_canonical_json(extracted_bp)
+
+    contract_errors = []
 
     if extracted_bp and not bp_err:
         ifaces = []
@@ -670,6 +1435,90 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
                 bp_dict_pre = extracted_bp.model_dump() if hasattr(extracted_bp, "model_dump") else (extracted_bp.to_dict() if hasattr(extracted_bp, "to_dict") else extracted_bp)
                 if isinstance(bp_dict_pre, dict) and "files" in bp_dict_pre:
                     aligned_contract["files"] = bp_dict_pre.get("files", {})
+
+                # Deterministic State Invariant: architecture_plan must be valid canonical ArchitecturalBlueprint JSON
+                if serialization_success or arch_plan:
+                    is_rep_valid, rep_errs = validate_canonical_architecture_plan_state(
+                        architecture_plan=arch_plan,
+                        canonical_blueprint=extracted_bp,
+                        contract=aligned_contract
+                    )
+                    if not is_rep_valid:
+                        status_label = "STATE_REPRESENTATION_FAILURE"
+                        contract_errors.extend(rep_errs)
+                        aligned_contract["status"] = "STATE_REPRESENTATION_FAILURE"
+                        if "provenance" not in aligned_contract or not isinstance(aligned_contract["provenance"], dict):
+                            aligned_contract["provenance"] = {}
+                        aligned_contract["provenance"]["active_validation_errors"] = list(contract_errors)
+                        aligned_contract["provenance"]["contract_validation_errors"] = list(contract_errors)
+                        first_divergence = "STATE_REPRESENTATION_FAILURE"
+
+            if use_staged:
+                if "provenance" not in aligned_contract or not isinstance(aligned_contract["provenance"], dict):
+                    aligned_contract["provenance"] = {}
+                aligned_contract["provenance"]["raw_stage_a_output"] = raw_stage_a_output
+                aligned_contract["provenance"]["raw_stage_b_output"] = raw_stage_b_output
+                aligned_contract["provenance"]["raw_stage_b1_output"] = raw_stage_b1_output
+                aligned_contract["provenance"]["raw_stage_b2_output"] = raw_stage_b2_output
+                aligned_contract["provenance"]["staged_metrics"] = {
+                    "stage_a_coverage": stage_a_coverage,
+                    "stage_a_valid": stage_a_valid,
+                    "stage_a_repair_count": stage_a_repairs,
+                    "stage_b_completeness": stage_b_completeness,
+                    "stage_b_repair_count": stage_b_repairs,
+                    "stage_b1_valid": stage_b1_valid,
+                    "stage_b1_repair_count": stage_b1_repairs,
+                    "stage_b2_valid": stage_b2_valid,
+                    "stage_b2_repair_count": stage_b2_repairs,
+                    "serialization_success": serialization_success,
+                    "first_divergence": first_divergence,
+                    "decoder_mode": b_decoder_telem.get("decoder_mode", "DECOMPOSED_B1_B2_B3"),
+                    "parse_success": b_decoder_telem.get("parse_success", True),
+                    "parse_failure_type": b_decoder_telem.get("parse_failure_type"),
+                    "stage": "STAGE_B"
+                }
+                if b2_delivery_telemetry:
+                    aligned_contract["provenance"]["b2_delivery_telemetry"] = b2_delivery_telemetry
+                    aligned_contract["provenance"]["staged_metrics"]["b2_delivery_telemetry"] = b2_delivery_telemetry
+                if frozen_stage_a:
+                    aligned_contract["provenance"]["frozen_stage_a"] = {
+                        "mappings": [m.to_dict() for m in frozen_stage_a.mappings],
+                        "sha256_seal": frozen_stage_a.sha256_seal,
+                        "validated_at": frozen_stage_a.validated_at
+                    }
+                if frozen_stage_b1:
+                    aligned_contract["provenance"]["frozen_stage_b1"] = {
+                        "elements": [e.to_dict() for e in frozen_stage_b1.elements],
+                        "sha256_seal": frozen_stage_b1.sha256_seal,
+                        "validated_at": frozen_stage_b1.validated_at
+                    }
+                if frozen_stage_b2:
+                    aligned_contract["provenance"]["frozen_stage_b2"] = {
+                        "bindings": [b.to_dict() for b in frozen_stage_b2.bindings],
+                        "files": dict(frozen_stage_b2.scaffold_files),
+                        "sha256_seal": frozen_stage_b2.sha256_seal,
+                        "validated_at": frozen_stage_b2.validated_at
+                    }
+                # Lifecycle and repair telemetry
+                aligned_contract["provenance"]["stage_lifecycle"] = new_lifecycle
+                if build_repair_telemetry is not None:
+                    aligned_contract["provenance"]["repair_telemetry"] = build_repair_telemetry(
+                        is_repair_turn=is_repair_turn,
+                        stage_lifecycle=new_lifecycle,
+                        pre_lifecycle_frozen_a=_pre_lifecycle_frozen_a,
+                        pre_lifecycle_frozen_b1=_pre_lifecycle_frozen_b1,
+                        pre_lifecycle_frozen_b2=_pre_lifecycle_frozen_b2,
+                        post_lifecycle_frozen_a=frozen_stage_a,
+                        post_lifecycle_frozen_b1=frozen_stage_b1,
+                        post_lifecycle_frozen_b2=frozen_stage_b2,
+                        new_frozen_b1=frozen_stage_b1 if new_lifecycle.get("stage_b1", {}).get("status") == "INVALIDATED" else None,
+                        new_frozen_b2=frozen_stage_b2 if new_lifecycle.get("stage_b2", {}).get("status") == "INVALIDATED" else None,
+                        causal_failure_category=_repair_causal_category,
+                        outer_error_category=_repair_outer_category,
+                        repair_owner=_repair_target_owner,
+                        invoked_stage=_invoked_stage,
+                        repair_attempt=state.get("contract_revision_count", 0),
+                    )
     else:
         # Blueprint JSON parsing failed or produced schema errors.
         # Strict Principle: JANGAN gunakan semantic regex fallback (zero fabricated contract).
@@ -682,7 +1531,74 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
             aligned_contract["provenance"] = {}
         aligned_contract["provenance"]["active_validation_errors"] = list(contract_errors)
         aligned_contract["provenance"]["contract_validation_errors"] = list(contract_errors)
+        if first_divergence:
+            aligned_contract["provenance"]["first_divergence"] = first_divergence
+        if use_staged:
+            aligned_contract["provenance"]["raw_stage_a_output"] = raw_stage_a_output
+            aligned_contract["provenance"]["raw_stage_b_output"] = raw_stage_b_output
+            aligned_contract["provenance"]["raw_stage_b1_output"] = raw_stage_b1_output
+            aligned_contract["provenance"]["raw_stage_b2_output"] = raw_stage_b2_output
+            aligned_contract["provenance"]["staged_metrics"] = {
+                "stage_a_coverage": stage_a_coverage,
+                "stage_a_valid": stage_a_valid,
+                "stage_a_repair_count": stage_a_repairs,
+                "stage_b_completeness": stage_b_completeness,
+                "stage_b_repair_count": stage_b_repairs,
+                "stage_b1_valid": stage_b1_valid,
+                "stage_b1_repair_count": stage_b1_repairs,
+                "stage_b2_valid": stage_b2_valid,
+                "stage_b2_repair_count": stage_b2_repairs,
+                "serialization_success": serialization_success,
+                "first_divergence": first_divergence,
+                "decoder_mode": b_decoder_telem.get("decoder_mode", "DECOMPOSED_B1_B2_B3"),
+                "parse_success": b_decoder_telem.get("parse_success", False),
+                "parse_failure_type": b_decoder_telem.get("parse_failure_type"),
+                "stage": "STAGE_B"
+            }
+            if b2_delivery_telemetry:
+                aligned_contract["provenance"]["b2_delivery_telemetry"] = b2_delivery_telemetry
+                aligned_contract["provenance"]["staged_metrics"]["b2_delivery_telemetry"] = b2_delivery_telemetry
+            if frozen_stage_a:
+                aligned_contract["provenance"]["frozen_stage_a"] = {
+                    "mappings": [m.to_dict() for m in frozen_stage_a.mappings],
+                    "sha256_seal": frozen_stage_a.sha256_seal,
+                    "validated_at": frozen_stage_a.validated_at
+                }
+            if frozen_stage_b1:
+                aligned_contract["provenance"]["frozen_stage_b1"] = {
+                    "elements": [e.to_dict() for e in frozen_stage_b1.elements],
+                    "sha256_seal": frozen_stage_b1.sha256_seal,
+                    "validated_at": frozen_stage_b1.validated_at
+                }
+            if frozen_stage_b2:
+                aligned_contract["provenance"]["frozen_stage_b2"] = {
+                    "bindings": [b.to_dict() for b in frozen_stage_b2.bindings],
+                    "files": dict(frozen_stage_b2.scaffold_files),
+                    "sha256_seal": frozen_stage_b2.sha256_seal,
+                    "validated_at": frozen_stage_b2.validated_at
+                }
+            # Lifecycle and repair telemetry (failure path)
+            aligned_contract["provenance"]["stage_lifecycle"] = new_lifecycle
+            if build_repair_telemetry is not None:
+                aligned_contract["provenance"]["repair_telemetry"] = build_repair_telemetry(
+                    is_repair_turn=is_repair_turn,
+                    stage_lifecycle=new_lifecycle,
+                    pre_lifecycle_frozen_a=_pre_lifecycle_frozen_a,
+                    pre_lifecycle_frozen_b1=_pre_lifecycle_frozen_b1,
+                    pre_lifecycle_frozen_b2=_pre_lifecycle_frozen_b2,
+                    post_lifecycle_frozen_a=frozen_stage_a,
+                    post_lifecycle_frozen_b1=frozen_stage_b1,
+                    post_lifecycle_frozen_b2=frozen_stage_b2,
+                    new_frozen_b1=frozen_stage_b1 if new_lifecycle.get("stage_b1", {}).get("status") == "INVALIDATED" else None,
+                    new_frozen_b2=frozen_stage_b2 if new_lifecycle.get("stage_b2", {}).get("status") == "INVALIDATED" else None,
+                    causal_failure_category=_repair_causal_category,
+                    outer_error_category=_repair_outer_category,
+                    repair_owner=_repair_target_owner,
+                    invoked_stage=_invoked_stage,
+                    repair_attempt=state.get("contract_revision_count", 0),
+                )
         val_hist = list(aligned_contract["provenance"].get("validation_history") or [])
+
         val_hist.append({
             "timestamp": datetime.now().isoformat(),
             "phase": "ARCHITECT_BLUEPRINT_PARSE",
@@ -691,7 +1607,7 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
         })
         aligned_contract["provenance"]["validation_history"] = val_hist
 
-    # Observability: Catat penyelarasan kontrak ALIGNED / REJECTED
+    # Observability: Catat penyelarasan kontrak ALIGNED / REJECTED / STATE_REPRESENTATION_FAILURE
     tracer = get_tracer(state.get("run_id"))
     if tracer:
         prov = aligned_contract.get("provenance", {}) if isinstance(aligned_contract, dict) else {}
@@ -723,14 +1639,35 @@ Tuliskan output JSON yang valid, presisi, dan konsisten di dalam penanda === BLU
     if extracted_bp:
         bp_dict = extracted_bp.model_dump() if hasattr(extracted_bp, "model_dump") else (extracted_bp.to_dict() if hasattr(extracted_bp, "to_dict") else extracted_bp)
 
+    stage_a_semantic_dict = None
+    if frozen_stage_a:
+        stage_a_semantic_dict = {
+            "mappings": [m.to_dict() for m in frozen_stage_a.mappings],
+            "sha256_seal": frozen_stage_a.sha256_seal,
+            "validated_at": frozen_stage_a.validated_at
+        }
+    elif mappings_a:
+        stage_a_semantic_dict = {
+            "mappings": [m.to_dict() for m in mappings_a]
+        }
+
+    stage_b_semantic_dict = None
+    if assembly_b:
+        stage_b_semantic_dict = assembly_b.to_dict() if hasattr(assembly_b, "to_dict") else asdict(assembly_b)
+
+    ret_status = "STATE_REPRESENTATION_FAILURE" if status_label == "STATE_REPRESENTATION_FAILURE" else "architect_done"
+
     return {
         "architecture_plan": arch_plan,
         "architectural_blueprint": bp_dict,
+        "canonical_blueprint": bp_dict,
+        "stage_a_semantic": stage_a_semantic_dict,
+        "stage_b_semantic": stage_b_semantic_dict,
         "contract": aligned_contract,
         "contract_status": status_label,
         "contract_validation_errors": contract_errors,
         "blueprint_revision_count": state.get("blueprint_revision_count", 0),
-        "status": "architect_done",
+        "status": ret_status,
         "logs": current_logs + [new_log]
     }
 
