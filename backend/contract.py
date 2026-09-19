@@ -39,6 +39,8 @@ try:
         extract_canonical_scenarios,
         evaluate_scaffold_scenario_compatibility,
         ScaffoldCompatibilityStatus,
+        ScaffoldStructuralStatus,
+        ScaffoldBehavioralStatus,
         ScaffoldScenarioMatrix,
     )
 except ImportError:
@@ -57,12 +59,16 @@ except ImportError:
             extract_canonical_scenarios,
             evaluate_scaffold_scenario_compatibility,
             ScaffoldCompatibilityStatus,
+            ScaffoldStructuralStatus,
+            ScaffoldBehavioralStatus,
             ScaffoldScenarioMatrix,
         )
     except ImportError:
         extract_canonical_scenarios = None
         evaluate_scaffold_scenario_compatibility = None
         ScaffoldCompatibilityStatus = None
+        ScaffoldStructuralStatus = None
+        ScaffoldBehavioralStatus = None
         ScaffoldScenarioMatrix = None
 
 try:
@@ -620,7 +626,13 @@ def check_pre_freeze_authority_compatibility(
                 "reason": r.reason,
                 "missing_aspects": r.missing_aspects,
             }
+            if getattr(r, "binding_evidence", None):
+                item["binding_evidence"] = r.binding_evidence.to_dict()
             missing_obligations.append(item)
+
+            diagnostic_block = ""
+            if getattr(r, "binding_evidence", None):
+                diagnostic_block = f"\n\n{r.binding_evidence.to_diagnostic_block()}"
 
             msg = (
                 f"\nORACLE_OBLIGATION:\n{ob_desc}\n\n"
@@ -628,6 +640,7 @@ def check_pre_freeze_authority_compatibility(
                 f"CONTRACT_COVERAGE:\n{cov_status_label}\n\n"
                 f"DIAGNOSIS:\n{r.reason}\n\n"
                 f"RESULT:\nINCOMPATIBLE — CONTRACT MUST NOT FREEZE (File: {ob.source_reference})"
+                f"{diagnostic_block}"
             )
             error_messages.append(msg)
 
@@ -700,15 +713,17 @@ def check_pre_freeze_authority_compatibility(
                     except Exception:
                         pass
 
-                if not scaffold_matrix.is_fully_compatible:
+                if not getattr(scaffold_matrix, "is_structurally_compatible", scaffold_matrix.is_fully_compatible):
                     is_compatible = False
                     for diag in scaffold_matrix.to_diagnosis_lines():
                         error_messages.append(diag)
                     for it in scaffold_matrix.items:
-                        if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value:
+                        is_struct_bad = getattr(it, "structural_compatibility", None) in ("INCOMPATIBLE", "MISSING")
+                        is_behav_bad = getattr(it, "behavioral_evidence", None) == "INCOMPATIBLE"
+                        if is_struct_bad or is_behav_bad or it.is_regression or it.compatibility == ScaffoldCompatibilityStatus.INCOMPATIBLE.value:
                             missing_obligations.append({
                                 "obligation": f"Acceptance Scenario '{it.scenario_id}' ({it.source_reference})",
-                                "coverage": it.compatibility,
+                                "coverage": getattr(it, "structural_compatibility", None) if is_struct_bad else (getattr(it, "behavioral_evidence", None) if is_behav_bad else it.compatibility),
                                 "result": "INCOMPATIBLE — CONTRACT MUST NOT FREEZE",
                                 "source_file": it.source_reference,
                                 "obligation_id": it.scenario_id,

@@ -959,6 +959,22 @@ class ScaffoldCompatibilityStatus(str, Enum):
     UNDETERMINED = "UNDETERMINED"
 
 
+class ScaffoldStructuralStatus(str, Enum):
+    """Status kompatibilitas struktural/arsitektur (identitas, keberadaan artefak, kecocokan signature)."""
+    STRUCTURAL_MATCH = "STRUCTURAL_MATCH"
+    INCOMPATIBLE = "INCOMPATIBLE"
+    MISSING = "MISSING"
+    UNDETERMINED = "UNDETERMINED"
+
+
+class ScaffoldBehavioralStatus(str, Enum):
+    """Bukti perilaku runtime (return value, exception branch, error status)."""
+    BEHAVIORALLY_PROVABLE = "BEHAVIORALLY_PROVABLE"
+    BEHAVIOR_NOT_PROVABLE = "BEHAVIOR_NOT_PROVABLE"
+    INCOMPATIBLE = "INCOMPATIBLE"
+    UNDETERMINED = "UNDETERMINED"
+
+
 @dataclass
 class ScaffoldCallableFact:
     """Fakta implementasi yang diekstraksi dari sebuah callable / unit di code_scaffold."""
@@ -984,7 +1000,7 @@ class ScaffoldCallableFact:
 class ScaffoldScenarioCompatibilityItem:
     """Item evaluasi kompatibilitas antara satu Acceptance Scenario dan code_scaffold."""
     scenario_id: str
-    compatibility: str  # COMPATIBLE | INCOMPATIBLE | UNDETERMINED
+    compatibility: str  # COMPATIBLE | INCOMPATIBLE | UNDETERMINED (backward-compatible)
     authority: str = "FROZEN_ORACLE"
     source_reference: str = ""
     observed_scaffold_facts: Dict[str, Any] = field(default_factory=dict)
@@ -992,13 +1008,18 @@ class ScaffoldScenarioCompatibilityItem:
     evidence: str = ""
     causal_status: str = CausalStatus.UNRESOLVED.value
     is_regression: bool = False
+    # Dimensi epistemik terpisah:
+    structural_compatibility: str = ScaffoldStructuralStatus.UNDETERMINED.value
+    behavioral_evidence: str = ScaffoldBehavioralStatus.UNDETERMINED.value
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> ScaffoldScenarioCompatibilityItem:
-        return cls(**d)
+        valid_fields = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in d.items() if k in valid_fields}
+        return cls(**filtered)
 
 
 @dataclass
@@ -1010,11 +1031,24 @@ class ScaffoldScenarioMatrix:
     incompatible_count: int = 0
     undetermined_count: int = 0
     regression_count: int = 0
+    # Dimensi epistemik struktural vs perilaku:
+    is_structurally_compatible: bool = False
+    structural_match_count: int = 0
+    structural_incompatible_count: int = 0
+    structural_missing_count: int = 0
+    behaviorally_provable_count: int = 0
+    behavior_not_provable_count: int = 0
 
     def to_diagnosis_lines(self) -> List[str]:
         lines = []
         for it in self.items:
-            if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value:
+            is_bad = (
+                it.structural_compatibility in (ScaffoldStructuralStatus.INCOMPATIBLE.value, ScaffoldStructuralStatus.MISSING.value)
+                or it.behavioral_evidence == ScaffoldBehavioralStatus.INCOMPATIBLE.value
+                or it.is_regression
+                or it.compatibility == ScaffoldCompatibilityStatus.INCOMPATIBLE.value
+            )
+            if is_bad:
                 reg_prefix = "[CRITICAL REGRESSION] " if it.is_regression else ""
                 lines.append(
                     f"{reg_prefix}SCENARIO_SCAFFOLD_INCOMPATIBILITY: Scenario '{it.scenario_id}' is {it.compatibility}.\n"
@@ -1033,6 +1067,12 @@ class ScaffoldScenarioMatrix:
             "incompatible_count": self.incompatible_count,
             "undetermined_count": self.undetermined_count,
             "regression_count": self.regression_count,
+            "is_structurally_compatible": self.is_structurally_compatible,
+            "structural_match_count": self.structural_match_count,
+            "structural_incompatible_count": self.structural_incompatible_count,
+            "structural_missing_count": self.structural_missing_count,
+            "behaviorally_provable_count": self.behaviorally_provable_count,
+            "behavior_not_provable_count": self.behavior_not_provable_count,
         }
 
 
@@ -1371,6 +1411,42 @@ class DartScaffoldExtractor:
         return facts
 
 
+def extract_all_scaffold_facts(scaffold_files: Dict[str, Any]) -> List[ScaffoldCallableFact]:
+    """
+    Ekstraksi deterministik seluruh ScaffoldCallableFact dari seluruh file scaffold
+    menggunakan PythonScaffoldExtractor (.py) atau DartScaffoldExtractor (.dart).
+    Mendukung scaffold_files berupa Dict[file_path, str | dict | object].
+    """
+    py_extractor = PythonScaffoldExtractor()
+    dart_extractor = DartScaffoldExtractor()
+
+    all_facts: List[ScaffoldCallableFact] = []
+    if not scaffold_files:
+        return all_facts
+
+    for file_path, mod in scaffold_files.items():
+        code = ""
+        if isinstance(mod, str):
+            code = mod
+        elif isinstance(mod, dict):
+            code = mod.get("code_scaffold") or mod.get("content") or ""
+        elif hasattr(mod, "code_scaffold"):
+            code = getattr(mod, "code_scaffold", "") or ""
+        elif hasattr(mod, "content"):
+            code = getattr(mod, "content", "") or ""
+
+        if not code or not code.strip():
+            continue
+
+        fp_clean = str(file_path).replace("\\", "/").strip()
+        if fp_clean.endswith(".py"):
+            all_facts.extend(py_extractor.extract_facts(fp_clean, code))
+        elif fp_clean.endswith(".dart"):
+            all_facts.extend(dart_extractor.extract_facts(fp_clean, code))
+
+    return all_facts
+
+
 def _route_matches(sc_path: str, fact_path: str) -> bool:
     """Memeriksa kecocokan route URL skenario dan scaffold secara deterministik."""
     if not sc_path or not fact_path:
@@ -1400,32 +1476,22 @@ def evaluate_scaffold_scenario_compatibility(
     Mengevaluasi secara deterministik kompatibilitas antara kumpulan Canonical Acceptance Scenarios
     dan code_scaffold yang diajukan Architect SEBELUM contract diizinkan bertransisi ke FROZEN.
 
-    DOKTRIN NON-NEGOTIABLE (Treatment #1.4):
+    DOKTRIN NON-NEGOTIABLE (Treatment #1.4 & #1.8.10):
     1. Oracle adalah IMMUTABLE ACCEPTANCE AUTHORITY (WHAT).
-    2. Architect adalah DESIGN AUTHORITY (HOW). Struktur bebas (dict, list, class, repo) asalkan
-       observable outcome dapat dipenuhi.
-    3. Tiga Status: COMPATIBLE, INCOMPATIBLE, UNDETERMINED.
-    4. Evaluator membedakan:
-       - PROVEN compatible: callable matches, parameter/shape matches, and appropriate path
-         (matching return for positive, matching error/guard for negative) is provably present.
-       - PROVEN incompatible: callable missing, call shape conflict, or provably cannot fulfill
-         (e.g. unconditional 204 with zero error path/branch in a self-contained body for negative scenario).
-       - UNDETERMINED: presence of opaque calls, dynamic dispatch, unresolved branches, or stubs
-         where reachability or absence cannot be statically proven.
+    2. Architect adalah DESIGN AUTHORITY (HOW).
+       - Architect membuktikan kompatibilitas struktural / arsitektur.
+       - Developer memproduksi implementasi.
+       - Oracle membuktikan perilaku penerimaan runtime.
+    3. Dua Dimensi Epistemik Terpisah:
+       - structural_compatibility: STRUCTURAL_MATCH | INCOMPATIBLE | MISSING | UNDETERMINED
+       - behavioral_evidence: BEHAVIORALLY_PROVABLE | BEHAVIOR_NOT_PROVABLE | INCOMPATIBLE | UNDETERMINED
+    4. Minimal stub (pass) dengan identitas & call shape yang valid adalah:
+       STRUCTURAL_MATCH + BEHAVIOR_NOT_PROVABLE + UNDETERMINED (compatibility).
+       Stub TIDAK PERNAH dipromosikan ke BEHAVIOR_PASS / COMPATIBLE.
     5. Aturan Absolut: UNDETERMINED TIDAK PERNAH dipromosikan ke PASS (FAIL-CLOSED).
     6. Multi-scenario preservation & regression detection (COMPATIBLE -> INCOMPATIBLE flagged as CRITICAL).
     """
-    py_extractor = PythonScaffoldExtractor()
-    dart_extractor = DartScaffoldExtractor()
-
-    all_facts: List[ScaffoldCallableFact] = []
-    for file_path, code in scaffold_files.items():
-        if not code:
-            continue
-        if file_path.endswith(".py"):
-            all_facts.extend(py_extractor.extract_facts(file_path, code))
-        elif file_path.endswith(".dart"):
-            all_facts.extend(dart_extractor.extract_facts(file_path, code))
+    all_facts: List[ScaffoldCallableFact] = extract_all_scaffold_facts(scaffold_files)
 
     prev_status_map = {}
     if previous_matrix:
@@ -1481,90 +1547,35 @@ def evaluate_scaffold_scenario_compatibility(
                 observed_scaffold_facts={},
                 expected_behavior=expected_repr,
                 evidence=evidence_msg,
-                causal_status=CausalStatus.VIOLATED.value
+                causal_status=CausalStatus.VIOLATED.value,
+                structural_compatibility=ScaffoldStructuralStatus.MISSING.value,
+                behavioral_evidence=ScaffoldBehavioralStatus.INCOMPATIBLE.value,
             ))
             continue
 
-        fact = matched_facts[0]
-        observed_facts = {
-            "name": fact.name,
-            "route": fact.route,
-            "http_method": fact.http_method,
-            "positional_params_count": fact.positional_params_count,
-            "has_named_params": fact.has_named_params,
-            "error_paths_count": len(fact.error_paths),
-            "conditional_branches_count": len(fact.conditional_branches),
-            "is_stub": fact.is_stub,
-            "has_opaque_calls": fact.has_opaque_calls,
-            "has_unconditional_return": fact.has_unconditional_return,
-        }
+        candidate_items: List[ScaffoldScenarioCompatibilityItem] = []
+        for fact in matched_facts:
+            observed_facts = {
+                "name": fact.name,
+                "route": fact.route,
+                "http_method": fact.http_method,
+                "positional_params_count": fact.positional_params_count,
+                "has_named_params": fact.has_named_params,
+                "error_paths_count": len(fact.error_paths),
+                "conditional_branches_count": len(fact.conditional_branches),
+                "is_stub": fact.is_stub,
+                "has_opaque_calls": fact.has_opaque_calls,
+                "has_unconditional_return": fact.has_unconditional_return,
+            }
 
-        # Check call shape / constructor compatibility
-        is_pos_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\[", sc.stimulus) or
-                           re.search(rf"\b{fact.name}\s*\([^{{)]*[,)]", sc.stimulus))
-        is_named_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\w+\s*:", sc.stimulus) or
-                             re.search(r"\b\w+\s*:\s*['\"\d]", sc.stimulus))
+            # Check call shape / constructor compatibility
+            is_pos_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\[", sc.stimulus) or
+                               re.search(rf"\b{fact.name}\s*\([^{{)]*[,)]", sc.stimulus))
+            is_named_call = bool(re.search(rf"\b{fact.name}\s*\(\s*\w+\s*:", sc.stimulus) or
+                                 re.search(r"\b\w+\s*:\s*['\"\d]", sc.stimulus))
 
-        if is_pos_call and not is_named_call and fact.has_named_params and fact.positional_params_count == 0:
-            items.append(ScaffoldScenarioCompatibilityItem(
-                scenario_id=sc.scenario_id,
-                compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
-                authority="FROZEN_ORACLE",
-                source_reference=sc.source_reference,
-                observed_scaffold_facts=observed_facts,
-                expected_behavior=expected_repr,
-                evidence=(
-                    f"Call shape incompatibility: Scenario invokes '{fact.name}' with positional arguments, "
-                    f"but scaffold constructor only accepts named/keyword parameters (0 positional parameters)."
-                ),
-                causal_status=CausalStatus.VIOLATED.value
-            ))
-            continue
-
-        if is_named_call and not fact.has_named_params and fact.positional_params_count > 0:
-            items.append(ScaffoldScenarioCompatibilityItem(
-                scenario_id=sc.scenario_id,
-                compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
-                authority="FROZEN_ORACLE",
-                source_reference=sc.source_reference,
-                observed_scaffold_facts=observed_facts,
-                expected_behavior=expected_repr,
-                evidence=(
-                    f"Call shape incompatibility: Scenario invokes '{fact.name}' with named arguments, "
-                    f"but scaffold constructor declares positional parameters without named parameter support."
-                ),
-                causal_status=CausalStatus.VIOLATED.value
-            ))
-            continue
-
-        # Check outcome compatibility (User Corrections 1 & 2)
-        is_negative = (
-            sc.scenario_kind == ScenarioKind.NEGATIVE.value or
-            (sc.expected_exception is not None and sc.expected_exception != "NONE") or
-            any(isinstance(v, int) and v >= 400 for v in sc.expected_outcome.values())
-        )
-
-        if is_negative:
-            # Case 1: Stub or Opaque Delegation without local error handling -> UNDETERMINED
-            if fact.is_stub or (fact.has_opaque_calls and not fact.error_paths and not fact.conditional_branches):
-                items.append(ScaffoldScenarioCompatibilityItem(
-                    scenario_id=sc.scenario_id,
-                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
-                    authority="FROZEN_ORACLE",
-                    source_reference=sc.source_reference,
-                    observed_scaffold_facts=observed_facts,
-                    expected_behavior=expected_repr,
-                    evidence=(
-                        f"Insufficient static evidence: Callable '{fact.name}' delegates to opaque logic or is stubbed; "
-                        f"absence or presence of error path cannot be statically proven."
-                    ),
-                    causal_status=CausalStatus.UNRESOLVED.value
-                ))
-                continue
-
-            # Case 2: Statically proven absence of error handling -> INCOMPATIBLE (Gate 05 / Correction 1)
-            if fact.has_unconditional_return and not fact.error_paths and not fact.conditional_branches:
-                items.append(ScaffoldScenarioCompatibilityItem(
+            if is_pos_call and not is_named_call and fact.has_named_params and fact.positional_params_count == 0:
+                candidate_items.append(ScaffoldScenarioCompatibilityItem(
                     scenario_id=sc.scenario_id,
                     compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
                     authority="FROZEN_ORACLE",
@@ -1572,92 +1583,191 @@ def evaluate_scaffold_scenario_compatibility(
                     observed_scaffold_facts=observed_facts,
                     expected_behavior=expected_repr,
                     evidence=(
-                        f"Statically proven absence of error path: Scenario expects negative/error outcome '{expected_repr}', "
-                        f"but scaffold implementation for '{fact.name}' provides only unconditional success with no conditional branch or error path."
+                        f"Call shape incompatibility: Scenario invokes '{fact.name}' with positional arguments, "
+                        f"but scaffold constructor only accepts named/keyword parameters (0 positional parameters)."
                     ),
-                    causal_status=CausalStatus.VIOLATED.value
+                    causal_status=CausalStatus.VIOLATED.value,
+                    structural_compatibility=ScaffoldStructuralStatus.INCOMPATIBLE.value,
+                    behavioral_evidence=ScaffoldBehavioralStatus.INCOMPATIBLE.value,
                 ))
                 continue
 
-            # Case 3: Error paths or conditional branches present -> Reachability Check (Correction 2)
-            has_matching_raise = False
-            for ep in fact.error_paths:
-                expected_st = None
-                for k, v in sc.expected_outcome.items():
-                    if "status" in k and isinstance(v, int):
-                        expected_st = v
-                if ep.get("status_code") == expected_st or ep.get("exception_type") in str(sc.expected_exception):
-                    has_matching_raise = True
-                    break
-                if ep.get("exception_type") == "HTTPException" and expected_st is not None and ep.get("status_code") is None:
-                    has_matching_raise = True
-                    break
+            if is_named_call and not fact.has_named_params and fact.positional_params_count > 0:
+                candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                    scenario_id=sc.scenario_id,
+                    compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                    authority="FROZEN_ORACLE",
+                    source_reference=sc.source_reference,
+                    observed_scaffold_facts=observed_facts,
+                    expected_behavior=expected_repr,
+                    evidence=(
+                        f"Call shape incompatibility: Scenario invokes '{fact.name}' with named arguments, "
+                        f"but scaffold constructor declares positional parameters without named parameter support."
+                    ),
+                    causal_status=CausalStatus.VIOLATED.value,
+                    structural_compatibility=ScaffoldStructuralStatus.INCOMPATIBLE.value,
+                    behavioral_evidence=ScaffoldBehavioralStatus.INCOMPATIBLE.value,
+                ))
+                continue
 
-            has_relevant_guard = False
-            for b in fact.conditional_branches:
-                if any(p in b for p in fact.param_names) or "not in" in b or "not" in b or "==" in b or "<" in b or ">" in b:
-                    has_relevant_guard = True
-                    break
+            # Check outcome compatibility (User Corrections 1 & 2 & Treatment #1.8.10)
+            is_negative = (
+                sc.scenario_kind == ScenarioKind.NEGATIVE.value or
+                (sc.expected_exception is not None and sc.expected_exception != "NONE") or
+                any(isinstance(v, int) and v >= 400 for v in sc.expected_outcome.values())
+            )
 
-            if has_matching_raise or has_relevant_guard or fact.collection_lookups:
-                # PROVEN COMPATIBLE
-                items.append(ScaffoldScenarioCompatibilityItem(
+            if is_negative:
+                # Case 1: Stub or Opaque Delegation without local error handling -> UNDETERMINED
+                # A stub has valid structure (STRUCTURAL_MATCH) but cannot prove behavior (BEHAVIOR_NOT_PROVABLE)
+                if fact.is_stub or (fact.has_opaque_calls and not fact.error_paths and not fact.conditional_branches):
+                    candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                        scenario_id=sc.scenario_id,
+                        compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                        authority="FROZEN_ORACLE",
+                        source_reference=sc.source_reference,
+                        observed_scaffold_facts=observed_facts,
+                        expected_behavior=expected_repr,
+                        evidence=(
+                            f"Insufficient static evidence: Callable '{fact.name}' delegates to opaque logic or is stubbed; "
+                            f"absence or presence of error path cannot be statically proven."
+                        ),
+                        causal_status=CausalStatus.UNRESOLVED.value,
+                        structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                        behavioral_evidence=ScaffoldBehavioralStatus.BEHAVIOR_NOT_PROVABLE.value,
+                    ))
+                    continue
+
+                # Case 2: Statically proven absence of error handling -> INCOMPATIBLE (Gate 05 / Correction 1)
+                if fact.has_unconditional_return and not fact.error_paths and not fact.conditional_branches:
+                    candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                        scenario_id=sc.scenario_id,
+                        compatibility=ScaffoldCompatibilityStatus.INCOMPATIBLE.value,
+                        authority="FROZEN_ORACLE",
+                        source_reference=sc.source_reference,
+                        observed_scaffold_facts=observed_facts,
+                        expected_behavior=expected_repr,
+                        evidence=(
+                            f"Statically proven absence of error path: Scenario expects negative/error outcome '{expected_repr}', "
+                            f"but scaffold implementation for '{fact.name}' provides only unconditional success with no conditional branch or error path."
+                        ),
+                        causal_status=CausalStatus.VIOLATED.value,
+                        structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                        behavioral_evidence=ScaffoldBehavioralStatus.INCOMPATIBLE.value,
+                    ))
+                    continue
+
+                # Case 3: Error paths or conditional branches present -> Reachability Check (Correction 2)
+                has_matching_raise = False
+                for ep in fact.error_paths:
+                    expected_st = None
+                    for k, v in sc.expected_outcome.items():
+                        if "status" in k and isinstance(v, int):
+                            expected_st = v
+                    if ep.get("status_code") == expected_st or ep.get("exception_type") in str(sc.expected_exception):
+                        has_matching_raise = True
+                        break
+                    if ep.get("exception_type") == "HTTPException" and expected_st is not None and ep.get("status_code") is None:
+                        has_matching_raise = True
+                        break
+
+                has_relevant_guard = False
+                for b in fact.conditional_branches:
+                    if any(p in b for p in fact.param_names) or "not in" in b or "not" in b or "==" in b or "<" in b or ">" in b:
+                        has_relevant_guard = True
+                        break
+
+                if has_matching_raise or has_relevant_guard or fact.collection_lookups:
+                    # PROVEN COMPATIBLE
+                    candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                        scenario_id=sc.scenario_id,
+                        compatibility=ScaffoldCompatibilityStatus.COMPATIBLE.value,
+                        authority="FROZEN_ORACLE",
+                        source_reference=sc.source_reference,
+                        observed_scaffold_facts=observed_facts,
+                        expected_behavior=expected_repr,
+                        evidence=f"Scaffold for '{fact.name}' provably defines reachable conditional branch or error path aligned with scenario stimulus/precondition.",
+                        causal_status=CausalStatus.RESOLVED.value,
+                        structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                        behavioral_evidence=ScaffoldBehavioralStatus.BEHAVIORALLY_PROVABLE.value,
+                    ))
+                    break
+                else:
+                    # Branches exist but reachability cannot be proven -> UNDETERMINED
+                    candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                        scenario_id=sc.scenario_id,
+                        compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                        authority="FROZEN_ORACLE",
+                        source_reference=sc.source_reference,
+                        observed_scaffold_facts=observed_facts,
+                        expected_behavior=expected_repr,
+                        evidence=(
+                            f"Conditional branch or error path present in '{fact.name}', "
+                            f"but reachability under scenario precondition cannot be statically proven."
+                        ),
+                        causal_status=CausalStatus.UNRESOLVED.value,
+                        structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                        behavioral_evidence=ScaffoldBehavioralStatus.UNDETERMINED.value,
+                    ))
+                    continue
+            else:
+                # Positive scenario
+                if fact.is_stub:
+                    candidate_items.append(ScaffoldScenarioCompatibilityItem(
+                        scenario_id=sc.scenario_id,
+                        compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
+                        authority="FROZEN_ORACLE",
+                        source_reference=sc.source_reference,
+                        observed_scaffold_facts=observed_facts,
+                        expected_behavior=expected_repr,
+                        evidence=f"Scaffold callable '{fact.name}' is stubbed; return behavior cannot be statically proven.",
+                        causal_status=CausalStatus.UNRESOLVED.value,
+                        structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                        behavioral_evidence=ScaffoldBehavioralStatus.BEHAVIOR_NOT_PROVABLE.value,
+                    ))
+                    continue
+
+                # Valid interface and return/constructor shape
+                candidate_items.append(ScaffoldScenarioCompatibilityItem(
                     scenario_id=sc.scenario_id,
                     compatibility=ScaffoldCompatibilityStatus.COMPATIBLE.value,
                     authority="FROZEN_ORACLE",
                     source_reference=sc.source_reference,
                     observed_scaffold_facts=observed_facts,
                     expected_behavior=expected_repr,
-                    evidence=f"Scaffold for '{fact.name}' provably defines reachable conditional branch or error path aligned with scenario stimulus/precondition.",
-                    causal_status=CausalStatus.RESOLVED.value
+                    evidence=f"Scaffold defines matching interface and return path for '{fact.name}'.",
+                    causal_status=CausalStatus.RESOLVED.value,
+                    structural_compatibility=ScaffoldStructuralStatus.STRUCTURAL_MATCH.value,
+                    behavioral_evidence=ScaffoldBehavioralStatus.BEHAVIORALLY_PROVABLE.value if not fact.is_stub else ScaffoldBehavioralStatus.BEHAVIOR_NOT_PROVABLE.value,
                 ))
-                continue
-            else:
-                # Branches exist but reachability cannot be proven -> UNDETERMINED
-                items.append(ScaffoldScenarioCompatibilityItem(
-                    scenario_id=sc.scenario_id,
-                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
-                    authority="FROZEN_ORACLE",
-                    source_reference=sc.source_reference,
-                    observed_scaffold_facts=observed_facts,
-                    expected_behavior=expected_repr,
-                    evidence=(
-                        f"Conditional branch or error path present in '{fact.name}', "
-                        f"but reachability under scenario precondition cannot be statically proven."
-                    ),
-                    causal_status=CausalStatus.UNRESOLVED.value
-                ))
-                continue
-        else:
-            # Positive scenario
-            has_explicit_return_expectation = any(
-                k in sc.expected_outcome
-                for k in ("status_code", "return_value", "equals", "value_in")
-            )
-            if fact.is_stub and has_explicit_return_expectation:
-                items.append(ScaffoldScenarioCompatibilityItem(
-                    scenario_id=sc.scenario_id,
-                    compatibility=ScaffoldCompatibilityStatus.UNDETERMINED.value,
-                    authority="FROZEN_ORACLE",
-                    source_reference=sc.source_reference,
-                    observed_scaffold_facts=observed_facts,
-                    expected_behavior=expected_repr,
-                    evidence=f"Scaffold callable '{fact.name}' is stubbed; return behavior cannot be statically proven.",
-                    causal_status=CausalStatus.UNRESOLVED.value
-                ))
-                continue
+                break
 
-            # Valid interface and return/constructor shape
-            items.append(ScaffoldScenarioCompatibilityItem(
-                scenario_id=sc.scenario_id,
-                compatibility=ScaffoldCompatibilityStatus.COMPATIBLE.value,
-                authority="FROZEN_ORACLE",
-                source_reference=sc.source_reference,
-                observed_scaffold_facts=observed_facts,
-                expected_behavior=expected_repr,
-                evidence=f"Scaffold defines matching interface and return path for '{fact.name}'.",
-                causal_status=CausalStatus.RESOLVED.value
-            ))
+        chosen_item = None
+        # 1. Fully COMPATIBLE
+        for it in candidate_items:
+            if it.compatibility == ScaffoldCompatibilityStatus.COMPATIBLE.value:
+                chosen_item = it
+                break
+        # 2. Structurally matched UNDETERMINED (e.g. valid minimal stub)
+        if chosen_item is None:
+            struct_undet = [
+                it for it in candidate_items
+                if it.structural_compatibility == ScaffoldStructuralStatus.STRUCTURAL_MATCH.value
+                and it.compatibility == ScaffoldCompatibilityStatus.UNDETERMINED.value
+            ]
+            if struct_undet:
+                chosen_item = struct_undet[0]
+        # 3. Any UNDETERMINED
+        if chosen_item is None:
+            undetermined_list = [it for it in candidate_items if it.compatibility == ScaffoldCompatibilityStatus.UNDETERMINED.value]
+            if undetermined_list:
+                chosen_item = undetermined_list[0]
+        # 4. Fallback to first candidate
+        if chosen_item is None and candidate_items:
+            chosen_item = candidate_items[0]
+
+        if chosen_item:
+            items.append(chosen_item)
 
     # Regression detection
     for it in items:
@@ -1674,13 +1784,37 @@ def evaluate_scaffold_scenario_compatibility(
     # Fail-closed: UNDETERMINED is NEVER promoted to PASS
     is_fully = (incompat_count == 0 and undet_count == 0 and len(items) > 0)
 
+    # Epistemic structural compatibility:
+    # Architect satisfies structural contract if:
+    # 1. All items are STRUCTURAL_MATCH (no MISSING, no INCOMPATIBLE)
+    # 2. Zero items have provably INCOMPATIBLE behavioral evidence (e.g. unconditional success when error needed)
+    # 3. Zero critical regressions
+    struct_match_cnt = sum(1 for it in items if it.structural_compatibility == ScaffoldStructuralStatus.STRUCTURAL_MATCH.value)
+    struct_incompat_cnt = sum(1 for it in items if it.structural_compatibility == ScaffoldStructuralStatus.INCOMPATIBLE.value)
+    struct_missing_cnt = sum(1 for it in items if it.structural_compatibility == ScaffoldStructuralStatus.MISSING.value)
+    behav_provable_cnt = sum(1 for it in items if it.behavioral_evidence == ScaffoldBehavioralStatus.BEHAVIORALLY_PROVABLE.value)
+    behav_not_provable_cnt = sum(1 for it in items if it.behavioral_evidence == ScaffoldBehavioralStatus.BEHAVIOR_NOT_PROVABLE.value)
+
+    is_struct = (
+        len(items) > 0 and
+        struct_match_cnt == len(items) and
+        not any(it.behavioral_evidence == ScaffoldBehavioralStatus.INCOMPATIBLE.value for it in items) and
+        regression_count == 0
+    )
+
     return ScaffoldScenarioMatrix(
         items=items,
         is_fully_compatible=is_fully,
         compatible_count=compat_count,
         incompatible_count=incompat_count,
         undetermined_count=undet_count,
-        regression_count=regression_count
+        regression_count=regression_count,
+        is_structurally_compatible=is_struct,
+        structural_match_count=struct_match_cnt,
+        structural_incompatible_count=struct_incompat_cnt,
+        structural_missing_count=struct_missing_cnt,
+        behaviorally_provable_count=behav_provable_cnt,
+        behavior_not_provable_count=behav_not_provable_cnt,
     )
 
 
@@ -1691,11 +1825,14 @@ def format_scaffold_compatibility_for_architect(matrix: ScaffoldScenarioMatrix) 
     """
     if not matrix.items:
         return ""
-    incompat_or_undet = [
+    incompat_items = [
         it for it in matrix.items
-        if it.compatibility != ScaffoldCompatibilityStatus.COMPATIBLE.value
+        if it.structural_compatibility in (ScaffoldStructuralStatus.INCOMPATIBLE.value, ScaffoldStructuralStatus.MISSING.value)
+        or it.behavioral_evidence == ScaffoldBehavioralStatus.INCOMPATIBLE.value
+        or it.is_regression
+        or it.compatibility == ScaffoldCompatibilityStatus.INCOMPATIBLE.value
     ]
-    if not incompat_or_undet:
+    if not incompat_items:
         return ""
 
     lines = [
@@ -1704,7 +1841,7 @@ def format_scaffold_compatibility_for_architect(matrix: ScaffoldScenarioMatrix) 
         "Pemeriksaan pre-freeze mendeteksi bahwa code_scaffold yang diajukan tidak kompatibel",
         "dengan skenario penerimaan yang diekstraksi dari Frozen Oracle:\n"
     ]
-    for i, it in enumerate(incompat_or_undet, 1):
+    for i, it in enumerate(incompat_items, 1):
         reg_tag = " [CRITICAL REGRESSION]" if it.is_regression else ""
         lines.append(f"[{i}] Scenario: {it.scenario_id} — Status: {it.compatibility}{reg_tag}")
         lines.append(f"    Source: {it.source_reference}")

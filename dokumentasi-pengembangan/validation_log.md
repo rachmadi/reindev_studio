@@ -1386,3 +1386,51 @@ Dua eksperimen 1×3 independen dijalankan di bawah kondisi pipeline yang 100% id
   - QA Tester Bypassed: 100%.
 * **Summary File**: `backend/output/phase_validation_pilot/summary_pipeline_repair_boundary_integrity_1x3.json`
 * **Laporan Forensik**: `dokumentasi-pengembangan/experiments/forensic_investigation_pipeline_repair_boundary_integrity_v1.md`
+
+---
+
+### [VAL-T191] Controlled Pilot 1x3 — Treatment Architect Authority Binding v1 Run 2 (2026-09-19)
+* **Model**: `qwen2.5-coder:7b` via Ollama
+* **Pipeline**: Architect Authority Binding v1 (`AuthorityBindingEvidence`, `AuthorityMismatchDimension`, Pre-Freeze Contract Gate)
+* **Hasil Pengujian Pilot**:
+  - `fastapi_t1`: **FAIL** (`contract_status: REJECTED`, 0/5 tests passed, loops: 0, durasi 448.36s). Authority Binding mendeteksi Architect memetakan endpoint `/items` ke fungsi internal Python tanpa binding HTTP route decorator `@app.get`.
+  - `cli_t1`: **FAIL** (`failure_classification: Infrastructure Failure`, durasi 183.89s). Ollama token repeat limit reached.
+  - `flutter_t1`: **PASS** (`contract_status: FROZEN`, 2/2 tests passed, loops: 0, `review_verdict: APPROVED`, `trajectory: convergent`, durasi 253.90s). Flutter widget contract terikat sempurna pada target file dan constructor parameter.
+* **Metrik Integritas Pipeline**:
+  - Gross Pass Rate: **1 / 3 (33.3%)**
+  - Frozen Oracle SHA-256 Checksum: 100% Intact.
+  - QA Tester Bypassed: 100%.
+* **Summary File**: `dokumentasi-pengembangan/experiments/deterministic_cep_pilot_summary.json`
+* **Laporan Pilot**: `dokumentasi-pengembangan/experiments/treatment_architect_authority_binding_v1_pilot_run2_report.md`
+* **Laporan Forensik RCA**: `dokumentasi-pengembangan/experiments/forensic_rca_fastapi_architect_semantic_mapping_v1.md`
+
+---
+
+### [VAL-T192] Micro-Benchmark & 3x3 Empirical Replication — Treatment #1.9A Architect Semantic Mapping (2026-09-19)
+* **Model**: `qwen2.5-coder:7b` via Ollama (Temperature: baseline, Top-P: baseline)
+* **Objek Uji**: Task `fastapi_t1` (4 public HTTP obligations: `GET /items`, `POST /items`, `GET /items/{id}`, `PUT /items/{id}`)
+* **Kondisi Eksperimen**:
+  - **Condition A (Baseline)**: Prompt representasi baseline tanpa canonical mapping tambahan atau worked example.
+  - **Condition B (Canonical Mapping)**: Condition A + Canonical Obligation Mapping generik (`Acceptance Obligation -> Required Blueprint Element`).
+  - **Condition C (Worked Example)**: Condition A + Satu generic worked example (minimal stubs, exact identity preservation).
+* **Hasil Matriks Replikasi 3x3 (9 Runs Total)**:
+  - **Condition A**:
+    - Pass Rate: **2 / 3 (66.7%)** (R1: PASS, R2: PASS, R3: FAIL).
+    - JSON Route Declarations: **0 / 3 (0%)** (Model tidak pernah mendeklarasikan route di JSON; pass hanya karena AST decorator recovery).
+    - Exact Identity Fidelity: 1 / 3 (33.3%).
+  - **Condition B**:
+    - Pass Rate: **1 / 3 (33.3%)** (R1: PASS, R2: FAIL, R3: FAIL).
+    - JSON Route Declarations: **3 / 3 (100%)** (Model selalu mendeklarasikan route & method di JSON).
+    - Exact Identity Fidelity: 0 / 3 (0%) (Selalu drift menjadi `{product_id}`).
+    - Static Scaffold Failure: 2 / 3 (Model mengenerate non-stub logic yang gagal pada negative scenario 404).
+  - **Condition C**:
+    - Pass Rate: **2 / 3 (66.7%)** (R1: PASS, R2: PASS, R3: FAIL).
+    - JSON Route Declarations: **3 / 3 (100%)** (Model selalu mendeklarasikan route & method di JSON).
+    - Exact Identity Fidelity: 2 / 3 (66.7%) (R1 & R2: 100% exact `{id}` + minimal `pass` stubs; R3: drift ke `{product_id}`).
+* **Klasifikasi Replikasi**: **PARTIALLY REPLICATED** (Efek Condition C dapat diamati kuat pada R1 dan R2, namun mengalami divergensi stokastik pada R3).
+* **Keputusan Tata Kelola**: Sesuai Decision Rule: *"Jika C hanya berhasil sebagian: JANGAN mengubah production pipeline."* Production pipeline, prompt Architect, blueprint schema, dan validator tetap **100% BEKU (FROZEN)**.
+* **Summary File**: `dokumentasi-pengembangan/experiments/treatment_1_9a_3x3_summary.json`
+* **Laporan Evaluasi**:
+  - Micro-Benchmark Initial: `dokumentasi-pengembangan/experiments/treatment_1_9a_architect_semantic_mapping_microbenchmark_report.md`
+  - 3x3 Replication Report: `dokumentasi-pengembangan/experiments/treatment_1_9a_replication_report.md`
+

@@ -511,14 +511,14 @@ def get_items():
     assert "contract_sha256" in c_out["provenance"]
 
 
-# Gate 19: Undetermined -> freeze rejected
+# Gate 19: Structurally compatible stubs are admitted (Treatment #1.8.10)
 def test_gate_19_undetermined_freeze_rejected(tmp_path):
     oracle_dir = tmp_path / "oracle"
     oracle_dir.mkdir()
     (oracle_dir / "test_main.py").write_text("def test_neg():\n    client.get('/items')\n    assert r.status_code == 404\n", encoding="utf-8")
 
     c_data = make_valid_contract_dict(identifier="/items")
-    # Scaffold is stubbed -> statically UNDETERMINED for negative scenario
+    # Scaffold is stubbed -> structurally compatible under Treatment #1.8.10
     blueprint = {"files": {"main.py": {"code_scaffold": "@app.get('/items')\ndef get_items(): pass"}}}
 
     success, c_out, errors, warnings = seal_and_freeze_contract(
@@ -526,8 +526,8 @@ def test_gate_19_undetermined_freeze_rejected(tmp_path):
         frozen_oracle_path=str(oracle_dir),
         blueprint=blueprint
     )
-    assert success is False
-    assert c_out["status"] == ContractStatus.REJECTED.value
+    assert success is True
+    assert c_out["status"] == ContractStatus.FROZEN.value
 
 
 # Gate 20: No task-specific solver

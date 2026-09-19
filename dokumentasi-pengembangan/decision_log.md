@@ -410,3 +410,42 @@ Dokumen ini mencatat seluruh keputusan arsitektur, teknis, dan metodologis yang 
      - `cli_t1`: Scaffold kode 5.995 karakter diterima dengan 0 AST error (Defect #2 terbukti tuntas). Seksi atomik `sec_07_repair_boundary` (`ALLOWED`, `FORBIDDEN`, `PRESERVE`) terkirim 100% utuh pada Turn 1 dan Turn 2 (`delivery_valid: True`, Defect #1 terbukti tuntas). Model berhasil dipanggil pada repair turn tanpa interupsi kegagalan delivery.
      - Penghentian Terkendali: Sesuai arahan pengguna akibat durasi eksekusi inferensi CPU model 7B (utilisasi GPU 0% karena 8k context window melampaui VRAM 6GB laptop), pilot dihentikan setelah `cli_t1` tuntas, mencegah beban eksekusi tambahan ~45 menit untuk `flutter_t1`.
 * **Dampak**: Dua defek struktural batas pipeline resmi tereliminasi secara generik tanpa task-specific branching atau pelanggaran komponen beku.
+
+---
+
+### [D-130] Treatment Architect Authority Binding v1 & Controlled Pilot Run 2 (2026-09-18 s.d. 2026-09-19)
+* **Konteks**: Berdasarkan temuan bahwa kontrak tidak boleh dibekukan apabila public interface obligations yang diwajibkan oleh Frozen Oracle tidak memiliki keterikatan semantik nyata (*Authority Binding*) pada blueprint yang diajukan Architect.
+* **Keputusan / Temuan**:
+  1. **Authority Binding Architecture**: Mengintegrasikan `AuthorityBindingEvidence` dan `AuthorityMismatchDimension` pada `canonical_obligation.py` dan `contract.py` untuk mengidentifikasi deviasi identitas interface, parameter, atau callable name secara eksplisit sebelum kontrak disegel (`seal_and_freeze_contract`).
+  2. **Controlled Pilot 1x3 Run 2 (`qwen2.5-coder:7b`)**:
+     - `fastapi_t1`: **FAIL** (`contract_status: REJECTED`). Authority Binding secara presisi menolak blueprint karena Architect mendeklarasikan fungsi internal (`get_items`, `read_item`, dll.) alih-alih route decorator `@app.get` yang terikat pada public endpoint `/items`. Durasi: 448,36s.
+     - `cli_t1`: **FAIL** (`failure_classification: Infrastructure Failure`). Inferensi model terinterupsi loop repetisi token pada Ollama (`prediction aborted, token repeat limit reached`). Durasi: 183,89s.
+     - `flutter_t1`: **PASS** (100% PASS, 2/2 tests passed, `contract_status: FROZEN`, `review_verdict: APPROVED`, `trajectory: convergent`). Durasi: 253,90s.
+  3. **Gross Pass Rate**: 1/3 (33.3%).
+* **Dampak**: Authority Binding berhasil mencegah false-freeze pada FastAPI secara presisi, namun mengungkap kegagalan Architect dalam memetakan HTTP endpoint ke blueprint routes.
+
+---
+
+### [D-131] Forensic RCA: FastAPI Architect Semantic Mapping v1 (2026-09-19)
+* **Konteks**: Mandat forensik bukti-pertama (evidence-first) untuk menentukan mengapa Architect Qwen 2.5 Coder 7B gagal memetakan 4 public HTTP obligations menjadi route/interface binding pada blueprint.
+* **Keputusan / Temuan**:
+  1. Klasifikasi Akar Masalah: **D & E (Architect Semantic Mapping Failure driven by Model Capability Limitations)**.
+  2. Evaluasi Bukti:
+     - Context & Representation (A & B): Telah menyajikan informasi endpoint `/items`, metode GET, dan status code secara eksplisit.
+     - Blueprint Schema (C): Schema `InterfaceContract` mendukung route decorator dan HTTP methods secara penuh.
+     - Perilaku Model: Model 7B memetakan call-site `client.get("/items")` ke representasi callable internal Python standar (`def get_items()`) tanpa menyertakan binding dekorator web (`@app.get("/items")`) di JSON contract, serta menghasilkan scaffold fungsi non-web.
+* **Dampak**: Menegaskan bahwa perbaikan tidak boleh berupa task-specific patch di pipeline, melainkan memerlukan eksperimen terisolasi pada semantic mapping capability model.
+
+---
+
+### [D-132] Treatment #1.9A Micro-Benchmark & 3x3 Empirical Replication (2026-09-19)
+* **Konteks**: Menguji hipotesis perbaikan semantic mapping Architect pada task `fastapi_t1` di bawah 3 kondisi eksperimen: Condition A (Baseline prompt), Condition B (Baseline + Canonical Obligation Mapping), Condition C (Baseline + Worked Example), dilanjutkan dengan replikasi empiris 3x3 (9 runs total).
+* **Keputusan / Temuan**:
+  1. **Hasil Matriks 3x3**:
+     - **Condition A (Baseline)**: Pass Rate 2/3 (66.7%). JSON route declaration: 0/3 (0%). Lolos hanya karena AST decorator recovery dari scaffold string. Identity fidelity: 1/3.
+     - **Condition B (Canonical Mapping)**: Pass Rate 1/3 (33.3%). JSON route declaration: 3/3 (100%). Selalu mendeklarasikan route/method, namun mengalami parameter drift ke `{product_id}` (3/3) dan over-generation logika scaffold yang memicu penolakan skenario negatif 404.
+     - **Condition C (Worked Example)**: Pass Rate 2/3 (66.7%). JSON route declaration: 3/3 (100%). Pada Run 1 dan Run 2 mencapai 100% exact identity (`{id}`) dan pure minimal stubs. Namun pada Run 3 mengalami regresi stokastik ke `{product_id}` dan scaffold over-generation.
+  2. **Klasifikasi Replikasi**: **PARTIALLY REPLICATED** (Stochastic Divergence).
+  3. **Penerapan Aturan Keputusan**: Sesuai doktrin riset: *"Jika C hanya berhasil sebagian: JANGAN mengubah production pipeline. Laporkan stochasticity dan divergence."* Production pipeline, prompt Architect, blueprint schema, dan validator tetap **100% DIBEKUKAN (FROZEN)** tanpa modifikasi.
+* **Dampak**: Menghindari premature modification pada pipeline inti dan membuktikan batas stokastik model 7B dalam mempertahankan invariant identitas endpoint.
+

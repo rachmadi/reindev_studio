@@ -947,12 +947,43 @@ orecursedirs = backend/output backend/sandbox .venv build .git.
 
 ---
 
-### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Pipeline Repair v1):
+---
+
+### Kasus E-076: Architect Failure to Map Public HTTP Endpoints to Route Decorators in FastAPI (Treatment Authority Binding v1)
+- **Waktu:** 2026-09-19 06:21 WIB (Pilot Run 2 `fastapi_t1`)
+- **Tingkat Keparahan:** High (Agent Capability / Semantic Mapping Failure)
+- **Gejala:** Contract Gate menolak blueprint (`REJECTED`) dengan diagnostik Authority Binding: `Obligation 'GET /items' has no corresponding public interface contract` dan `Target artifact mismatch for items: expected main.py, but declared in None`.
+- **Akar Masalah:** Model Qwen 2.5 Coder 7B memetakan call-site HTTP client (`client.get('/items')`) ke fungsi internal Python standar (`def get_items()`) alih-alih mendeklarasikan route decorator FastAPI (`@app.get('/items')`) di JSON contract dan scaffold kode.
+- **Tindakan Korektif & Temuan:**
+  1. Melakukan audit forensik bukti-pertama (`forensic_rca_fastapi_architect_semantic_mapping_v1.md`).
+  2. Menguji hipotesis perbaikan melalui micro-benchmark terisolasi Treatment #1.9A (Conditions A, B, C) dan replikasi 3x3.
+  3. Replikasi membuktikan bahwa condition C (Worked Example) mampu mendorong model mendeklarasikan route (100% routes declared), namun rentan terhadap divergensi stokastik (parameter drift ke `{product_id}`).
+  4. Sesuai doktrin, pipeline production dibekukan tanpa modifikasi prematur.
+- **Sumber Solusi:** FORENSIC RCA & TREATMENT #1.9A REPLICATION.
+- **Status:** Terdokumentasi secara empiris (Empirically Documented & Frozen).
+
+---
+
+### Kasus E-077: Ollama Token Repeat Limit Abort During CLI Task Pilot Run 2
+- **Waktu:** 2026-09-19 06:28 WIB (Pilot Run 2 `cli_t1`)
+- **Tingkat Keparahan:** Medium (Local Inference Infrastructure Failure)
+- **Gejala:** Eksekusi task `cli_t1` terhenti tiba-tiba dengan error: `prediction aborted, token repeat limit reached (status code: -1)`.
+- **Akar Masalah:** Mesin inferensi Ollama mendeteksi pengulangan token yang melampaui ambang batas batas repetisi lokal pada saat model menghasilkan keluaran repetitif untuk parameter parser CLI.
+- **Tindakan Korektif:**
+  1. Mengklasifikasikan kegagalan sebagai `Infrastructure Failure` (bukan defek pipeline atau kontrak).
+  2. Memverifikasi integritas checksum SHA-256 Oracle yang tetap 100% utuh.
+- **Sumber Solusi:** PILOT RUN 2 TELEMETRY AUDIT.
+- **Status:** Terdokumentasi (Documented Infrastructure Flaw).
+
+---
+
+### Ringkasan Rasio Penanganan Galat Kumulatif (s.d. Treatment #1.9A):
 - **Diselesaikan Mandiri oleh Agen:** 34 kasus (termasuk E-065, E-068, E-072, E-073, E-074, E-075)
 - **Diselesaikan atas Intervensi IA:** 7 kasus
-- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 11 kasus (termasuk E-067)
+- **Inisiatif Strategis IA + Evaluasi Kritis Pengujian:** 13 kasus (termasuk E-067, E-076, E-077)
 - **Kasus Forensik & Rekomendasi Terbuka:** 7 kasus (E-060, E-061, E-062, E-066, E-069, E-070, E-071)
-- **Total Galat Terdokumentasi:** 75 kasus (E-001 s/d E-075)
+- **Total Galat Terdokumentasi:** 77 kasus (E-001 s/d E-077)
+
 
 
 

@@ -2865,3 +2865,23 @@ Metodologi: Rumuskan hipotesis H1.7: Penguatan Evidence-Grounded Requirement Com
   - Menegakkan arahan penghentian terkendali (*Controlled Stop Rule*) dari pengguna setelah `cli_t1` tuntas guna mencegah pemborosan komputasi inferensi CPU Ollama (~40 menit untuk `flutter_t1`) akibat offloading memori (KV cache 8k context melampaui VRAM 6GB GPU).
   - Menerbitkan laporan investigasi forensik resmi `forensic_investigation_pipeline_repair_boundary_integrity_v1.md` dan memutakhirkan seluruh berkas tata kelola IIDD.
 
+---
+
+### Sesi: Authority Binding v1, Forensic RCA, & Replikasi #1.9A (18–19 September 2026, 13:30 – 10:45 WIB)
+- **Pengguna (Intent Architect)**:
+  - Mengarahkan audit forensik dan evaluasi Treatment #1.8.10 dan #1.8.11 (Architect Simplification).
+  - Menginstruksikan implementasi Architect Authority Binding v1 dan eksekusi Controlled Pilot Run 2 pada Qwen 7B.
+  - Mengeluarkan instruksi resmi: *"FORENSIC RCA — FASTAPI ARCHITECT SEMANTIC MAPPING v1"* (STATUS: FORENSIC ONLY. NO CODE/PROMPT/ORACLE MODIFICATION. NO RERUN).
+  - Menginstruksikan *"TREATMENT #1.9A — ARCHITECT SEMANTIC MAPPING MICRO-BENCHMARK"* pada Qwen 7B dengan 3 kondisi: Condition A (Baseline), Condition B (Canonical Mapping), Condition C (Worked Example).
+  - Menginstruksikan *"REPLICATION #1.9A — ARCHITECT SEMANTIC MAPPING"* (RESEARCH-ONLY REPLICATION, 2 replication run tambahan R2 & R3 across A, B, C; 9 total runs).
+  - Menginstruksikan: *"laporkan tiap 3 menit"*, *"update dokumentasi dulu ke github"*.
+- **Asisten**:
+  - Mengintegrasikan Authority Binding v1 di `backend/canonical_obligation.py` dan `backend/contract.py` dengan penegakan pre-freeze check berbasis `AuthorityBindingEvidence`.
+  - Mengeksekusi Controlled Pilot Run 2: FastAPI FAIL (REJECTED contract), CLI FAIL (Ollama repeat limit), Flutter PASS (2/2 tests passed, FROZEN, APPROVED).
+  - Menyusun laporan Forensik RCA `forensic_rca_fastapi_architect_semantic_mapping_v1.md`, membuktikan akar masalah berada pada model capability/semantic mapping (Kategori D/E).
+  - Membangun harness terisolasi `treatment_1_9a/` dan mengeksekusi micro-benchmark serta matriks replikasi 3x3 (9 runs).
+  - Mendokumentasikan hasil: Condition A (2/3 PASS via AST backfiller, 0/3 JSON routes), Condition B (1/3 PASS, 3/3 JSON routes, 3/3 parameter drift `{product_id}`), Condition C (2/3 PASS, 3/3 JSON routes, 2/3 exact `{id}`, 1/3 stochastic regression).
+  - Menerapkan Decision Rule ketat: klasifikasi *Partially Replicated* menghasilkan keputusan **Zero Production Pipeline Mutation** (production pipeline tetap dibekukan).
+  - Memutakhirkan seluruh berkas tata kelola IIDD, memverifikasi suite 871 unit tests PASS (0 regresi), menyusun git commit komprehensif, dan melakukan push ke remote GitHub.
+
+

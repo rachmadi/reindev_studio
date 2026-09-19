@@ -895,4 +895,31 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
     - `dokumentasi-pengembangan/experiments/forensic_investigation_pipeline_repair_boundary_integrity_v1.md`: Laporan audit forensik menyeluruh atas eliminasi kedua defek dan telemetri empiris live pilot.
     - Pemutakhiran menyeluruh berkas log tata kelola IIDD: `decision_log.md` (D-129), `validation_log.md` (VAL-T190), `error_log.md` (E-074, E-075), `context_drift_log.md`, `human_intervention.md` (#124–#127), `iteration_summary.md`, `durasi_per_fitur.md` (Sesi 9: 1.80h, Grand Total: 90.75h).
 
+---
+
+### [19 September 2026] Authority Binding v1, Forensic RCA, & Treatment #1.9A 3x3 Replication
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(contract)` / `test` / `docs(forensics)`
+- **Waktu**: 2026-09-19 10:45 WIB
+- **Status**: TERVERIFIKASI PENUH (871/871 unit tests PASS, 0 regresi, Pre-Flight Gates A–I 100% PASS, Research Replication Completed, Zero Production Pipeline Mutation)
+- **Cakupan Perubahan**:
+  - `backend/canonical_obligation.py` & `backend/contract.py`: Implementasi Architect Authority Binding v1 (`AuthorityBindingEvidence`, `AuthorityMismatchDimension`, pre-freeze verification) untuk mencegah penutupan kontrak palsu (*false-freeze*) saat public interface Oracle tidak terikat pada blueprint.
+  - `backend/canonical_scenario.py`: Penegakan pemisahan `is_structurally_compatible` dari `behavioral_evidence` agar stub struktural awal diterima oleh Contract Gate (Treatment #1.8.10).
+  - Test suites:
+    - `backend/tests/test_architect_authority_binding_v1.py`: Pengujian verifikasi keterikatan semantik Oracle-Blueprint.
+    - `backend/tests/test_treatment1_8_10_pipeline_repair_v1.py`: Pengujian kelayakan struktural scaffold.
+    - `backend/tests/test_unified_architect_v1.py`: Pengujian unifikasi pipeline Architect.
+  - Research Harness & Replikasi Empiris:
+    - `treatment_1_9/`: Micro-benchmark Developer Semantic Repair.
+    - `treatment_1_9a/`: Micro-benchmark & 3x3 empirical replication runner untuk isolasi masalah semantic mapping Architect pada task `fastapi_t1`.
+  - Laporan Riset & Forensik di `dokumentasi-pengembangan/experiments/`:
+    - `treatment_architect_authority_binding_v1_pilot_run2_report.md`: Laporan Controlled Pilot Run 2 (FastAPI REJECTED, CLI Infrastructure Failure, Flutter PASS).
+    - `forensic_rca_fastapi_architect_semantic_mapping_v1.md`: Forensic RCA bukti-pertama kegagalan pemetaan rute HTTP pada Qwen 7B (Category D/E).
+    - `treatment_1_9a_architect_semantic_mapping_microbenchmark_report.md`: Hasil micro-benchmark kondisi A, B, C.
+    - `treatment_1_9a_replication_report.md`: Hasil matriks replikasi 3x3 (9 runs) dengan klasifikasi PARTIALLY REPLICATED dan penerapan doktrin Zero Production Mutation.
+    - Berkas ringkasan data eksperimen: `treatment_1_9a_3x3_summary.json` & `treatment_1_9a_summary.json`.
+  - Pemutakhiran Berkas Tata Kelola IIDD:
+    - `decision_log.md` (D-130, D-131, D-132), `validation_log.md` (VAL-T191, VAL-T192), `error_log.md` (E-076, E-077), `context_drift_log.md`, `human_intervention.md` (#128–#135), `iteration_summary.md`, `durasi_per_fitur.md` (Sesi 10: 2.88h, Akumulasi: 93.63h).
+
+
 

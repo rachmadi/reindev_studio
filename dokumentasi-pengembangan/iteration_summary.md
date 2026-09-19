@@ -252,5 +252,26 @@ eview_report, complete).
    - Pre-Flight Verification Gates A–I: **100% PASS** (Seluruh 9 gerbang validasi lolos sempurna).
 4. **Verifikasi Empiris Pilot Terkendali (`fastapi_t1`, `cli_t1`):**
    - `fastapi_t1`: Scaffold kode 3.336 char diterima dengan 0 AST error (Defect #2 terbukti tuntas).
-   - `cli_t1`: Scaffold kode 5.995 char diterima dengan 0 AST error (Defect #2 terbukti tuntas). Komponen atomik `sec_07_repair_boundary` terkirim utuh tanpa pemotongan pada Turn 1 & 2 (`delivery_valid: True`, Defect #1 terbukti tuntas).
    - Early Stopping Terkendali: Dihentikan atas instruksi pengguna setelah `cli_t1` selesai akibat inferensi CPU model 7B (utilisasi GPU 0% karena context 8k melebihi VRAM 6GB laptop), menghemat 40+ menit komputasi.
+
+---
+
+## ═══════════════════════════════════════════════════════════════════════════
+## AUTHORITY BINDING v1, FORENSIC RCA & REPLIKASI #1.9A — 2026-09-18 s.d. 2026-09-19
+## ═══════════════════════════════════════════════════════════════════════════
+
+### 1. Capaian Utama:
+1. **Implementasi Architect Authority Binding v1:**
+   - Menghubungkan public interface obligations dari Frozen Oracle secara langsung dengan elemen blueprint arsitektur yang diajukan Architect (`backend/canonical_obligation.py` & `backend/contract.py`).
+   - Mencegah *false-freeze* pada kontrak apabila model mengaburkan endpoint HTTP menjadi fungsi internal biasa atau tidak menyertakan route decorator.
+2. **Hasil Pilot Terkendali Run 2 (Qwen 7B):**
+   - `fastapi_t1`: **FAIL** (`contract_status: REJECTED`). Authority Binding secara presisi menolak blueprint karena model memetakan endpoint HTTP ke fungsi Python internal tanpa `@app.get`.
+   - `cli_t1`: **FAIL** (`Infrastructure Failure` — batas repetisi token Ollama tercapai).
+   - `flutter_t1`: **PASS** (100% PASS, 2/2 tests passed, `contract_status: FROZEN`, `review_verdict: APPROVED`, `trajectory: convergent`).
+3. **Forensic RCA Bukti-Pertama (Evidence-First):**
+   - Membuktikan bahwa kegagalan Architect FastAPI murni disebabkan oleh *Semantic Mapping Capability Limitation* dari model Qwen 7B (Category D/E), bukan kegagalan representasi konteks atau skema blueprint.
+4. **Micro-Benchmark & 3x3 Empirical Replication (#1.9A):**
+   - Mengisolasi 3 kondisi eksperimen di lingkungan riset mandiri: Condition A (Baseline: 2/3 pass via AST backfiller, 0/3 JSON routes), Condition B (Canonical Mapping: 1/3 pass, 3/3 JSON routes, 3/3 parameter drift `{product_id}`), Condition C (Worked Example: 2/3 pass, 3/3 JSON routes, 2/3 exact identity, 1/3 parameter drift).
+   - Klasifikasi: **PARTIALLY REPLICATED** akibat divergensi stokastik pada model 7B.
+   - Penegakan Tata Kelola: Sesuai aturan riset ketat, production pipeline dibekukan tanpa perubahan (*Zero Production Pipeline Mutation*).
+

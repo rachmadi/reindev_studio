@@ -42,11 +42,14 @@ try:
         format_scenarios_for_architect,
         format_behavioral_mismatches_for_developer,
         ScaffoldCompatibilityStatus,
+        ScaffoldStructuralStatus,
+        ScaffoldBehavioralStatus,
         ScaffoldCallableFact,
         ScaffoldScenarioCompatibilityItem,
         ScaffoldScenarioMatrix,
         evaluate_scaffold_scenario_compatibility,
         format_scaffold_compatibility_for_architect,
+        extract_all_scaffold_facts,
     )
 except (ImportError, ValueError):
     try:
@@ -61,11 +64,14 @@ except (ImportError, ValueError):
             format_scenarios_for_architect,
             format_behavioral_mismatches_for_developer,
             ScaffoldCompatibilityStatus,
+            ScaffoldStructuralStatus,
+            ScaffoldBehavioralStatus,
             ScaffoldCallableFact,
             ScaffoldScenarioCompatibilityItem,
             ScaffoldScenarioMatrix,
             evaluate_scaffold_scenario_compatibility,
             format_scaffold_compatibility_for_architect,
+            extract_all_scaffold_facts,
         )
     except ImportError:
         pass
@@ -126,6 +132,75 @@ class CoverageStatus(str, Enum):
     MISSING = "MISSING"
     INCOMPATIBLE = "INCOMPATIBLE"
     UNDETERMINED = "UNDETERMINED"
+
+
+class AuthorityMismatchDimension(str, Enum):
+    SEMANTIC_IDENTITY = "SEMANTIC_IDENTITY"
+    CALLABLE_IDENTITY = "CALLABLE_IDENTITY"
+    PARAMETER_IDENTITY = "PARAMETER_IDENTITY"
+    PARAMETER_TYPE = "PARAMETER_TYPE"
+    RETURN_IDENTITY = "RETURN_IDENTITY"
+    TARGET_ARTIFACT = "TARGET_ARTIFACT"
+    ROUTE_METHOD = "ROUTE_METHOD"
+    AMBIGUOUS_MATCH = "AMBIGUOUS_MATCH"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+@dataclass(frozen=True)
+class AuthorityBindingEvidence:
+    """
+    Bukti diagnosis deterministik authority binding.
+    Memuat WHAT yang inkompatibel atau tidak selaras dengan Frozen Acceptance Authority,
+    tanpa memberikan instruksi atau preskripsi HOW to implement.
+    """
+    authority_source: str = "FROZEN_ACCEPTANCE_ORACLE"
+    obligation_id: str = ""
+    authoritative_value: Any = ""
+    blueprint_value: Any = ""
+    mismatch_dimension: Union[AuthorityMismatchDimension, str] = ""
+    affected_element: str = ""
+    status: str = "INCOMPATIBLE"
+    reason: str = ""
+    authority_symbol: Optional[str] = None
+    blueprint_symbol: Optional[str] = None
+    expected_value: Any = None
+    actual_value: Any = None
+    target_artifact: Optional[str] = None
+
+    def to_diagnostic_block(self) -> str:
+        auth_val = self.expected_value if self.expected_value is not None else self.authoritative_value
+        blue_val = self.actual_value if self.actual_value is not None else self.blueprint_value
+        dim_str = self.mismatch_dimension.value if isinstance(self.mismatch_dimension, AuthorityMismatchDimension) else str(self.mismatch_dimension)
+        lines = [
+            "AUTHORITY_BINDING_DIAGNOSTIC:",
+            f"- Authority Source: {self.authority_source}",
+            f"- Obligation ID: {self.obligation_id or self.authority_symbol or 'UNKNOWN'}",
+            f"- Mismatch Dimension: {dim_str}",
+            f"- Authoritative Expected: {auth_val}",
+            f"- Blueprint Provided: {blue_val}",
+        ]
+        if self.blueprint_symbol:
+            lines.append(f"- Blueprint Symbol: {self.blueprint_symbol}")
+        if self.target_artifact:
+            lines.append(f"- Target Artifact: {self.target_artifact}")
+        if self.reason:
+            lines.append(f"- Reason: {self.reason}")
+        return "\n".join(lines)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "authority_source": self.authority_source,
+            "obligation_id": self.obligation_id,
+            "authority_symbol": self.authority_symbol,
+            "blueprint_symbol": self.blueprint_symbol,
+            "mismatch_dimension": self.mismatch_dimension.value if isinstance(self.mismatch_dimension, AuthorityMismatchDimension) else str(self.mismatch_dimension),
+            "authoritative_value": str(self.expected_value if self.expected_value is not None else self.authoritative_value),
+            "blueprint_value": str(self.actual_value if self.actual_value is not None else self.blueprint_value),
+            "status": self.status,
+            "reason": self.reason,
+            "target_artifact": self.target_artifact
+        }
+
 
 
 # ===========================================================================
@@ -346,6 +421,85 @@ def normalize_interface_declaration(raw_ifc: Any) -> Optional[CanonicalInterface
     )
 
 
+def find_deterministic_callable_fact(
+    identifier: str,
+    target_file: Optional[str],
+    facts: List[ScaffoldCallableFact]
+) -> Optional[ScaffoldCallableFact]:
+    """
+    Mencari ScaffoldCallableFact deterministik untuk sebuah callable identifier.
+    Aturan Epistemik (Treatment #1.8.10 Part A):
+    1. Identitas callable harus cocok secara eksak (name == identifier).
+    2. Jika target_file didefinisikan, harus cocok dengan file_path fakta (jika fakta mencantumkan file).
+    3. Jika terdapat beberapa fakta dengan route/method berbeda untuk callable yang sama,
+       dianggap ambigu dan return None (fail-closed, Rule A.4).
+    4. Kemiripan nama tanpa route AST tidak menghasilkan route (Rule A.3).
+    """
+    if not identifier or not facts:
+        return None
+
+    matching = [f for f in facts if f.name == identifier]
+    if not matching:
+        return None
+
+    # Filter berdasarkan target file jika ada
+    if target_file:
+        norm_tf = str(target_file).replace("\\", "/").strip()
+        file_matching = [
+            f for f in matching
+            if not f.file_path or f.file_path.replace("\\", "/").strip() == norm_tf
+        ]
+        if file_matching:
+            matching = file_matching
+
+    # Periksa ambiguitas route / method di antara fakta-fakta yang cocok
+    facts_with_route = [f for f in matching if f.route]
+    if not facts_with_route:
+        return matching[0]
+
+    routes = {normalize_route_path(f.route) for f in facts_with_route if f.route}
+    methods = {str(f.http_method).upper() for f in facts_with_route if f.http_method}
+    if len(routes) > 1 or len(methods) > 1:
+        # Ambigu: Rule A.4 melarang auto-resolve pada binding multi-definisi yang berkonflik
+        return None
+
+    return facts_with_route[0]
+
+
+def bind_scaffold_callable_facts_to_interfaces(
+    interfaces: List[CanonicalInterfaceDeclaration],
+    facts: List[ScaffoldCallableFact]
+) -> List[CanonicalInterfaceDeclaration]:
+    """
+    Menghubungkan fakta AST scaffold (ScaffoldCallableFact) ke deklarasi antarmuka kanonikal
+    secara deterministik tanpa inferensi kemiripan nama naif.
+    """
+    if not interfaces or not facts:
+        return interfaces
+
+    for c_ifc in interfaces:
+        # Jika route dan method sudah eksplisit dideklarasikan pada kontrak, pertahankan
+        if c_ifc.canonical_route is not None and c_ifc.canonical_method is not None:
+            continue
+
+        fact = find_deterministic_callable_fact(c_ifc.identifier, c_ifc.target_file, facts)
+        if fact and fact.route:
+            if c_ifc.canonical_route is None:
+                c_ifc.canonical_route = normalize_route_path(fact.route)
+            if c_ifc.canonical_method is None and fact.http_method:
+                c_ifc.canonical_method = str(fact.http_method).upper().strip()
+            if not c_ifc.interface_type or c_ifc.interface_type in ("FUNCTION", ""):
+                c_ifc.interface_type = "HTTP_ENDPOINT"
+
+            if isinstance(c_ifc.raw_declaration, dict):
+                c_ifc.raw_declaration["route"] = c_ifc.canonical_route
+                if c_ifc.canonical_method:
+                    c_ifc.raw_declaration["http_method"] = c_ifc.canonical_method
+                c_ifc.raw_declaration["interface_type"] = c_ifc.interface_type
+
+    return interfaces
+
+
 # ===========================================================================
 # 4. Canonical Obligation Integrity Guard
 # ===========================================================================
@@ -410,9 +564,10 @@ class ObligationCoverageResult:
     matched_declaration_id: Optional[str] = None
     reason: str = ""
     missing_aspects: List[str] = field(default_factory=list)
+    binding_evidence: Optional[AuthorityBindingEvidence] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "obligation_id": self.obligation.obligation_id,
             "obligation_kind": self.obligation.obligation_kind,
             "public_identity": self.obligation.public_identity,
@@ -422,6 +577,18 @@ class ObligationCoverageResult:
             "missing_aspects": self.missing_aspects,
             "source_reference": self.obligation.source_reference,
         }
+        if self.binding_evidence:
+            d["binding_evidence"] = {
+                "authority_source": self.binding_evidence.authority_source,
+                "obligation_id": self.binding_evidence.obligation_id,
+                "authoritative_value": self.binding_evidence.authoritative_value,
+                "blueprint_value": self.binding_evidence.blueprint_value,
+                "mismatch_dimension": self.binding_evidence.mismatch_dimension,
+                "affected_element": self.binding_evidence.affected_element,
+                "status": self.binding_evidence.status,
+                "reason": self.binding_evidence.reason,
+            }
+        return d
 
 
 @dataclass
@@ -518,6 +685,8 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
         self.file_name = file_name
         self.func_status_map = func_status_map
         self.current_function: Optional[str] = None
+        self.current_function_dicts: Dict[str, List[str]] = {}
+        self.current_function_asserted_keys: List[str] = []
         self.obligations: Dict[str, CanonicalObligation] = {}
         self.imported_from_main: Set[str] = set()
         self.proven_class_symbols: Set[str] = set()
@@ -527,17 +696,57 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
             "pathlib", "asyncio", "typing", "collections", "itertools", "functools"
         }
 
+    def _pre_scan_function_body(self, body: List[ast.stmt]) -> Tuple[Dict[str, List[str]], List[str]]:
+        fn_dicts: Dict[str, List[str]] = {}
+        asserted_keys: List[str] = []
+        for stmt in body:
+            if isinstance(stmt, ast.Assign):
+                for t in stmt.targets:
+                    if isinstance(t, ast.Name) and isinstance(stmt.value, ast.Dict):
+                        keys = [
+                            k.value for k in stmt.value.keys
+                            if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                        ]
+                        fn_dicts[t.id] = keys
+            elif isinstance(stmt, ast.Assert):
+                for n in ast.walk(stmt.test):
+                    if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Constant) and isinstance(n.slice.value, str):
+                        asserted_keys.append(n.slice.value)
+                    elif isinstance(n, ast.Compare):
+                        for op, comp in zip(n.ops, n.comparators):
+                            if isinstance(op, ast.In) and isinstance(n.left, ast.Constant) and isinstance(n.left.value, str):
+                                asserted_keys.append(n.left.value)
+        return fn_dicts, asserted_keys
+
     def visit_FunctionDef(self, node: ast.FunctionDef):
         prev = self.current_function
+        prev_dicts = self.current_function_dicts
+        prev_asserts = self.current_function_asserted_keys
+
         self.current_function = node.name
+        fn_dicts, asserted_keys = self._pre_scan_function_body(node.body)
+        self.current_function_dicts = fn_dicts
+        self.current_function_asserted_keys = asserted_keys
+
         self.generic_visit(node)
         self.current_function = prev
+        self.current_function_dicts = prev_dicts
+        self.current_function_asserted_keys = prev_asserts
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
         prev = self.current_function
+        prev_dicts = self.current_function_dicts
+        prev_asserts = self.current_function_asserted_keys
+
         self.current_function = node.name
+        fn_dicts, asserted_keys = self._pre_scan_function_body(node.body)
+        self.current_function_dicts = fn_dicts
+        self.current_function_asserted_keys = asserted_keys
+
         self.generic_visit(node)
         self.current_function = prev
+        self.current_function_dicts = prev_dicts
+        self.current_function_asserted_keys = prev_asserts
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
@@ -625,14 +834,79 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
                     if path_val and path_val.startswith("/"):
                         norm_path = normalize_route_path(path_val)
                         ep_key = f"HTTP:{method_name}:{norm_path}"
-                        if ep_key not in self.obligations:
-                            clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
-                            ob_id = f"OBL-HTTP-{method_name}-{clean_id}"
-                            exp_status = self.func_status_map.get((method_name, norm_path))
-                            outputs = {"expected_status": exp_status} if exp_status else {}
-                            status_info = f" (expected status: {exp_status})" if exp_status else ""
-                            num_pos = len(node.args)
-                            kw_names = [kw.arg for kw in node.keywords if kw.arg]
+                        clean_id = norm_path.strip("/").replace("/", "_").replace("{", "").replace("}", "") or "root"
+                        ob_id = f"OBL-HTTP-{method_name}-{clean_id}"
+                        exp_status = self.func_status_map.get((method_name, norm_path))
+                        outputs = {"expected_status": exp_status} if exp_status else {}
+                        status_info = f" (expected status: {exp_status})" if exp_status else ""
+                        num_pos = len(node.args)
+                        kw_names = [kw.arg for kw in node.keywords if kw.arg]
+
+                        # Ekstraksi payload fields dan query parameters secara deterministik
+                        kw_payload_fields: List[str] = []
+                        kw_query_params: List[str] = []
+                        for kw in node.keywords:
+                            if kw.arg in ("json", "data"):
+                                if isinstance(kw.value, ast.Dict):
+                                    kw_payload_fields.extend([
+                                        k.value for k in kw.value.keys
+                                        if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                                    ])
+                                elif isinstance(kw.value, ast.Name) and kw.value.id in self.current_function_dicts:
+                                    kw_payload_fields.extend(self.current_function_dicts[kw.value.id])
+                            elif kw.arg == "params":
+                                if isinstance(kw.value, ast.Dict):
+                                    kw_query_params.extend([
+                                        k.value for k in kw.value.keys
+                                        if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                                    ])
+                                elif isinstance(kw.value, ast.Name) and kw.value.id in self.current_function_dicts:
+                                    kw_query_params.extend(self.current_function_dicts[kw.value.id])
+
+                        kw_payload_fields = list(dict.fromkeys(kw_payload_fields))
+                        kw_query_params = list(dict.fromkeys(kw_query_params))
+                        resp_fields = list(dict.fromkeys(self.current_function_asserted_keys))
+
+                        inputs_payload: Dict[str, Any] = {"http_method": method_name, "raw_path": path_val}
+                        if kw_payload_fields:
+                            inputs_payload["payload_fields"] = kw_payload_fields
+                        if kw_query_params:
+                            inputs_payload["query_parameters"] = kw_query_params
+
+                        if resp_fields:
+                            outputs["response_fields"] = resp_fields
+
+                        canonical_arg_names = kw_payload_fields if kw_payload_fields else kw_names
+
+                        if ep_key in self.obligations:
+                            existing = self.obligations[ep_key]
+                            merged_inputs = dict(existing.inputs)
+                            if kw_payload_fields:
+                                curr_p = merged_inputs.get("payload_fields", [])
+                                merged_inputs["payload_fields"] = list(dict.fromkeys(curr_p + kw_payload_fields))
+                            if kw_query_params:
+                                curr_q = merged_inputs.get("query_parameters", [])
+                                merged_inputs["query_parameters"] = list(dict.fromkeys(curr_q + kw_query_params))
+
+                            merged_outputs = dict(existing.outputs)
+                            if exp_status and not merged_outputs.get("expected_status"):
+                                merged_outputs["expected_status"] = exp_status
+                            if resp_fields:
+                                curr_r = merged_outputs.get("response_fields", [])
+                                merged_outputs["response_fields"] = list(dict.fromkeys(curr_r + resp_fields))
+
+                            merged_args = list(dict.fromkeys(existing.argument_names + canonical_arg_names))
+                            merged_kw = list(dict.fromkeys(existing.keyword_arguments + kw_names))
+
+                            self.obligations[ep_key] = replace(
+                                existing,
+                                inputs=merged_inputs,
+                                outputs=merged_outputs,
+                                argument_names=merged_args,
+                                keyword_arguments=merged_kw,
+                                argument_count=max(existing.argument_count, len(merged_args))
+                            )
+                        else:
                             self.obligations[ep_key] = CanonicalObligation(
                                 obligation_id=ob_id,
                                 authority=ObligationAuthority.FROZEN_ORACLE.value,
@@ -642,12 +916,12 @@ class PythonOracleAstVisitor(ast.NodeVisitor):
                                 caller=self.current_function or "",
                                 callee=norm_path,
                                 public_identity=norm_path,
-                                inputs={"http_method": method_name, "raw_path": path_val},
+                                inputs=inputs_payload,
                                 outputs=outputs,
                                 positional_arguments=num_pos,
                                 keyword_arguments=kw_names,
-                                argument_count=num_pos + len(kw_names),
-                                argument_names=kw_names,
+                                argument_count=max(num_pos, len(canonical_arg_names)),
+                                argument_names=canonical_arg_names,
                                 epistemic_status=EpistemicStatus.PROVEN_FACT.value,
                                 observable_behavior=f"HTTP endpoint '{norm_path}' accepting {method_name} method{status_info}",
                                 acceptance_evidence=f"client.{method_name.lower()}('{path_val}')",
@@ -1396,6 +1670,122 @@ def check_call_shape_compatibility(
     return "UNDETERMINED", f"Insufficient structural evidence to prove call shape compatibility for '{ob_sym}'.", {}
 
 
+def _extract_all_scaffold_symbols(
+    scaffold_files: Dict[str, Any]
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+    """
+    Ekstraksi simbol, kelas (fields, types, init parameters), fungsi (parameters, types, return type, status_code),
+    dan route endpoints secara deterministik dari kumpulan file scaffold (.py dan .dart).
+    Murni generic AST/token parser tanpa domain hardcoding.
+    """
+    classes: Dict[str, Dict[str, Any]] = {}
+    functions: Dict[str, Dict[str, Any]] = {}
+    route_endpoints: Dict[str, List[Dict[str, Any]]] = {}
+
+    for fp, content in scaffold_files.items():
+        if not isinstance(content, str) or not content.strip():
+            continue
+
+        if fp.endswith(".dart"):
+            for cb in re.finditer(r"\bclass\s+([A-Za-z0-9_]+)[^{]*\{", content):
+                cname = cb.group(1)
+                snippet = content[cb.end():cb.end() + 2000]
+                named: List[str] = []
+                ctor_m = re.search(rf"\b{cname}\s*\((.*?)\)", snippet, re.DOTALL)
+                if ctor_m:
+                    p_str = ctor_m.group(1)
+                    named = re.findall(r"this\.([A-Za-z0-9_]+)", p_str)
+                fields: List[str] = [m.group(1) for m in re.finditer(r"\bfinal\s+(?:[A-Za-z0-9_<>]+)\s+([A-Za-z0-9_]+)\s*;", snippet)]
+                all_f = list(dict.fromkeys(fields + named))
+                classes[cname] = {
+                    "name": cname,
+                    "fields": all_f,
+                    "named_params": named,
+                    "target_file": fp
+                }
+            for fm in re.finditer(r"(?:^|\n)\s*(?:[A-Za-z0-9_<>, ]+)\s+([a-z][A-Za-z0-9_]*)\s*\((.*?)\)\s*\{", content):
+                fname = fm.group(1)
+                functions[fname] = {
+                    "name": fname,
+                    "target_file": fp,
+                    "params": [],
+                    "param_types": {},
+                    "route": None,
+                    "method": None,
+                    "status_code": None
+                }
+        else:
+            try:
+                tree = ast.parse(content)
+                for node in tree.body:
+                    if isinstance(node, ast.ClassDef):
+                        fields: List[str] = []
+                        field_types: Dict[str, str] = {}
+                        init_params: List[str] = []
+                        for item in node.body:
+                            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                                fields.append(item.target.id)
+                                try:
+                                    field_types[item.target.id] = ast.unparse(item.annotation)
+                                except Exception:
+                                    field_types[item.target.id] = "Any"
+                            elif isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "__init__":
+                                init_params = [a.arg for a in item.args.args if a.arg != "self"]
+                        classes[node.name] = {
+                            "name": node.name,
+                            "fields": list(dict.fromkeys(fields + init_params)),
+                            "field_types": field_types,
+                            "init_params": init_params,
+                            "target_file": fp
+                        }
+                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        r = None
+                        m = None
+                        sc = None
+                        for dec in node.decorator_list:
+                            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+                                cand_m = dec.func.attr.upper()
+                                if cand_m in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
+                                    m = cand_m
+                                    if dec.args and isinstance(dec.args[0], ast.Constant) and isinstance(dec.args[0].value, str):
+                                        r = dec.args[0].value
+                                    for kw in dec.keywords:
+                                        if kw.arg == "status_code" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, int):
+                                            sc = kw.value.value
+                        p_names = [a.arg for a in node.args.args if a.arg not in ("self", "cls")]
+                        p_types: Dict[str, str] = {}
+                        for a in node.args.args:
+                            if a.annotation:
+                                try:
+                                    p_types[a.arg] = ast.unparse(a.annotation)
+                                except Exception:
+                                    pass
+                        ret_type = None
+                        if node.returns:
+                            try:
+                                ret_type = ast.unparse(node.returns)
+                            except Exception:
+                                pass
+                        fn_info = {
+                            "name": node.name,
+                            "target_file": fp,
+                            "params": p_names,
+                            "param_types": p_types,
+                            "return_type": ret_type,
+                            "route": r,
+                            "method": m,
+                            "status_code": sc
+                        }
+                        functions[node.name] = fn_info
+                        if r:
+                            norm_r = normalize_route_path(r)
+                            route_endpoints.setdefault(norm_r, []).append(fn_info)
+            except Exception:
+                pass
+
+    return classes, functions, route_endpoints
+
+
 def check_obligation_coverage(
     obligations: List[CanonicalObligation],
     contract: Any,
@@ -1437,6 +1827,47 @@ def check_obligation_coverage(
 
     declarations_count = len(declared_interfaces) + len(declared_models)
 
+    # Ekstraksi file scaffold dari blueprint dan/atau contract untuk ekstraksi fakta deterministik (Treatment #1.8.10 Part A)
+    scaffold_files: Dict[str, Any] = {}
+    if blueprint:
+        if hasattr(blueprint, "files") and getattr(blueprint, "files"):
+            for fp, mod in blueprint.files.items():
+                sc = getattr(mod, "code_scaffold", None) or (mod.get("code_scaffold") if isinstance(mod, dict) else str(mod))
+                if sc:
+                    scaffold_files[fp] = sc
+        elif isinstance(blueprint, dict) and "files" in blueprint and isinstance(blueprint["files"], dict):
+            for fp, mod in blueprint["files"].items():
+                sc = mod.get("code_scaffold") if isinstance(mod, dict) else (getattr(mod, "code_scaffold", None) or str(mod))
+                if sc:
+                    scaffold_files[fp] = sc
+        elif isinstance(blueprint, dict):
+            for k in ("code_scaffold", "scaffold_code", "scaffold"):
+                if k in blueprint and isinstance(blueprint[k], str):
+                    scaffold_files["main.py"] = blueprint[k]
+                    break
+
+    if isinstance(contract_dict, dict) and "files" in contract_dict and isinstance(contract_dict["files"], dict):
+        for fp, mod in contract_dict["files"].items():
+            if fp not in scaffold_files:
+                sc = mod.get("code_scaffold") if isinstance(mod, dict) else (getattr(mod, "code_scaffold", None) or str(mod))
+                if sc:
+                    scaffold_files[fp] = sc
+    elif isinstance(contract_dict, dict):
+        for k in ("code_scaffold", "scaffold_code", "scaffold"):
+            if k in contract_dict and isinstance(contract_dict[k], str):
+                if "main.py" not in scaffold_files:
+                    scaffold_files["main.py"] = contract_dict[k]
+                break
+
+    scaffold_facts: List[ScaffoldCallableFact] = []
+    if scaffold_files and extract_all_scaffold_facts is not None:
+        try:
+            scaffold_facts = extract_all_scaffold_facts(scaffold_files)
+        except Exception:
+            pass
+
+    scaffold_classes, scaffold_functions, scaffold_route_endpoints = _extract_all_scaffold_symbols(scaffold_files)
+
     canonical_interfaces: List[CanonicalInterfaceDeclaration] = []
     for raw_ifc in declared_interfaces:
         c_ifc = normalize_interface_declaration(raw_ifc)
@@ -1444,6 +1875,10 @@ def check_obligation_coverage(
             continue
         canonical_interfaces.append(c_ifc)
 
+    if scaffold_facts:
+        bind_scaffold_callable_facts_to_interfaces(canonical_interfaces, scaffold_facts)
+
+    for c_ifc in canonical_interfaces:
         if c_ifc.canonical_route:
             norm_r = normalize_route_path(c_ifc.canonical_route)
             http_endpoints.setdefault(norm_r, []).append(c_ifc)
@@ -1495,10 +1930,10 @@ def check_obligation_coverage(
             req_method = ob.inputs.get("http_method", "").upper().strip() if ob.inputs else ""
 
             # Pembuktian Kompatibilitas Semantik (Distinct Public Identities):
-            # 1. Exact match pada normalized route path (misal /products vs /products, /products/{id} vs /products/{id})
+            # 1. Exact match pada normalized route path
             matched_ifcs: List[CanonicalInterfaceDeclaration] = list(http_endpoints.get(req_path, []))
 
-            # 2. Semantic match: jika obligation adalah parameterized endpoint (/users/{id}) dan interface dideklarasikan pada base route (/users) dengan PATH parameter
+            # 2. Semantic match: parameterized endpoint (/users/{id}) vs base route (/users) dengan PATH parameter
             if not matched_ifcs and "{id}" in req_path:
                 base_req = req_path.replace("/{id}", "").rstrip("/")
                 for candidate in http_endpoints.get(base_req, []):
@@ -1527,6 +1962,29 @@ def check_obligation_coverage(
                                 if has_path_param:
                                     matched_ifcs.append(c_ifc)
 
+            if not matched_ifcs and scaffold_facts:
+                matching_rf = [
+                    f for f in scaffold_facts
+                    if f.route and normalize_route_path(f.route) == req_path
+                ]
+                if req_method and len(matching_rf) > 1:
+                    matching_rf_m = [f for f in matching_rf if f.http_method and f.http_method.upper() == req_method]
+                    if matching_rf_m:
+                        matching_rf = matching_rf_m
+
+                distinct_names = {f.name for f in matching_rf}
+                if len(matching_rf) >= 1 and len(distinct_names) == 1:
+                    rf = matching_rf[0]
+                    synth_ifc = CanonicalInterfaceDeclaration(
+                        identifier=rf.name,
+                        target_file=rf.file_path,
+                        interface_type="HTTP_ENDPOINT",
+                        canonical_route=normalize_route_path(rf.route),
+                        canonical_method=str(rf.http_method).upper() if rf.http_method else None,
+                        raw_declaration={"identifier": rf.name, "route": rf.route, "http_method": rf.http_method}
+                    )
+                    matched_ifcs.append(synth_ifc)
+
             if not matched_ifcs:
                 clean_name = req_path.strip("/").replace("/", "_")
                 potential_internal = [s for s in symbol_interfaces.keys() if clean_name in s.lower()]
@@ -1537,22 +1995,32 @@ def check_obligation_coverage(
                         f"binding proof connects them to public endpoint '{req_path}')"
                     )
 
+                evidence = AuthorityBindingEvidence(
+                    authority_source=ob.source_reference,
+                    authority_symbol=ob.public_identity,
+                    mismatch_dimension=AuthorityMismatchDimension.ROUTE_METHOD,
+                    expected_value=f"{req_method} {req_path}" if req_method else req_path,
+                    actual_value=None,
+                    reason=f"Public HTTP endpoint '{req_path}' has no declared interface coverage in contract{reason_extra}",
+                    target_artifact=ob.source_reference
+                )
+
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.MISSING,
                     reason=f"Public HTTP endpoint '{req_path}' has no declared interface coverage in contract{reason_extra}",
-                    missing_aspects=[f"HTTP endpoint: {req_path}"]
+                    missing_aspects=[f"HTTP endpoint: {req_path}"],
+                    binding_evidence=evidence
                 )
                 results.append(res)
                 missing_cnt += 1
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({ob.public_identity})")
 
             else:
-                # Path found, now evaluate method compatibility rigorously (NO WILDCARD)
+                # Path found, now evaluate method compatibility and authority binding dimensions
                 if req_method:
                     compatible_ifc: Optional[CanonicalInterfaceDeclaration] = None
                     declared_methods: List[str] = []
-                    has_absent_method = False
 
                     for c_ifc in matched_ifcs:
                         m = c_ifc.canonical_method
@@ -1561,48 +2029,199 @@ def check_obligation_coverage(
                             if m == req_method:
                                 compatible_ifc = c_ifc
                                 break
-                        else:
-                            has_absent_method = True
 
                     if compatible_ifc is not None:
                         matched_id = compatible_ifc.raw_declaration.get("interface_id") or compatible_ifc.identifier
-                        res = ObligationCoverageResult(
-                            obligation=ob,
-                            status=CoverageStatus.COVERED,
-                            matched_declaration_id=matched_id,
-                            reason=f"HTTP endpoint '{req_path}' [{req_method}] has proven coverage by interface contract '{matched_id}'"
-                        )
-                        results.append(res)
-                        covered_cnt += 1
+                        mismatch_evidence: Optional[AuthorityBindingEvidence] = None
+                        mismatch_status: Optional[CoverageStatus] = None
+                        mismatch_reason = ""
+
+                        # 1. Dimension: RETURN_IDENTITY / STATUS_CODE
+                        exp_status = ob.outputs.get("expected_status") if ob.outputs else None
+                        if exp_status is not None:
+                            dec_status = compatible_ifc.raw_declaration.get("status_code")
+                            if dec_status is None and isinstance(compatible_ifc.raw_declaration.get("returns"), dict):
+                                dec_status = compatible_ifc.raw_declaration["returns"].get("status_code")
+                            if dec_status is None:
+                                for fn in scaffold_route_endpoints.get(req_path, []):
+                                    if (not req_method or fn.get("method") == req_method) and fn.get("status_code") is not None:
+                                        dec_status = fn.get("status_code")
+                                        break
+                            if dec_status is not None and dec_status != exp_status:
+                                mismatch_status = CoverageStatus.INCOMPATIBLE
+                                mismatch_reason = (
+                                    f"HTTP endpoint '{req_path}' [{req_method}] declares status code {dec_status}, "
+                                    f"but acceptance tests assert status code {exp_status}"
+                                )
+                                mismatch_evidence = AuthorityBindingEvidence(
+                                    authority_source=ob.source_reference,
+                                    authority_symbol=ob.public_identity,
+                                    blueprint_symbol=matched_id,
+                                    mismatch_dimension=AuthorityMismatchDimension.RETURN_IDENTITY,
+                                    expected_value=exp_status,
+                                    actual_value=dec_status,
+                                    reason=mismatch_reason,
+                                    target_artifact=compatible_ifc.target_file
+                                )
+
+                        # 2. Dimension: PARAMETER_IDENTITY (payload fields)
+                        auth_payload_fields = ob.inputs.get("payload_fields") if ob.inputs else None
+                        if mismatch_status is None and auth_payload_fields:
+                            declared_payload_fields: Set[str] = set()
+                            for p in compatible_ifc.parameters:
+                                p_name = p.get("name") if isinstance(p, dict) else (p.get("param_name") if isinstance(p, dict) else getattr(p, "name", ""))
+                                p_type = p.get("type") if isinstance(p, dict) else (p.get("param_type") if isinstance(p, dict) else getattr(p, "type", ""))
+                                if p_type and p_type in data_models_map:
+                                    m_fields = data_models_map[p_type].get("fields", [])
+                                    for f in m_fields:
+                                        f_name = f.get("name") if isinstance(f, dict) else (f.get("field_name") if isinstance(f, dict) else getattr(f, "name", str(f)))
+                                        if f_name:
+                                            declared_payload_fields.add(f_name)
+                                elif p_type and p_type in scaffold_classes:
+                                    declared_payload_fields.update(scaffold_classes[p_type].get("fields", []))
+                                elif p_name and p_name not in ("request", "response", "db", "session"):
+                                    declared_payload_fields.add(p_name)
+
+                            for fn in scaffold_route_endpoints.get(req_path, []):
+                                if not req_method or fn.get("method") == req_method:
+                                    for p_name, p_type in fn.get("param_types", {}).items():
+                                        if p_type in scaffold_classes:
+                                            declared_payload_fields.update(scaffold_classes[p_type].get("fields", []))
+                                        elif p_type in data_models_map:
+                                            m_fields = data_models_map[p_type].get("fields", [])
+                                            for f in m_fields:
+                                                f_name = f.get("name") if isinstance(f, dict) else (f.get("field_name") if isinstance(f, dict) else getattr(f, "name", str(f)))
+                                                if f_name:
+                                                    declared_payload_fields.add(f_name)
+                                    for p_name in fn.get("params", []):
+                                        if p_name not in ("request", "response", "db", "session"):
+                                            declared_payload_fields.add(p_name)
+
+                            if not declared_payload_fields:
+                                res_clean = req_path.strip("/").split("/")[0].rstrip("s")
+                                for m_name, m_data in data_models_map.items():
+                                    if res_clean.lower() in m_name.lower():
+                                        for f in m_data.get("fields", []):
+                                            f_name = f.get("name") if isinstance(f, dict) else (f.get("field_name") if isinstance(f, dict) else getattr(f, "name", str(f)))
+                                            if f_name:
+                                                declared_payload_fields.add(f_name)
+                                        break
+
+                            if not declared_payload_fields:
+                                res_clean = req_path.strip("/").split("/")[0].rstrip("s")
+                                for c_name, c_data in scaffold_classes.items():
+                                    if res_clean.lower() in c_name.lower():
+                                        declared_payload_fields.update(c_data.get("fields", []))
+                                        break
+
+                            if declared_payload_fields:
+                                missing_payload = [f for f in auth_payload_fields if f not in declared_payload_fields]
+                                if missing_payload:
+                                    mismatch_status = CoverageStatus.INCOMPATIBLE
+                                    mismatch_reason = (
+                                        f"Authoritative payload field(s) {missing_payload} are not accepted by endpoint/model "
+                                        f"for '{req_path}' [{req_method}] (declared fields: {sorted(list(declared_payload_fields))})"
+                                    )
+                                    mismatch_evidence = AuthorityBindingEvidence(
+                                        authority_source=ob.source_reference,
+                                        authority_symbol=ob.public_identity,
+                                        blueprint_symbol=matched_id,
+                                        mismatch_dimension=AuthorityMismatchDimension.PARAMETER_IDENTITY,
+                                        expected_value=auth_payload_fields,
+                                        actual_value=sorted(list(declared_payload_fields)),
+                                        reason=mismatch_reason,
+                                        target_artifact=compatible_ifc.target_file
+                                    )
+
+                        # 3. Dimension: TARGET_ARTIFACT
+                        if mismatch_status is None and ob.metadata and ob.metadata.get("target_artifact"):
+                            exp_art = ob.metadata["target_artifact"]
+                            if compatible_ifc.target_file and Path(compatible_ifc.target_file).name != Path(exp_art).name:
+                                mismatch_status = CoverageStatus.INCOMPATIBLE
+                                mismatch_reason = (
+                                    f"Target artifact mismatch for '{req_path}': expected {exp_art}, "
+                                    f"but declared in {compatible_ifc.target_file}"
+                                )
+                                mismatch_evidence = AuthorityBindingEvidence(
+                                    authority_source=ob.source_reference,
+                                    authority_symbol=ob.public_identity,
+                                    blueprint_symbol=matched_id,
+                                    mismatch_dimension=AuthorityMismatchDimension.TARGET_ARTIFACT,
+                                    expected_value=exp_art,
+                                    actual_value=compatible_ifc.target_file,
+                                    reason=mismatch_reason,
+                                    target_artifact=compatible_ifc.target_file
+                                )
+
+                        if mismatch_status is not None:
+                            res = ObligationCoverageResult(
+                                obligation=ob,
+                                status=mismatch_status,
+                                matched_declaration_id=matched_id,
+                                reason=mismatch_reason,
+                                missing_aspects=[mismatch_reason],
+                                binding_evidence=mismatch_evidence
+                            )
+                            results.append(res)
+                            incompatible_cnt += 1
+                            summary_reasons.append(f"INCOMPATIBLE: {ob.obligation_id} ({mismatch_reason})")
+                        else:
+                            res = ObligationCoverageResult(
+                                obligation=ob,
+                                status=CoverageStatus.COVERED,
+                                matched_declaration_id=matched_id,
+                                reason=f"HTTP endpoint '{req_path}' [{req_method}] has proven coverage by interface contract '{matched_id}'"
+                            )
+                            results.append(res)
+                            covered_cnt += 1
+
                     elif declared_methods:
-                        # Endpoint dideklarasikan, tetapi method eksplisit berbeda (INCOMPATIBLE / MISSING method)
-                        # Contoh: Oracle demands GET, contract only declared ['POST', 'DELETE']
                         matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
+                        evidence = AuthorityBindingEvidence(
+                            authority_source=ob.source_reference,
+                            authority_symbol=ob.public_identity,
+                            blueprint_symbol=matched_id,
+                            mismatch_dimension=AuthorityMismatchDimension.ROUTE_METHOD,
+                            expected_value=req_method,
+                            actual_value=declared_methods,
+                            reason=f"HTTP endpoint '{req_path}' declared with method(s) {declared_methods}, but expected method [{req_method}] is missing from contract",
+                            target_artifact=matched_ifcs[0].target_file
+                        )
                         res = ObligationCoverageResult(
                             obligation=ob,
                             status=CoverageStatus.MISSING,
                             matched_declaration_id=matched_id,
                             reason=f"HTTP endpoint '{req_path}' declared with method(s) {declared_methods}, but expected method [{req_method}] is missing from contract",
-                            missing_aspects=[f"HTTP method: {req_method}"]
+                            missing_aspects=[f"HTTP method: {req_method}"],
+                            binding_evidence=evidence
                         )
                         results.append(res)
                         missing_cnt += 1
                         summary_reasons.append(f"MISSING: {ob.obligation_id} (Method [{req_method}] missing, found {declared_methods})")
                     else:
-                        # Route cocok tetapi method absent pada deklarasi contract (bukan wildcard!)
                         matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
+                        evidence = AuthorityBindingEvidence(
+                            authority_source=ob.source_reference,
+                            authority_symbol=ob.public_identity,
+                            blueprint_symbol=matched_id,
+                            mismatch_dimension=AuthorityMismatchDimension.INSUFFICIENT_EVIDENCE,
+                            expected_value=req_method,
+                            actual_value=None,
+                            reason=f"HTTP endpoint '{req_path}' declared in contract without explicit HTTP method (cannot prove compatibility with expected method [{req_method}])",
+                            target_artifact=matched_ifcs[0].target_file
+                        )
                         res = ObligationCoverageResult(
                             obligation=ob,
                             status=CoverageStatus.UNDETERMINED,
                             matched_declaration_id=matched_id,
                             reason=f"HTTP endpoint '{req_path}' declared in contract without explicit HTTP method (cannot prove compatibility with expected method [{req_method}])",
-                            missing_aspects=[f"Explicit HTTP method [{req_method}] on {req_path}"]
+                            missing_aspects=[f"Explicit HTTP method [{req_method}] on {req_path}"],
+                            binding_evidence=evidence
                         )
                         results.append(res)
                         undetermined_cnt += 1
                         summary_reasons.append(f"UNDETERMINED: {ob.obligation_id} (HTTP method absent on contract declaration)")
                 else:
-                    # Obligation tidak mensyaratkan method spesifik (hanya eksistensi route/endpoint)
                     matched_id = matched_ifcs[0].raw_declaration.get("interface_id") or matched_ifcs[0].identifier
                     res = ObligationCoverageResult(
                         obligation=ob,
@@ -1616,109 +2235,331 @@ def check_obligation_coverage(
         # B. DATA MODEL OBLIGATION (e.g. MetricData, Product, Matrix)
         elif ob.obligation_kind == ObligationKind.DATA_MODEL.value:
             model_name = ob.public_identity
+            matched_model: Optional[Dict[str, Any]] = None
+            matched_id: Optional[str] = None
+            target_file: Optional[str] = None
+
             if model_name in data_models_map:
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=data_models_map[model_name].get("model_name"),
-                    reason=f"Data model '{model_name}' covered in contract data_models"
-                )
-                results.append(res)
-                covered_cnt += 1
+                matched_model = data_models_map[model_name]
+                matched_id = matched_model.get("model_name")
+                target_file = matched_model.get("target_file")
             elif model_name in symbol_interfaces:
                 c_ifc = symbol_interfaces[model_name][0]
                 matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=matched_id,
-                    reason=f"Data model/class '{model_name}' covered in contract interface_contracts"
+                target_file = c_ifc.target_file
+            elif model_name in scaffold_classes:
+                c_sc = scaffold_classes[model_name]
+                matched_id = model_name
+                target_file = c_sc.get("target_file")
+
+            if matched_id is None:
+                all_declared = sorted(list(data_models_map.keys()) + list(symbol_interfaces.keys()) + list(scaffold_classes.keys()))
+                evidence = AuthorityBindingEvidence(
+                    authority_source=ob.source_reference,
+                    authority_symbol=model_name,
+                    mismatch_dimension=AuthorityMismatchDimension.CALLABLE_IDENTITY,
+                    expected_value=model_name,
+                    actual_value=all_declared,
+                    reason=f"Data model / entity '{model_name}' is not declared in contract data_models or interface_contracts",
+                    target_artifact=ob.source_reference
                 )
-                results.append(res)
-                covered_cnt += 1
-            else:
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.MISSING,
                     reason=f"Data model/class '{model_name}' is not declared in contract data_models or interface_contracts",
-                    missing_aspects=[f"Data model: {model_name}"]
+                    missing_aspects=[f"Data model: {model_name}"],
+                    binding_evidence=evidence
                 )
                 results.append(res)
                 missing_cnt += 1
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({model_name})")
+            else:
+                mismatch_evidence = None
+                mismatch_status = None
+                mismatch_reason = ""
+
+                # Dimension: PARAMETER_IDENTITY (model fields)
+                auth_fields = ob.keyword_arguments or ob.argument_names or (ob.inputs.get("fields") if ob.inputs else [])
+                if auth_fields and (model_name in scaffold_classes or blueprint is not None or scaffold_files):
+                    declared_fields: Set[str] = set()
+                    if matched_model:
+                        for f in matched_model.get("fields", []):
+                            f_name = f.get("name") if isinstance(f, dict) else (f.get("field_name") if isinstance(f, dict) else getattr(f, "name", str(f)))
+                            if f_name:
+                                declared_fields.add(f_name)
+                    if model_name in scaffold_classes:
+                        declared_fields.update(scaffold_classes[model_name].get("fields", []))
+
+                    if declared_fields:
+                        missing_fields = [f for f in auth_fields if f not in declared_fields]
+                        if missing_fields:
+                            mismatch_status = CoverageStatus.INCOMPATIBLE
+                            mismatch_reason = (
+                                f"Data model '{model_name}' is missing required field(s): {missing_fields} "
+                                f"(declared fields: {sorted(list(declared_fields))})"
+                            )
+                            mismatch_evidence = AuthorityBindingEvidence(
+                                authority_source=ob.source_reference,
+                                authority_symbol=model_name,
+                                blueprint_symbol=matched_id,
+                                mismatch_dimension=AuthorityMismatchDimension.PARAMETER_IDENTITY,
+                                expected_value=auth_fields,
+                                actual_value=sorted(list(declared_fields)),
+                                reason=mismatch_reason,
+                                target_artifact=target_file
+                            )
+
+                # Dimension: TARGET_ARTIFACT
+                if mismatch_status is None and ob.metadata and ob.metadata.get("target_artifact"):
+                    exp_art = ob.metadata["target_artifact"]
+                    if target_file and Path(target_file).name != Path(exp_art).name:
+                        mismatch_status = CoverageStatus.INCOMPATIBLE
+                        mismatch_reason = (
+                            f"Target artifact mismatch for data model '{model_name}': expected {exp_art}, "
+                            f"but declared in {target_file}"
+                        )
+                        mismatch_evidence = AuthorityBindingEvidence(
+                            authority_source=ob.source_reference,
+                            authority_symbol=model_name,
+                            blueprint_symbol=matched_id,
+                            mismatch_dimension=AuthorityMismatchDimension.TARGET_ARTIFACT,
+                            expected_value=exp_art,
+                            actual_value=target_file,
+                            reason=mismatch_reason,
+                            target_artifact=target_file
+                        )
+
+                if mismatch_status is not None:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=mismatch_status,
+                        matched_declaration_id=matched_id,
+                        reason=mismatch_reason,
+                        missing_aspects=[mismatch_reason],
+                        binding_evidence=mismatch_evidence
+                    )
+                    results.append(res)
+                    incompatible_cnt += 1
+                    summary_reasons.append(f"INCOMPATIBLE: {ob.obligation_id} ({mismatch_reason})")
+                else:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=CoverageStatus.COVERED,
+                        matched_declaration_id=matched_id,
+                        reason=f"Data model '{model_name}' covered in contract/scaffold"
+                    )
+                    results.append(res)
+                    covered_cnt += 1
 
         # C. CALLABLE INTERFACE (e.g. add_matrices, metricDataProvider)
         elif ob.obligation_kind == ObligationKind.CALLABLE_INTERFACE.value:
             symbol_name = ob.public_identity
+            matched_id: Optional[str] = None
+            target_file: Optional[str] = None
+
             if symbol_name in symbol_interfaces:
                 c_ifc = symbol_interfaces[symbol_name][0]
                 matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=matched_id,
-                    reason=f"Callable interface '{symbol_name}' covered by interface contract {matched_id}"
-                )
-                results.append(res)
-                covered_cnt += 1
+                target_file = c_ifc.target_file
             elif symbol_name in data_models_map:
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=data_models_map[symbol_name].get("model_name"),
-                    reason=f"Callable/constructible symbol '{symbol_name}' covered by data model"
+                matched_id = data_models_map[symbol_name].get("model_name")
+                target_file = data_models_map[symbol_name].get("target_file")
+            elif symbol_name in scaffold_functions:
+                matched_id = symbol_name
+                target_file = scaffold_functions[symbol_name].get("target_file")
+            elif symbol_name in scaffold_classes:
+                matched_id = symbol_name
+                target_file = scaffold_classes[symbol_name].get("target_file")
+
+            if matched_id is None:
+                all_declared = sorted(list(symbol_interfaces.keys()) + list(data_models_map.keys()) + list(scaffold_functions.keys()) + list(scaffold_classes.keys()))
+                evidence = AuthorityBindingEvidence(
+                    authority_source=ob.source_reference,
+                    authority_symbol=symbol_name,
+                    mismatch_dimension=AuthorityMismatchDimension.CALLABLE_IDENTITY,
+                    expected_value=symbol_name,
+                    actual_value=all_declared,
+                    reason=f"Callable symbol/interface '{symbol_name}' is missing from contract interface_contracts",
+                    target_artifact=ob.source_reference
                 )
-                results.append(res)
-                covered_cnt += 1
-            else:
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.MISSING,
                     reason=f"Callable symbol/interface '{symbol_name}' is missing from contract interface_contracts",
-                    missing_aspects=[f"Callable interface: {symbol_name}"]
+                    missing_aspects=[f"Callable interface: {symbol_name}"],
+                    binding_evidence=evidence
                 )
                 results.append(res)
                 missing_cnt += 1
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({symbol_name})")
+            else:
+                mismatch_evidence = None
+                mismatch_status = None
+                mismatch_reason = ""
+
+                # Dimension: TARGET_ARTIFACT
+                if ob.metadata and ob.metadata.get("target_artifact"):
+                    exp_art = ob.metadata["target_artifact"]
+                    if target_file and Path(target_file).name != Path(exp_art).name:
+                        mismatch_status = CoverageStatus.INCOMPATIBLE
+                        mismatch_reason = (
+                            f"Target artifact mismatch for callable '{symbol_name}': expected {exp_art}, "
+                            f"but declared in {target_file}"
+                        )
+                        mismatch_evidence = AuthorityBindingEvidence(
+                            authority_source=ob.source_reference,
+                            authority_symbol=symbol_name,
+                            blueprint_symbol=matched_id,
+                            mismatch_dimension=AuthorityMismatchDimension.TARGET_ARTIFACT,
+                            expected_value=exp_art,
+                            actual_value=target_file,
+                            reason=mismatch_reason,
+                            target_artifact=target_file
+                        )
+
+                if mismatch_status is not None:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=mismatch_status,
+                        matched_declaration_id=matched_id,
+                        reason=mismatch_reason,
+                        missing_aspects=[mismatch_reason],
+                        binding_evidence=mismatch_evidence
+                    )
+                    results.append(res)
+                    incompatible_cnt += 1
+                    summary_reasons.append(f"INCOMPATIBLE: {ob.obligation_id} ({mismatch_reason})")
+                else:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=CoverageStatus.COVERED,
+                        matched_declaration_id=matched_id,
+                        reason=f"Callable interface '{symbol_name}' covered by contract/scaffold '{matched_id}'"
+                    )
+                    results.append(res)
+                    covered_cnt += 1
 
         # D. OBSERVABLE RUNTIME (e.g. UI Widget CardMetric)
         elif ob.obligation_kind == ObligationKind.OBSERVABLE_RUNTIME.value:
             widget_name = ob.public_identity
+            matched_id: Optional[str] = None
+            target_file: Optional[str] = None
+
             if widget_name in symbol_interfaces:
                 c_ifc = symbol_interfaces[widget_name][0]
                 matched_id = c_ifc.raw_declaration.get("interface_id") or c_ifc.identifier
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=matched_id,
-                    reason=f"Observable runtime widget '{widget_name}' covered by interface contract {matched_id}"
-                )
-                results.append(res)
-                covered_cnt += 1
+                target_file = c_ifc.target_file
             elif widget_name in data_models_map:
-                res = ObligationCoverageResult(
-                    obligation=ob,
-                    status=CoverageStatus.COVERED,
-                    matched_declaration_id=data_models_map[widget_name].get("model_name"),
-                    reason=f"Observable component '{widget_name}' declared in contract models"
+                matched_id = data_models_map[widget_name].get("model_name")
+                target_file = data_models_map[widget_name].get("target_file")
+            elif widget_name in scaffold_classes:
+                matched_id = widget_name
+                target_file = scaffold_classes[widget_name].get("target_file")
+
+            if matched_id is None:
+                all_declared = sorted(list(symbol_interfaces.keys()) + list(data_models_map.keys()) + list(scaffold_classes.keys()))
+                evidence = AuthorityBindingEvidence(
+                    authority_source=ob.source_reference,
+                    authority_symbol=widget_name,
+                    mismatch_dimension=AuthorityMismatchDimension.CALLABLE_IDENTITY,
+                    expected_value=widget_name,
+                    actual_value=all_declared,
+                    reason=f"Observable runtime component/widget '{widget_name}' is not declared in interface_contracts",
+                    target_artifact=ob.source_reference
                 )
-                results.append(res)
-                covered_cnt += 1
-            else:
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.MISSING,
                     reason=f"Observable runtime component/widget '{widget_name}' is not declared in interface_contracts",
-                    missing_aspects=[f"Component/Widget: {widget_name}"]
+                    missing_aspects=[f"Component/Widget: {widget_name}"],
+                    binding_evidence=evidence
                 )
                 results.append(res)
                 missing_cnt += 1
                 summary_reasons.append(f"MISSING: {ob.obligation_id} ({widget_name})")
+            else:
+                mismatch_evidence = None
+                mismatch_status = None
+                mismatch_reason = ""
+
+                # Dimension: PARAMETER_IDENTITY (e.g. named arguments like data)
+                auth_args = ob.keyword_arguments or ob.argument_names or []
+                if auth_args:
+                    declared_args: Set[str] = set()
+                    if widget_name in symbol_interfaces:
+                        for p in symbol_interfaces[widget_name][0].parameters:
+                            p_name = p.get("name") if isinstance(p, dict) else getattr(p, "name", "")
+                            if p_name:
+                                declared_args.add(p_name)
+                    if widget_name in scaffold_classes:
+                        declared_args.update(scaffold_classes[widget_name].get("named_params", []))
+                        declared_args.update(scaffold_classes[widget_name].get("fields", []))
+
+                    if declared_args:
+                        missing_args = [a for a in auth_args if a not in declared_args]
+                        if missing_args:
+                            mismatch_status = CoverageStatus.INCOMPATIBLE
+                            mismatch_reason = (
+                                f"Widget constructor '{widget_name}' missing required named parameter(s): {missing_args} "
+                                f"(declared parameters: {sorted(list(declared_args))})"
+                            )
+                            mismatch_evidence = AuthorityBindingEvidence(
+                                authority_source=ob.source_reference,
+                                authority_symbol=widget_name,
+                                blueprint_symbol=matched_id,
+                                mismatch_dimension=AuthorityMismatchDimension.PARAMETER_IDENTITY,
+                                expected_value=auth_args,
+                                actual_value=sorted(list(declared_args)),
+                                reason=mismatch_reason,
+                                target_artifact=target_file
+                            )
+
+                # Dimension: TARGET_ARTIFACT
+                if mismatch_status is None and ob.metadata and ob.metadata.get("target_artifact"):
+                    exp_art = ob.metadata["target_artifact"]
+                    if target_file and Path(target_file).name != Path(exp_art).name:
+                        mismatch_status = CoverageStatus.INCOMPATIBLE
+                        mismatch_reason = (
+                            f"Target artifact mismatch for widget '{widget_name}': expected {exp_art}, "
+                            f"but declared in {target_file}"
+                        )
+                        mismatch_evidence = AuthorityBindingEvidence(
+                            authority_source=ob.source_reference,
+                            authority_symbol=widget_name,
+                            blueprint_symbol=matched_id,
+                            mismatch_dimension=AuthorityMismatchDimension.TARGET_ARTIFACT,
+                            expected_value=exp_art,
+                            actual_value=target_file,
+                            reason=mismatch_reason,
+                            target_artifact=target_file
+                        )
+
+                if mismatch_status is not None:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=mismatch_status,
+                        matched_declaration_id=matched_id,
+                        reason=mismatch_reason,
+                        missing_aspects=[mismatch_reason],
+                        binding_evidence=mismatch_evidence
+                    )
+                    results.append(res)
+                    incompatible_cnt += 1
+                    summary_reasons.append(f"INCOMPATIBLE: {ob.obligation_id} ({mismatch_reason})")
+                else:
+                    res = ObligationCoverageResult(
+                        obligation=ob,
+                        status=CoverageStatus.COVERED,
+                        matched_declaration_id=matched_id,
+                        reason=f"Observable runtime widget '{widget_name}' covered by interface contract {matched_id}"
+                    )
+                    results.append(res)
+                    covered_cnt += 1
 
         # E. DEFAULT / BEHAVIORAL
         else:
             identity = ob.public_identity
-            if identity in symbol_interfaces or identity in data_models_map:
+            if identity in symbol_interfaces or identity in data_models_map or identity in scaffold_classes or identity in scaffold_functions:
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.COVERED,
@@ -1727,11 +2568,21 @@ def check_obligation_coverage(
                 results.append(res)
                 covered_cnt += 1
             else:
+                evidence = AuthorityBindingEvidence(
+                    authority_source=ob.source_reference,
+                    authority_symbol=identity,
+                    mismatch_dimension=AuthorityMismatchDimension.CALLABLE_IDENTITY,
+                    expected_value=identity,
+                    actual_value=sorted(list(symbol_interfaces.keys()) + list(data_models_map.keys())),
+                    reason=f"Obligation '{identity}' has no corresponding public interface contract",
+                    target_artifact=ob.source_reference
+                )
                 res = ObligationCoverageResult(
                     obligation=ob,
                     status=CoverageStatus.MISSING,
                     reason=f"Obligation '{identity}' has no corresponding public interface contract",
-                    missing_aspects=[f"Identity: {identity}"]
+                    missing_aspects=[f"Identity: {identity}"],
+                    binding_evidence=evidence
                 )
                 results.append(res)
                 missing_cnt += 1
@@ -1742,18 +2593,29 @@ def check_obligation_coverage(
         ob_pos = r.obligation.positional_arguments or 0
         ob_kw = r.obligation.keyword_arguments or []
         if r.status == CoverageStatus.COVERED and (ob_pos > 0 or len(ob_kw) > 0):
-            call_shape_status, call_shape_reason, _ = check_call_shape_compatibility(
+            call_shape_status, call_shape_reason, call_shape_meta = check_call_shape_compatibility(
                 r.obligation,
                 contract_dict,
                 blueprint=blueprint
             )
             if call_shape_status in (CoverageStatus.INCOMPATIBLE, "INCOMPATIBLE"):
+                evidence = AuthorityBindingEvidence(
+                    authority_source=r.obligation.source_reference,
+                    authority_symbol=r.obligation.public_identity,
+                    blueprint_symbol=r.matched_declaration_id,
+                    mismatch_dimension=AuthorityMismatchDimension.PARAMETER_IDENTITY,
+                    expected_value={"positional": ob_pos, "keywords": ob_kw},
+                    actual_value=call_shape_meta,
+                    reason=call_shape_reason,
+                    target_artifact=r.obligation.source_reference
+                )
                 r = ObligationCoverageResult(
                     obligation=r.obligation,
                     status=CoverageStatus.INCOMPATIBLE,
                     matched_declaration_id=r.matched_declaration_id,
                     reason=call_shape_reason,
-                    missing_aspects=[f"Call shape compatible with {r.obligation.positional_arguments} pos / {r.obligation.keyword_arguments} kw"]
+                    missing_aspects=[f"Call shape compatible with {r.obligation.positional_arguments} pos / {r.obligation.keyword_arguments} kw"],
+                    binding_evidence=evidence
                 )
                 covered_cnt -= 1
                 incompatible_cnt += 1

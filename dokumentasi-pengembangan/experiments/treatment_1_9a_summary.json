@@ -1,0 +1,145 @@
+{
+  "A": {
+    "condition": "A",
+    "verdict": "PASS",
+    "seal_success": true,
+    "latency_sec": 60.45,
+    "prompt_tokens": 5395,
+    "eval_tokens": 808,
+    "raw_output_chars": 3207,
+    "structural_blueprint_validity": true,
+    "parse_error": null,
+    "obligation_coverage": {
+      "total_obligations": 4,
+      "covered_count": 4,
+      "missing_count": 0,
+      "is_fully_covered": true
+    },
+    "identity_fidelity": false,
+    "observed_paths": [
+      "/products",
+      "/products/{product_id}"
+    ],
+    "semantic_mapping_fidelity": {
+      "has_route_bindings": true,
+      "declared_routes_count": 0,
+      "declared_routes": []
+    },
+    "invented_elements": [],
+    "authority_substitution": false,
+    "errors": [],
+    "warnings": [
+      "Pilar 4 (Konsistensi): return_type 'list[Product]' pada interface 'get_all_products' tidak merujuk ke data_models yang dideklarasikan."
+    ]
+  },
+  "B": {
+    "condition": "B",
+    "verdict": "FAIL",
+    "seal_success": false,
+    "latency_sec": 73.56,
+    "prompt_tokens": 5820,
+    "eval_tokens": 867,
+    "raw_output_chars": 3425,
+    "structural_blueprint_validity": true,
+    "parse_error": null,
+    "obligation_coverage": {
+      "total_obligations": 4,
+      "covered_count": 4,
+      "missing_count": 0,
+      "is_fully_covered": true
+    },
+    "identity_fidelity": false,
+    "observed_paths": [
+      "/products",
+      "/products/{product_id}"
+    ],
+    "semantic_mapping_fidelity": {
+      "has_route_bindings": true,
+      "declared_routes_count": 4,
+      "declared_routes": [
+        {
+          "identifier": "create_product",
+          "route": "/products",
+          "method": "POST"
+        },
+        {
+          "identifier": "get_all_products",
+          "route": "/products",
+          "method": "GET"
+        },
+        {
+          "identifier": "get_product",
+          "route": "/products/{product_id}",
+          "method": "GET"
+        },
+        {
+          "identifier": "delete_product",
+          "route": "/products/{product_id}",
+          "method": "DELETE"
+        }
+      ]
+    },
+    "invented_elements": [],
+    "authority_substitution": false,
+    "errors": [
+      "Pilar 4 (Oracle Consistency): CONTRACT_VALIDATION_FAILED: PRE_FREEZE_AUTHORITY_INCOMPATIBLE\n\nreason:\nArchitect interface contract is inconsistent with the frozen test interface. (does not cover authoritative obligations demanded by the Frozen Oracle).\n\ndetails:\nSCENARIO_SCAFFOLD_INCOMPATIBILITY: Scenario 'SCN-POS-BF95F007' is INCOMPATIBLE.\n  Source: test_main.py:48\n  Expected: {\"status_code\": 404}\n  Observed Scaffold: {\"name\": \"delete_product\", \"route\": \"/products/{product_id}\", \"http_method\": \"DELETE\", \"positional_params_count\": 1, \"has_named_params\": true, \"error_paths_count\": 0, \"conditional_branches_count\": 0, \"is_stub\": false, \"has_opaque_calls\": false, \"has_unconditional_return\": true}\n  Evidence: Statically proven absence of error path: Scenario expects negative/error outcome '{'status_code': 404}', but scaffold implementation for 'delete_product' provides only unconditional success with no conditional branch or error path."
+    ],
+    "warnings": [
+      "Pilar 4 (Konsistensi): return_type 'list[Product]' pada interface 'get_all_products' tidak merujuk ke data_models yang dideklarasikan."
+    ]
+  },
+  "C": {
+    "condition": "C",
+    "verdict": "PASS",
+    "seal_success": true,
+    "latency_sec": 66.94,
+    "prompt_tokens": 6096,
+    "eval_tokens": 770,
+    "raw_output_chars": 3022,
+    "structural_blueprint_validity": true,
+    "parse_error": null,
+    "obligation_coverage": {
+      "total_obligations": 4,
+      "covered_count": 4,
+      "missing_count": 0,
+      "is_fully_covered": true
+    },
+    "identity_fidelity": true,
+    "observed_paths": [
+      "/products",
+      "/products/{id}"
+    ],
+    "semantic_mapping_fidelity": {
+      "has_route_bindings": true,
+      "declared_routes_count": 4,
+      "declared_routes": [
+        {
+          "identifier": "create_product",
+          "route": "/products",
+          "method": "POST"
+        },
+        {
+          "identifier": "get_all_products",
+          "route": "/products",
+          "method": "GET"
+        },
+        {
+          "identifier": "get_product_by_id",
+          "route": "/products/{id}",
+          "method": "GET"
+        },
+        {
+          "identifier": "delete_product",
+          "route": "/products/{id}",
+          "method": "DELETE"
+        }
+      ]
+    },
+    "invented_elements": [],
+    "authority_substitution": false,
+    "errors": [],
+    "warnings": [
+      "Pilar 4 (Konsistensi): return_type 'list[Product]' pada interface 'get_all_products' tidak merujuk ke data_models yang dideklarasikan."
+    ]
+  }
+}
