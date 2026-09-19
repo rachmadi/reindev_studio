@@ -921,5 +921,19 @@ equirement_traceability_matrix.md | Inisialisasi struktur repositori, gitignore,
   - Pemutakhiran Berkas Tata Kelola IIDD:
     - `decision_log.md` (D-130, D-131, D-132), `validation_log.md` (VAL-T191, VAL-T192), `error_log.md` (E-076, E-077), `context_drift_log.md`, `human_intervention.md` (#128–#135), `iteration_summary.md`, `durasi_per_fitur.md` (Sesi 10: 2.88h, Akumulasi: 93.63h).
 
+---
 
-
+### [19 September 2026] Architect Semantic Grounding v1 Pilot & Final Experimental Synthesis #1.3–#1.9
+- **Branch**: `experiment/treatment-1.8-agent-capability`
+- **Tipe**: `feat(architect)` / `test` / `docs(synthesis)`
+- **Waktu**: 2026-09-19 11:50 WIB
+- **Status**: TERVERIFIKASI PENUH (1.062/1.062 tests PASS bersih, 0 regresi, Pre-Flight Gates A–I 100% PASS, Controlled 1x3 Pilot Executed, Final Synthesis Canonical Asset Established)
+- **Cakupan Perubahan**:
+  - `backend/agents/architect.py`: Implementasi generik `format_canonical_obligation_blueprint_mapping` (Part 1) dan `GENERIC_WORKED_EXAMPLE` (Part 2) pada Seksi [2] prompt Turn 0 Architect.
+  - Pilot Run 1x3 (`treatment_architect_semantic_grounding_v1_pilot_summary.json`):
+    - `cli_t1`: **PASS** (1-shot Turn 0 FROZEN contract, 5/5 unit tests passed dalam 0.10s, 0 developer loops).
+    - `fastapi_t1`: **FAIL** (Contract Gate fail-closed 100% aktif menolak rute deviasi `/inventaris/{id}`, 0 downstream leakage).
+    - `flutter_t1`: **FAIL** (Architect berhasil FROZEN pada Turn 1 repair, terhenti di Developer type mismatch `double` vs `String`).
+  - Laporan & Artefak Ilmiah di `dokumentasi-pengembangan/experiments/`:
+    - `treatment_architect_semantic_grounding_v1_controlled_pilot_report.md`: Laporan 15-poin evaluasi komprehensif Controlled Pilot 1x3.
+    - `final_experimental_synthesis_treatment1_3_to_1_9.md`: Sintesis final kanonikal yang menjawab pertanyaan fundamental *"Apa sebenarnya yang berhasil dibuktikan oleh ReinDev?"* memuat 5 Teorema Terbukti, Matriks Evolusi Lintas-Treatment, dan Paradigma Otonom I-CERV.

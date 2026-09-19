@@ -37,6 +37,8 @@ try:
         format_acceptance_usage_evidence,
         find_deterministic_callable_fact,
         normalize_route_path,
+        CanonicalObligation,
+        ObligationKind,
     )
     from ..canonical_scenario import (
         extract_canonical_scenarios,
@@ -93,6 +95,8 @@ except (ImportError, ValueError):
             format_acceptance_usage_evidence,
             find_deterministic_callable_fact,
             normalize_route_path,
+            CanonicalObligation,
+            ObligationKind,
         )
     except ImportError:
         def extract_canonical_oracle_obligations(*args, **kwargs): return []
@@ -100,6 +104,8 @@ except (ImportError, ValueError):
         def format_acceptance_usage_evidence(*args, **kwargs): return ""
         def find_deterministic_callable_fact(*args, **kwargs): return None
         def normalize_route_path(p): return str(p)
+        CanonicalObligation = None
+        ObligationKind = None
     try:
         from canonical_scenario import (
             extract_canonical_scenarios,
@@ -432,6 +438,115 @@ def _normalize_interface_contract_dict(d: dict, idx: int, is_dart: bool, primary
     return item
 
 
+def format_canonical_obligation_blueprint_mapping(obligations: List[Any]) -> str:
+    """
+    Format representasi generik pemetaan dari Acceptance Obligation ke Required Blueprint Element.
+    (Treatment — Architect Semantic Grounding v1, Part 1).
+
+    Menghubungkan otoritas penerimaan ke kontrak cetak biru kanonikal secara deklaratif (WHAT)
+    tanpa mendikte strategi implementasi atau solver spesifik.
+    """
+    if not obligations:
+        return ""
+
+    lines = [
+        "=== [CANONICAL OBLIGATION TO BLUEPRINT BINDING SPECIFICATION] ===",
+        "Prinsip Pemetaan Kanonikal (Generic Representation Contract):",
+        "Setiap Acceptance Obligation di atas WAJIB dipetakan secara eksplisit ke elemen ArchitecturalBlueprint yang bersesuaian:\n"
+    ]
+
+    for idx, ob in enumerate(obligations, 1):
+        ob_id = getattr(ob, "obligation_id", f"OBL-{idx}")
+        ob_kind = getattr(ob, "obligation_kind", "UNKNOWN")
+        pub_ident = getattr(ob, "public_identity", "")
+        inputs = getattr(ob, "inputs", {}) or {}
+
+        lines.append(f"{idx}. Obligation ID: {ob_id}")
+        lines.append("   Authority Identity:")
+        lines.append(f"     kind: {ob_kind}")
+        lines.append(f"     value: {pub_ident}")
+
+        method = None
+        if isinstance(inputs, dict):
+            method = inputs.get("http_method") or inputs.get("method")
+        if method:
+            lines.append(f"     method: {method}")
+
+        lines.append("   Required Blueprint Element:")
+        kind_str = str(ob_kind).upper()
+        if "DATA_MODEL" in kind_str:
+            lines.append("     element_kind: data_models")
+            lines.append(f'     required_identity_fields: model_name (exact: "{pub_ident}"), fields')
+        elif "INTERACTION" in kind_str:
+            lines.append("     element_kind: interface_contracts")
+            method_field = f', method (exact: "{method}")' if method else ""
+            lines.append(f'     required_identity_fields: identifier, route (exact: "{pub_ident}"){method_field}')
+        elif "OBSERVABLE_RUNTIME" in kind_str:
+            lines.append("     element_kind: interface_contracts")
+            lines.append(f'     required_identity_fields: identifier (exact: "{pub_ident}"), target_file')
+        else:  # CALLABLE_INTERFACE, CALLABLE, FUNCTION, etc.
+            lines.append("     element_kind: interface_contracts")
+            lines.append(f'     required_identity_fields: identifier (exact: "{pub_ident}"), target_file, parameters')
+        lines.append("     required: true\n")
+
+    lines.append("ATURAN TRANSFORMASI KANONIKAL GENERIK:")
+    lines.append('- Jika kind == "INTERACTION" (misal: HTTP endpoint / Web API):')
+    lines.append("  * `route`: path persis dari identity.value (pertahankan placeholder path identik, misal {id})")
+    lines.append("  * `method`: HTTP method persis jika ada")
+    lines.append("  * `identifier`: nama fungsi/handler pengimplementasi route")
+    lines.append('- Jika kind == "CALLABLE_INTERFACE" atau fungsi/metode publik:')
+    lines.append("  * `identifier`: nama callable persis dari identity.value")
+    lines.append('- Jika kind == "DATA_MODEL":')
+    lines.append("  * petakan ke `data_models` dengan `model_name` sesuai identity.value")
+    lines.append('- Jika kind == "OBSERVABLE_RUNTIME":')
+    lines.append("  * petakan ke `interface_contracts` dengan `identifier` sesuai identity.value")
+    lines.append("=== END [CANONICAL OBLIGATION TO BLUEPRINT BINDING SPECIFICATION] ===")
+
+    return "\n".join(lines)
+
+
+GENERIC_WORKED_EXAMPLE = """
+
+=== [GENERIC WORKED EXAMPLE — CANONICAL BINDING TRANSFORMATION] ===
+Berikut adalah SATU contoh generik transformasi antarmuka interaksi publik menjadi kontrak blueprint kanonikal (WHAT -> HOW):
+
+Contoh Obligasi:
+{
+  "obligation_id": "OBL-EXAMPLE-01",
+  "authority_identity": {
+    "kind": "INTERACTION",
+    "value": "/service/v1/resource",
+    "method": "PATCH"
+  },
+  "required_blueprint_element": {
+    "element_kind": "interface_contracts",
+    "required_identity_fields": ["identifier", "route", "method"]
+  }
+}
+
+Transformasi pada Blueprint:
+1. Pada "interface_contracts":
+{
+  "identifier": "handle_resource_action",
+  "route": "/service/v1/resource",
+  "method": "PATCH",
+  "target_file": "service.py",
+  "parameters": [
+    {
+      "param_name": "payload",
+      "param_type": "dict",
+      "is_required": true
+    }
+  ],
+  "expected_return": {
+    "return_type": "dict"
+  }
+}
+2. Pada "files" ("service.py" scaffold):
+Deklarasikan antarmuka publik yang menangani route "/service/v1/resource" dengan method "PATCH" sebagai minimal stub (`pass`).
+=== END [GENERIC WORKED EXAMPLE — CANONICAL BINDING TRANSFORMATION] ==="""
+
+
 def architect_agent(state: SquadState, llm: Any = None, tracer: Any = None) -> dict:
     t0 = time.time()
 
@@ -605,6 +720,19 @@ Tuliskan output cetak biru JSON kanonikal di dalam penanda persis === BLUEPRINT 
         except Exception:
             oracle_scenario_section = ""
 
+        # Canonical Obligation to Blueprint Mapping & Generic Worked Example (Treatment — Architect Semantic Grounding v1)
+        canonical_mapping_section = ""
+        worked_example_section = ""
+        if oracle_obs:
+            try:
+                mapping_text = format_canonical_obligation_blueprint_mapping(oracle_obs)
+                if mapping_text:
+                    canonical_mapping_section = f"\n\n{mapping_text.strip()}"
+                    worked_example_section = f"\n\n{GENERIC_WORKED_EXAMPLE.strip()}"
+            except Exception:
+                canonical_mapping_section = ""
+                worked_example_section = ""
+
         prompt = f"""TARGET BAHASA PEMROGRAMAN WAJIB: {target_lang.upper()}
 
 {structure_rule}
@@ -618,7 +746,7 @@ Tugas Pengguna:
 [2] ACCEPTANCE OBLIGATION LEDGER (AUTHORITATIVE ACCEPTANCE OBLIGATIONS):
 Authority: FROZEN_ORACLE (Immutable Acceptance Authority — Sumber Kebenaran Mutlak)
 Prinsip: Seluruh obligasi publik di bawah ini WAJIB dideklarasikan secara presisi pada interface_contracts atau data_models.
-{oracle_ledger_section if oracle_ledger_section else "Tidak ada acceptance obligation spesifik yang diekstrak. Gunakan User Intent dan V0 Requirements sebagai panduan."}{oracle_scenario_section}
+{oracle_ledger_section if oracle_ledger_section else "Tidak ada acceptance obligation spesifik yang diekstrak. Gunakan User Intent dan V0 Requirements sebagai panduan."}{oracle_scenario_section}{canonical_mapping_section}{worked_example_section}
 
 [3] PM SPECIFICATION (PROPOSAL — DESIGN REFERENCE ONLY):
 Peran: Product Manager adalah PROPOSAL perancangan fitur, BUKAN Acceptance Authority.
@@ -632,7 +760,7 @@ Format root harus berupa object JSON ArchitecturalBlueprint dengan fields:
 - "file_tree": list path file implementasi (maksimal 1-2 file, DILARANG memasukkan file test)
 - "architecture_summary": ringkasan arsitektur
 - "files": mapping file path ke object {{"module_role": str, "imports": list, "code_scaffold": str}}
-- "interface_contracts": list object interface {{"identifier": str, "target_file": str, "parameters": list, "expected_return": dict}}
+- "interface_contracts": list object interface {{"identifier": str, "route": str (optional for HTTP/web endpoints), "method": str (optional for HTTP/web endpoints), "target_file": str, "parameters": list, "expected_return": dict}}
 - "data_models": list object data model {{"model_name": str, "target_file": str, "fields": list}}
 
 [5] ARCHITECT CONSTRUCTION RULES:
