@@ -565,10 +565,28 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
                 "error": err_dict,
                 "logs": current_logs + [error_log]
             }
+        except Exception as exc:
+            log_model_interaction(
+                tracer, role="developer", messages=messages, response=None, raw_output="",
+                duration_sec=time.perf_counter() - model_call_started, iteration=iteration,
+                provider=dev_backend or state.get("provider"),
+                requested_model=state.get("developer_model") or state.get("model_name"),
+                model_client=adapter, error=exc,
+            )
+            raise
     else:
         llm = get_llm(role="developer", provider=state.get("provider"))
         model_client = llm
-        response = llm.invoke(messages)
+        try:
+            response = llm.invoke(messages)
+        except Exception as exc:
+            log_model_interaction(
+                tracer, role="developer", messages=messages, response=None, raw_output="",
+                duration_sec=time.perf_counter() - model_call_started, iteration=iteration,
+                provider=state.get("provider"), requested_model=state.get("model_name"),
+                model_client=llm, error=exc,
+            )
+            raise
         raw_output = response.content if hasattr(response, "content") else str(response)
 
     log_model_interaction(
