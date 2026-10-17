@@ -44,6 +44,7 @@ except (ImportError, ValueError):
         from tracer import get_tracer, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
+        def log_model_interaction(*args, **kwargs): return None
     try:
         from environment_grounding import generate_fact_card_for_architect
     except ImportError:
