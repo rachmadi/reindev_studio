@@ -105,7 +105,7 @@ class RunTracer:
         try:
             json.dumps(event, default=str, ensure_ascii=False)
         except Exception as exc:
-            event["stage"] = "audit_trail"
+            event["stage"] = stage
             event["event_type"] = "serialization_failure"
             event["data"] = {
                 "original_stage": stage,
