@@ -83,3 +83,44 @@ def test_traced_route_records_decision_without_changing_it(tmp_path):
     assert events[0]["event_type"] == "route_decision"
     assert events[0]["data"]["target_node"] == "developer"
     assert events[0]["data"]["decision_state"] == state
+
+
+
+def test_tracing_failure_does_not_change_node_result_or_execution(tmp_path, monkeypatch):
+    run_id = "audit-noninterference"
+    trace_dir = tmp_path / run_id
+    tracer = RunTracer.register(run_id, trace_dir)
+    calls = []
+
+    def fail_log(*args, **kwargs):
+        raise OSError("simulated trace sink failure")
+
+    monkeypatch.setattr(tracer, "log_event", fail_log)
+
+    def node_fn(state):
+        calls.append(state)
+        return {"status": "unchanged", "value": 42}
+
+    state = {"run_id": run_id, "iteration_count": 0}
+    result = _traced_node("sample_node", node_fn)(state)
+
+    assert len(calls) == 1
+    assert result == {"status": "unchanged", "value": 42}
+    assert state == {"run_id": run_id, "iteration_count": 0}
+
+
+def test_traced_route_reraises_original_exception(tmp_path):
+    run_id = "audit-route-error"
+    trace_dir = tmp_path / run_id
+    RunTracer.register(run_id, trace_dir)
+
+    def route_fn(_state):
+        raise RuntimeError("route failed")
+
+    with pytest.raises(RuntimeError, match="route failed"):
+        _traced_route("route_after_sample", route_fn)({"run_id": run_id, "iteration_count": 0})
+
+    events = _events(trace_dir)
+    assert len(events) == 1
+    assert events[0]["event_type"] == "route_error"
+    assert events[0]["data"]["exception_message"] == "route failed"
