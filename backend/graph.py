@@ -29,7 +29,7 @@ try:
     from .agents.tester import tester_agent
     from .agents.reviewer import reviewer_agent
     from .executor_v2 import executor_node_v2 as executor_node
-    from .tracer import get_tracer, compute_dict_hashes, compute_object_hash
+    from .tracer import get_tracer, compute_dict_hashes, compute_object_hash, set_trace_context, reset_trace_context
     from .contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
     from .phase_validators import (
         validate_pm_phase,
@@ -53,11 +53,13 @@ except (ImportError, ValueError):
     except ImportError:
         from executor import executor_node
     try:
-        from tracer import get_tracer, compute_dict_hashes, compute_object_hash
+        from tracer import get_tracer, compute_dict_hashes, compute_object_hash, set_trace_context, reset_trace_context
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
         def compute_object_hash(obj): return ""
+        def set_trace_context(correlation_id, parent_event_id=None): return None
+        def reset_trace_context(token): return None
     try:
         from contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
     except ImportError:
@@ -961,11 +963,22 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
         except Exception:
             start_event_id = None
 
+        context_token = None
+        try:
+            context_token = set_trace_context(execution_id, start_event_id)
+        except Exception:
+            context_token = None
+
         started = time.perf_counter()
         try:
             result = node_fn(state)
         except Exception as exc:
             duration = round(time.perf_counter() - started, 6)
+            if context_token is not None:
+                try:
+                    reset_trace_context(context_token)
+                except Exception:
+                    pass
             try:
                 tracer.log_event(
                     stage="graph_node",
@@ -987,6 +1000,11 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                 pass
             raise
 
+        if context_token is not None:
+            try:
+                reset_trace_context(context_token)
+            except Exception:
+                pass
         duration = round(time.perf_counter() - started, 6)
         output_snapshot = _trace_snapshot(result)
         try:
