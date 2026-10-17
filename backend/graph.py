@@ -13,6 +13,7 @@ Mengintegrasikan 6 End-Phase Quality Boundaries formal dengan penegakan mutlak:
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 import ast
+import os
 import copy
 import time
 import uuid
@@ -892,6 +893,41 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
             )
             if key in state
         }
+        # Record resolved non-secret model configuration as factual context.
+        # This mirrors backend/config.py defaults; it does not affect model selection.
+        selected_provider = str(state.get("provider") or os.getenv("LLM_PROVIDER", "ollama")).lower()
+        if node_name == "developer":
+            resolved_provider = str(state.get("developer_backend") or selected_provider).lower()
+            resolved_model = state.get("developer_model") or state.get("model_name")
+            resolved_llm_config = {
+                "provider": resolved_provider,
+                "model": resolved_model,
+                "source": "SquadState developer_backend/developer_model",
+            }
+        elif node_name in ("pm", "architect", "tester", "reviewer"):
+            if selected_provider == "openrouter":
+                resolved_model = os.getenv(
+                    "OPENROUTER_REASONING_MODEL" if node_name in ("pm", "architect", "reviewer") else "OPENROUTER_CODER_MODEL",
+                    "anthropic/claude-3.5-sonnet" if node_name in ("pm", "architect", "reviewer") else "deepseek/deepseek-chat",
+                )
+                resolved_llm_config = {
+                    "provider": selected_provider,
+                    "model": resolved_model,
+                    "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                    "temperature": 0.2,
+                }
+            else:
+                role_defaults = {"pm": 300, "architect": 350, "developer": 1000, "tester": 1000, "reviewer": 1000}
+                resolved_llm_config = {
+                    "provider": "ollama",
+                    "model": os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b"),
+                    "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                    "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
+                    "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", str(role_defaults.get(node_name, 600)))),
+                    "temperature": 0.2,
+                }
+        else:
+            resolved_llm_config = None
         try:
             start_event_id = tracer.log_event(
                 stage="graph_node",
@@ -904,6 +940,7 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                     "input_state": input_snapshot,
                     "input_state_sha256": compute_object_hash(input_snapshot),
                     "configured_model_context": model_context,
+                    "resolved_llm_config": resolved_llm_config,
                     "input_status": state.get("status"),
                 },
             )
