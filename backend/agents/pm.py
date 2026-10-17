@@ -17,6 +17,7 @@ except (ImportError, ValueError):
         from tracer import get_tracer, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
+        def log_model_interaction(*args, **kwargs): return None
 
 PM_SYSTEM_PROMPT = """Anda adalah Senior Software Product Manager dalam tim rekayasa perangkat lunak ReinDev Studio.
 Tugas Anda adalah merumuskan spesifikasi teknis SUPER RINGKAS (Maksimal 100 kata total).
