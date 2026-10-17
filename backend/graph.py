@@ -858,6 +858,14 @@ def route_after_executor(state: SquadState) -> str:
     return "reviewer"
 
 
+def _trace_env_int(name: str, default: int) -> int:
+    """Read telemetry-only integer settings without allowing bad env values to affect a run."""
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
 def _trace_snapshot(value: Any) -> Any:
     """Create a detached audit snapshot without allowing observability to affect execution."""
     try:
@@ -922,8 +930,8 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                     "provider": "ollama",
                     "model": os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b"),
                     "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-                    "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
-                    "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", str(role_defaults.get(node_name, 600)))),
+                    "num_ctx": _trace_env_int("OLLAMA_NUM_CTX", 2048),
+                    "num_predict": _trace_env_int("OLLAMA_NUM_PREDICT", role_defaults.get(node_name, 600)),
                     "temperature": 0.2,
                 }
         else:
