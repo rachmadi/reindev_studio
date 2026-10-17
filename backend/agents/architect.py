@@ -10,6 +10,7 @@ Self-Healing Revision Loop (max 2 revisions).
 
 import re
 import json
+import time
 from pathlib import Path
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
@@ -21,7 +22,7 @@ try:
         extract_contract_json_from_text,
         ContractStatus
     )
-    from ..tracer import get_tracer
+    from ..tracer import get_tracer, log_model_interaction
     from ..environment_grounding import generate_fact_card_for_architect
     from ..architect_validator import validate_architect_blueprint
 except (ImportError, ValueError):
@@ -40,7 +41,7 @@ except (ImportError, ValueError):
         def extract_contract_json_from_text(t): return None
         class ContractStatus: ALIGNED = "ALIGNED"
     try:
-        from tracer import get_tracer
+        from tracer import get_tracer, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
     try:
@@ -438,8 +439,16 @@ Perbaiki inkonsistensi yang ada, lalu tuliskan diagram struktur file tree dan ko
         HumanMessage(content=prompt)
     ]
     
+    model_call_started = time.perf_counter()
     response = llm.invoke(messages)
     arch_plan = response.content if hasattr(response, "content") else str(response)
+    tracer = get_tracer(state.get("run_id"))
+    log_model_interaction(
+        tracer, role="architect", messages=messages, response=response, raw_output=arch_plan,
+        duration_sec=time.perf_counter() - model_call_started,
+        iteration=state.get("iteration_count", 0), provider=state.get("provider"),
+        requested_model=state.get("model_name"), model_client=llm,
+    )
 
     # P0-2: Lengkapi kontrak menjadi ALIGNED (Prioritas: Blueprint JSON -> Kontrak JSON blok -> Default Fallback)
     draft_contract = state.get("contract")
