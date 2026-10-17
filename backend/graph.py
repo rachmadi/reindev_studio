@@ -913,7 +913,13 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                 "source": "SquadState developer_backend/developer_model",
             }
         elif node_name in ("pm", "architect", "tester", "reviewer"):
-            if selected_provider == "openrouter":
+            if os.getenv("MOCK_LLM", "false").lower() == "true":
+                resolved_llm_config = {
+                    "provider": "mock",
+                    "model": "FakeListChatModel",
+                    "source": "MOCK_LLM environment setting",
+                }
+            elif selected_provider == "openrouter":
                 resolved_model = os.getenv(
                     "OPENROUTER_REASONING_MODEL" if node_name in ("pm", "architect", "reviewer") else "OPENROUTER_CODER_MODEL",
                     "anthropic/claude-3.5-sonnet" if node_name in ("pm", "architect", "reviewer") else "deepseek/deepseek-chat",
