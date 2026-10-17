@@ -254,6 +254,81 @@ def get_tracer(run_id: Any = _UNSPECIFIED_RUN_ID) -> Optional[RunTracer]:
     return RunTracer.get(run_id)
 
 
+def log_model_interaction(
+    tracer: Optional[RunTracer],
+    role: str,
+    messages: Any,
+    response: Any,
+    raw_output: Any,
+    duration_sec: float,
+    iteration: int = 0,
+    provider: Optional[str] = None,
+    requested_model: Optional[str] = None,
+    model_client: Any = None,
+    backend_metadata: Optional[Dict[str, Any]] = None,
+    error: Optional[BaseException] = None,
+) -> None:
+    """Record the actual prompt, raw model output, timing and non-secret call metadata."""
+    if tracer is None:
+        return
+    try:
+        message_snapshot = []
+        for message in messages or []:
+            message_snapshot.append({
+                "role": getattr(message, "type", type(message).__name__),
+                "content": getattr(message, "content", str(message)),
+            })
+        raw_text = raw_output if isinstance(raw_output, str) else str(raw_output)
+        client_model = None
+        for attr in ("model", "model_name", "model_id"):
+            try:
+                client_model = getattr(model_client, attr, None)
+            except Exception:
+                client_model = None
+            if client_model:
+                break
+        response_metadata = {}
+        usage_metadata = {}
+        if response is not None:
+            try:
+                response_metadata = getattr(response, "response_metadata", {}) or {}
+            except Exception:
+                response_metadata = {}
+            try:
+                usage_metadata = getattr(response, "usage_metadata", {}) or {}
+            except Exception:
+                usage_metadata = {}
+        data = {
+            "role": role,
+            "provider": provider,
+            "requested_model": requested_model,
+            "resolved_model": client_model,
+            "model_client_type": type(model_client).__name__ if model_client is not None else None,
+            "prompt_messages": message_snapshot,
+            "prompt_sha256": compute_object_hash(message_snapshot),
+            "raw_output": raw_text,
+            "raw_output_sha256": compute_sha256(raw_text),
+            "duration_sec": round(float(duration_sec), 6),
+            "response_metadata": response_metadata,
+            "usage_metadata": usage_metadata,
+            "backend_metadata": backend_metadata or {},
+        }
+        if error is not None:
+            data["error"] = {
+                "type": type(error).__name__,
+                "message": str(error),
+            }
+        tracer.log_event(
+            stage=role,
+            event_type="model_call_error" if error is not None else "model_call",
+            iteration=iteration,
+            data=data,
+        )
+    except Exception:
+        # Instrumentation must never mask model results or the original exception.
+        return
+
+
 def calculate_trace_otrr(trace_file: Path | str) -> Dict[str, Any]:
     """
     Menghitung One-Turn Repair Rate (OTRR) dari berkas trace JSONL.
