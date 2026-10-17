@@ -909,14 +909,14 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
         if node_name == "developer":
             resolved_provider = str(state.get("developer_backend") or selected_provider).lower()
             resolved_model = state.get("developer_model") or state.get("model_name")
-            resolved_llm_config = {
+            llm_config_from_state_and_environment = {
                 "provider": resolved_provider,
                 "model": resolved_model,
                 "source": "SquadState developer_backend/developer_model",
             }
         elif node_name in ("pm", "architect", "tester", "reviewer"):
             if os.getenv("MOCK_LLM", "false").lower() == "true":
-                resolved_llm_config = {
+                llm_config_from_state_and_environment = {
                     "provider": "mock",
                     "model": "FakeListChatModel",
                     "source": "MOCK_LLM environment setting",
@@ -926,7 +926,7 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                     "OPENROUTER_REASONING_MODEL" if node_name in ("pm", "architect", "reviewer") else "OPENROUTER_CODER_MODEL",
                     "anthropic/claude-3.5-sonnet" if node_name in ("pm", "architect", "reviewer") else "deepseek/deepseek-chat",
                 )
-                resolved_llm_config = {
+                llm_config_from_state_and_environment = {
                     "provider": selected_provider,
                     "model": resolved_model,
                     "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
@@ -934,7 +934,7 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                 }
             else:
                 role_defaults = {"pm": 300, "architect": 350, "developer": 1000, "tester": 1000, "reviewer": 1000}
-                resolved_llm_config = {
+                llm_config_from_state_and_environment = {
                     "provider": "ollama",
                     "model": os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b"),
                     "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
@@ -943,7 +943,7 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                     "temperature": 0.2,
                 }
         else:
-            resolved_llm_config = None
+            llm_config_from_state_and_environment = None
         try:
             start_event_id = tracer.log_event(
                 stage="graph_node",
@@ -956,7 +956,7 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
                     "input_state": input_snapshot,
                     "input_state_sha256": compute_object_hash(input_snapshot),
                     "configured_model_context": model_context,
-                    "resolved_llm_config": resolved_llm_config,
+                    "llm_config_from_state_and_environment": llm_config_from_state_and_environment,
                     "input_status": state.get("status"),
                 },
             )
