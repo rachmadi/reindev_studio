@@ -4,6 +4,7 @@ import hashlib
 import threading
 import logging
 import uuid
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -28,6 +29,20 @@ def compute_object_hash(obj: Any) -> str:
 
 
 _UNSPECIFIED_RUN_ID = object()
+_TRACE_CONTEXT = ContextVar("reindev_trace_context", default=None)
+
+
+def set_trace_context(correlation_id: str, parent_event_id: Optional[str] = None):
+    """Associate events emitted inside one graph-node execution with that node."""
+    return _TRACE_CONTEXT.set({
+        "correlation_id": correlation_id,
+        "parent_event_id": parent_event_id,
+    })
+
+
+def reset_trace_context(token) -> None:
+    """Restore the previous trace context after a node finishes."""
+    _TRACE_CONTEXT.reset(token)
 
 
 class RunTracer:
@@ -86,6 +101,12 @@ class RunTracer:
         Append satu event JSONL. Mengembalikan event_id untuk menghubungkan event.
         Kegagalan observability dilaporkan melalui logger dan tidak dilempar ke pipeline.
         """
+        context = _TRACE_CONTEXT.get()
+        if context:
+            if correlation_id is None:
+                correlation_id = context.get("correlation_id")
+            if parent_event_id is None:
+                parent_event_id = context.get("parent_event_id")
         timestamp = datetime.now().astimezone().isoformat()
         event_id = uuid.uuid4().hex
         event = {
