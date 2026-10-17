@@ -71,10 +71,19 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
         HumanMessage(content=prompt)
     ]
     
-    model_call_started = time.perf_counter()
-    response = llm.invoke(messages)
-    specs = response.content if hasattr(response, "content") else str(response)
     tracer = get_tracer(state.get("run_id"))
+    model_call_started = time.perf_counter()
+    try:
+        response = llm.invoke(messages)
+    except Exception as exc:
+        log_model_interaction(
+            tracer, role="pm", messages=messages, response=None, raw_output="",
+            duration_sec=time.perf_counter() - model_call_started, iteration=repair_count,
+            provider=state.get("provider"), requested_model=state.get("model_name"),
+            model_client=llm, error=exc,
+        )
+        raise
+    specs = response.content if hasattr(response, "content") else str(response)
     log_model_interaction(
         tracer, role="pm", messages=messages, response=response, raw_output=specs,
         duration_sec=time.perf_counter() - model_call_started, iteration=repair_count,
