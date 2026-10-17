@@ -17,6 +17,7 @@ except (ImportError, ValueError):
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
+        def log_model_interaction(*args, **kwargs): return None
     from contract import verify_contract_checkpoint
 
 REVIEWER_SYSTEM_PROMPT = """Anda adalah Principal Code Reviewer & Tech Lead dalam tim rekayasa perangkat lunak ReinDev Studio.
