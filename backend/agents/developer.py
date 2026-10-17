@@ -2,12 +2,13 @@ import os
 import copy
 import json
 import re
+import time
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ..state import SquadState
     from ..config import get_llm
     from ..environment_grounding import generate_fact_card
-    from ..tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
+    from ..tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash, log_model_interaction
     from ..contract import verify_contract_checkpoint, ContractIntegrityError
 except (ImportError, ValueError):
     from state import SquadState
@@ -18,11 +19,12 @@ except (ImportError, ValueError):
         def generate_fact_card(target_language: str, task: str = "") -> str:  # type: ignore[misc]
             return ""
     try:
-        from tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
+        from tracer import get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_sha256(s): return ""
         def compute_dict_hashes(f): return {}
+        def log_model_interaction(*args, **kwargs): return None
         def compute_object_hash(o): return ""
     try:
         from contract import verify_contract_checkpoint, ContractIntegrityError
@@ -527,8 +529,11 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
     use_gateway = (dev_backend == "openrouter") or (not is_mocked and DeveloperGateway is not None)
 
     metadata = {}
+    model_client = None
+    model_call_started = time.perf_counter()
     if use_gateway and DeveloperGateway is not None:
         adapter = DeveloperGateway.from_state(state)
+        model_client = adapter
         try:
             response = adapter.invoke(
                 messages,
@@ -540,6 +545,12 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
             metadata = getattr(response, "metadata", {})
         except DeveloperTransportError as exc:
             err_dict = exc.to_dict()
+            log_model_interaction(
+                tracer, role="developer", messages=messages, response=None, raw_output="",
+                duration_sec=time.perf_counter() - model_call_started, iteration=iteration,
+                provider=exc.provider, requested_model=exc.model, model_client=adapter,
+                backend_metadata=err_dict, error=exc,
+            )
             if tracer:
                 tracer.log_event(
                     stage="developer",
@@ -556,9 +567,17 @@ Silakan tulis kode program lengkap sesuai format penanda === FILE: ... === tanpa
             }
     else:
         llm = get_llm(role="developer", provider=state.get("provider"))
+        model_client = llm
         response = llm.invoke(messages)
         raw_output = response.content if hasattr(response, "content") else str(response)
 
+    log_model_interaction(
+        tracer, role="developer", messages=messages, response=response, raw_output=raw_output,
+        duration_sec=time.perf_counter() - model_call_started, iteration=iteration,
+        provider=metadata.get("provider", dev_backend or state.get("provider")),
+        requested_model=metadata.get("model", state.get("developer_model") or state.get("model_name")),
+        model_client=model_client, backend_metadata=metadata,
+    )
     code_files = parse_code_blocks(raw_output, target_lang=target_lang)
     
     # Gabungkan dengan kode sebelumnya agar file yang tidak diubah tidak hilang
