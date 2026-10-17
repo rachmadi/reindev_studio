@@ -2,6 +2,8 @@ import os
 import json
 import hashlib
 import threading
+import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -39,6 +41,9 @@ class RunTracer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.trace_file = self.output_dir / "run_trace.jsonl"
         self._file_lock = threading.Lock()
+        self._event_sequence = 0
+        self._write_failures = 0
+        self._logger = logging.getLogger(__name__)
 
     @classmethod
     def register(cls, run_id: str, output_dir: Path | str) -> "RunTracer":
@@ -51,53 +56,79 @@ class RunTracer:
     @classmethod
     def get(cls, run_id: Optional[str] = None) -> Optional["RunTracer"]:
         with cls._lock:
-            if run_id and run_id in cls._instances:
-                return cls._instances[run_id]
+            # Explicit run IDs are authoritative; never attribute an unknown run
+            # to whichever run happened to register most recently.
+            if run_id is not None:
+                return cls._instances.get(run_id)
             if cls._active_run_id and cls._active_run_id in cls._instances:
                 return cls._instances[cls._active_run_id]
             return None
 
-    def log_event(self, stage: str, event_type: str, iteration: int, data: Dict[str, Any]) -> None:
+    @property
+    def write_failures(self) -> int:
+        """Jumlah kegagalan append yang diketahui selama umur instance ini."""
+        return self._write_failures
+
+    def log_event(
+        self,
+        stage: str,
+        event_type: str,
+        iteration: int,
+        data: Dict[str, Any],
+        correlation_id: Optional[str] = None,
+        parent_event_id: Optional[str] = None,
+    ) -> Optional[str]:
         """
-        Merekam satu event observabilitas ke dalam berkas run_trace.jsonl secara thread-safe dan aman.
-        Jika serialisasi gagal, event logging_error akan dicatat sebagai pengganti tanpa melempar exception.
+        Append satu event JSONL. Mengembalikan event_id untuk menghubungkan event.
+        Kegagalan observability dilaporkan melalui logger dan tidak dilempar ke pipeline.
         """
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now().astimezone().isoformat()
+        event_id = uuid.uuid4().hex
         event = {
+            "event_id": event_id,
             "run_id": self.run_id,
             "timestamp": timestamp,
             "stage": stage,
             "event_type": event_type,
             "iteration": iteration,
-            "data": data
+            "data": data,
         }
+        if correlation_id is not None:
+            event["correlation_id"] = correlation_id
+        if parent_event_id is not None:
+            event["parent_event_id"] = parent_event_id
 
         try:
-            line = json.dumps(event, default=str, ensure_ascii=False)
-        except Exception as e:
-            fallback_event = {
-                "run_id": self.run_id,
-                "timestamp": timestamp,
-                "stage": stage,
-                "event_type": "logging_error",
-                "iteration": iteration,
-                "data": {
-                    "error_message": str(e),
-                    "original_stage": stage,
-                    "original_event_type": event_type
-                }
+            json.dumps(event, default=str, ensure_ascii=False)
+        except Exception as exc:
+            event["stage"] = "audit_trail"
+            event["event_type"] = "serialization_failure"
+            event["data"] = {
+                "original_stage": stage,
+                "original_event_type": event_type,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
             }
-            try:
-                line = json.dumps(fallback_event, default=str, ensure_ascii=False)
-            except Exception:
-                return
 
         try:
             with self._file_lock:
-                with open(self.trace_file, "a", encoding="utf-8") as f:
-                    f.write(line + "\n")
-        except Exception:
-            pass
+                self._event_sequence += 1
+                event["sequence"] = self._event_sequence
+                line = json.dumps(event, default=str, ensure_ascii=False)
+                with open(self.trace_file, "a", encoding="utf-8") as trace:
+                    trace.write(line + "\\n")
+                    trace.flush()
+            return event_id
+        except Exception as exc:
+            self._write_failures += 1
+            # Do not recursively write to a file whose append just failed.
+            # Report the loss through process logging without stopping the pipeline.
+            self._logger.error(
+                "AUDIT_TRACE_WRITE_FAILURE run_id=%s sequence=%s stage=%s event_type=%s path=%s error=%s",
+                self.run_id, self._event_sequence, stage, event_type,
+                self.trace_file, exc, exc_info=True,
+            )
+            return None
 
     # Iterasi 7: Helper Telemetry Methods for Deterministic Context-Aware Validation
     def log_validation_failure(self, validator: str, verdict: str, violations_count: int, package_hash: str = "", iteration: int = 0) -> None:
