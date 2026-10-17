@@ -94,3 +94,48 @@ def test_tracer_safe_serialization_fallback():
     assert len(lines) == 1
     event = json.loads(lines[0])
     assert event["stage"] == "tester"
+
+
+
+def test_trace_events_have_unique_ids_sequence_and_parent_links():
+    run_id = "test_trace_identity"
+    tracer = RunTracer.register(run_id, TEST_TRACE_DIR / run_id)
+    parent_id = tracer.log_event("graph_node", "node_start", 0, {"node": "pm"})
+    child_id = tracer.log_event(
+        "graph_node", "node_complete", 0, {"node": "pm"},
+        correlation_id="execution-1", parent_event_id=parent_id
+    )
+
+    lines = (TEST_TRACE_DIR / run_id / "run_trace.jsonl").read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines]
+    assert parent_id and child_id and parent_id != child_id
+    assert [event["sequence"] for event in events] == [1, 2]
+    assert events[0]["event_id"] == parent_id
+    assert events[1]["parent_event_id"] == parent_id
+    assert events[1]["correlation_id"] == "execution-1"
+    assert all(event["run_id"] == run_id for event in events)
+
+
+def test_explicit_unknown_run_id_never_falls_back_to_active_tracer():
+    run_id = "test_trace_isolation"
+    tracer = RunTracer.register(run_id, TEST_TRACE_DIR / run_id)
+    assert get_tracer(run_id) is tracer
+    assert get_tracer("unknown-run-id") is None
+
+
+def test_trace_write_failure_is_reported_without_raising(monkeypatch, caplog):
+    import builtins
+
+    run_id = "test_trace_write_failure"
+    tracer = RunTracer.register(run_id, TEST_TRACE_DIR / run_id)
+
+    def fail_open(*args, **kwargs):
+        raise OSError("simulated disk write failure")
+
+    monkeypatch.setattr(builtins, "open", fail_open)
+    with caplog.at_level("ERROR"):
+        result = tracer.log_event("tester", "output", 0, {"ok": True})
+
+    assert result is None
+    assert tracer.write_failures == 1
+    assert "AUDIT_TRACE_WRITE_FAILURE" in caplog.text
