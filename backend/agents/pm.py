@@ -1,9 +1,10 @@
 from langchain_core.messages import SystemMessage, HumanMessage
+import time
 try:
     from ..state import SquadState
     from ..config import get_llm
     from ..contract import create_draft_contract, ContractStatus
-    from ..tracer import get_tracer
+    from ..tracer import get_tracer, log_model_interaction
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
@@ -13,7 +14,7 @@ except (ImportError, ValueError):
         def create_draft_contract(*args, **kwargs): return {}
         class ContractStatus: DRAFT = "DRAFT"
     try:
-        from tracer import get_tracer
+        from tracer import get_tracer, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
 
@@ -69,8 +70,15 @@ Tuliskan spesifikasi SUPER RINGKAS (maksimal 100 kata) sesuai format 1, 2, 3 tan
         HumanMessage(content=prompt)
     ]
     
+    model_call_started = time.perf_counter()
     response = llm.invoke(messages)
     specs = response.content if hasattr(response, "content") else str(response)
+    tracer = get_tracer(state.get("run_id"))
+    log_model_interaction(
+        tracer, role="pm", messages=messages, response=response, raw_output=specs,
+        duration_sec=time.perf_counter() - model_call_started, iteration=repair_count,
+        provider=state.get("provider"), requested_model=state.get("model_name"), model_client=llm,
+    )
 
     # Domain detection & DRAFT Contract generation (mission-agnostic categories)
     task_lower = user_task.lower()
