@@ -116,7 +116,7 @@ class RunTracer:
                 event["sequence"] = self._event_sequence
                 line = json.dumps(event, default=str, ensure_ascii=False)
                 with open(self.trace_file, "a", encoding="utf-8") as trace:
-                    trace.write(line + "\\n")
+                    trace.write(line + "\n")
                     trace.flush()
             return event_id
         except Exception as exc:
