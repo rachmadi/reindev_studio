@@ -1,18 +1,19 @@
 import ast
 import re
+import time
 from typing import Tuple, Dict, Any, List
 from langchain_core.messages import SystemMessage, HumanMessage
 
 try:
     from ..state import SquadState
     from ..config import get_llm
-    from ..tracer import get_tracer, compute_dict_hashes
+    from ..tracer import get_tracer, compute_dict_hashes, log_model_interaction
     from ..contract import verify_contract_checkpoint
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
     try:
-        from tracer import get_tracer, compute_dict_hashes
+        from tracer import get_tracer, compute_dict_hashes, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
@@ -309,8 +310,16 @@ Hasil Pengujian Sandbox QA:
         HumanMessage(content=prompt)
     ]
     
+    model_call_started = time.perf_counter()
     response = llm.invoke(messages)
     raw_review_notes = response.content if hasattr(response, "content") else str(response)
+    tracer = get_tracer(state.get("run_id"))
+    log_model_interaction(
+        tracer, role="reviewer", messages=messages, response=response, raw_output=raw_review_notes,
+        duration_sec=time.perf_counter() - model_call_started,
+        iteration=iteration, provider=state.get("provider"),
+        requested_model=state.get("model_name"), model_client=llm,
+    )
     
     # Enforce Deterministic Verdict Override
     if not is_gate_passed:
