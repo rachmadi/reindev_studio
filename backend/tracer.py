@@ -26,6 +26,10 @@ def compute_object_hash(obj: Any) -> str:
     except Exception:
         return ""
 
+
+_UNSPECIFIED_RUN_ID = object()
+
+
 class RunTracer:
     """
     Tracer append-only berbasis JSONL untuk observabilitas mendalam alur multi-agent ReinDev Studio.
@@ -54,12 +58,12 @@ class RunTracer:
             return tracer
 
     @classmethod
-    def get(cls, run_id: Optional[str] = None) -> Optional["RunTracer"]:
+    def get(cls, run_id: Any = _UNSPECIFIED_RUN_ID) -> Optional["RunTracer"]:
         with cls._lock:
-            # Explicit run IDs are authoritative; never attribute an unknown run
-            # to whichever run happened to register most recently.
-            if run_id is not None:
-                return cls._instances.get(run_id)
+            # An explicit value (including None) is authoritative; never attribute
+            # an unscoped event to whichever run registered most recently.
+            if run_id is not _UNSPECIFIED_RUN_ID:
+                return cls._instances.get(run_id) if isinstance(run_id, str) else None
             if cls._active_run_id and cls._active_run_id in cls._instances:
                 return cls._instances[cls._active_run_id]
             return None
@@ -245,8 +249,8 @@ class RunTracer:
         )
 
 
-def get_tracer(run_id: Optional[str] = None) -> Optional[RunTracer]:
-    """Helper fungsi global untuk mendapatkan instance tracer aktif."""
+def get_tracer(run_id: Any = _UNSPECIFIED_RUN_ID) -> Optional[RunTracer]:
+    """Ambil tracer berdasarkan run_id; hanya pemanggilan tanpa argumen memakai tracer aktif."""
     return RunTracer.get(run_id)
 
 
