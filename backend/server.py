@@ -11,6 +11,7 @@ import time
 import json
 import asyncio
 import hashlib
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -1025,6 +1026,40 @@ async def squad_websocket_endpoint(websocket: WebSocket):
                     }))
                     
                 except Exception as e:
+                    # Audit failures are observational only: recording them must never mask
+                    # the original pipeline exception or alter its handling.
+                    error_duration = round(time.time() - start_time, 2)
+                    try:
+                        tracer.log_event(
+                            stage="run_lifecycle",
+                            event_type="run_error",
+                            iteration=(accumulated_state.get("iteration_count", 0) if "accumulated_state" in locals() else 0),
+                            data={
+                                "run_id": run_id,
+                                "exception_type": type(e).__name__,
+                                "exception_message": str(e),
+                                "traceback": traceback.format_exc(),
+                                "duration_sec": error_duration,
+                                "last_known_status": accumulated_state.get("status") if "accumulated_state" in locals() else "unknown",
+                                "last_known_iteration": accumulated_state.get("iteration_count", 0) if "accumulated_state" in locals() else 0,
+                            }
+                        )
+                        tracer.log_event(
+                            stage="run_lifecycle",
+                            event_type="run_end",
+                            iteration=(accumulated_state.get("iteration_count", 0) if "accumulated_state" in locals() else 0),
+                            data={
+                                "run_id": run_id,
+                                "final_status": "pipeline_error",
+                                "termination_reason": "uncaught_pipeline_exception",
+                                "exception_type": type(e).__name__,
+                                "duration_sec": error_duration,
+                                "is_terminal": True,
+                            }
+                        )
+                    except Exception:
+                        # Preserve the original error response if audit instrumentation fails.
+                        pass
                     await manager.send_personal(websocket, make_event("error", {
                         "message": f"Pipeline Execution Error: {str(e)}"
                     }))
