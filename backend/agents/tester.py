@@ -175,10 +175,19 @@ Silakan tulis automated unit test suite lengkap sesuai aturan di atas dalam form
         HumanMessage(content=prompt)
     ]
     
-    model_call_started = time.perf_counter()
-    response = llm.invoke(messages)
-    raw_output = response.content if hasattr(response, "content") else str(response)
     tracer = get_tracer(state.get("run_id"))
+    model_call_started = time.perf_counter()
+    try:
+        response = llm.invoke(messages)
+    except Exception as exc:
+        log_model_interaction(
+            tracer, role="tester", messages=messages, response=None, raw_output="",
+            duration_sec=time.perf_counter() - model_call_started,
+            iteration=state.get("iteration_count", 0), provider=state.get("provider"),
+            requested_model=state.get("model_name"), model_client=llm, error=exc,
+        )
+        raise
+    raw_output = response.content if hasattr(response, "content") else str(response)
     log_model_interaction(
         tracer, role="tester", messages=messages, response=response, raw_output=raw_output,
         duration_sec=time.perf_counter() - model_call_started,
