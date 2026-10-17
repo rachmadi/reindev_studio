@@ -30,6 +30,8 @@ def test_traced_node_records_actual_input_output_and_duration(tmp_path):
 
     def node_fn(actual_state):
         calls.append(actual_state)
+        tracer = RunTracer.get(run_id)
+        tracer.log_event("sample_node", "internal_fact", 2, {"fact": "observed"})
         return {"status": "ok", "code_files": {"main.py": "print(2)"}}
 
     result = _traced_node("sample_node", node_fn)(state)
@@ -38,12 +40,13 @@ def test_traced_node_records_actual_input_output_and_duration(tmp_path):
     assert len(calls) == 1
     assert state == original_state
     assert result == {"status": "ok", "code_files": {"main.py": "print(2)"}}
-    assert [event["event_type"] for event in events] == ["node_start", "node_complete"]
+    assert [event["event_type"] for event in events] == ["node_start", "internal_fact", "node_complete"]
     assert events[0]["data"]["input_state"] == original_state
-    assert events[1]["data"]["output"] == result
-    assert events[1]["data"]["duration_sec"] >= 0
+    assert events[2]["data"]["output"] == result
+    assert events[2]["data"]["duration_sec"] >= 0
+    assert events[2]["parent_event_id"] == events[0]["event_id"]
+    assert events[0]["correlation_id"] == events[1]["correlation_id"] == events[2]["correlation_id"]
     assert events[1]["parent_event_id"] == events[0]["event_id"]
-    assert events[0]["correlation_id"] == events[1]["correlation_id"]
 
 
 def test_traced_node_records_exception_and_reraises_same_error(tmp_path):
