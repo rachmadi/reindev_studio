@@ -1,5 +1,6 @@
 import json
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import pytest
 from backend.tracer import RunTracer, get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash, log_model_interaction
@@ -175,3 +176,29 @@ def test_model_interaction_trace_contains_prompt_output_timing_and_metadata(tmp_
     assert event["data"]["resolved_model"] == "test-model"
     assert event["data"]["usage_metadata"]["input_tokens"] == 12
     assert len(event["data"]["prompt_sha256"]) == 64
+
+
+
+def test_parallel_runs_keep_trace_files_and_sequences_isolated(tmp_path):
+    tracer_a = RunTracer.register("parallel-a", tmp_path / "parallel-a")
+    tracer_b = RunTracer.register("parallel-b", tmp_path / "parallel-b")
+
+    def write_events(tracer, label):
+        for index in range(25):
+            tracer.log_event("parallel_test", "fact", index, {"label": label, "index": index})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(write_events, tracer_a, "A")
+        b = pool.submit(write_events, tracer_b, "B")
+        a.result()
+        b.result()
+
+    events_a = [json.loads(line) for line in (tmp_path / "parallel-a" / "run_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+    events_b = [json.loads(line) for line in (tmp_path / "parallel-b" / "run_trace.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len(events_a) == len(events_b) == 25
+    assert {event["run_id"] for event in events_a} == {"parallel-a"}
+    assert {event["run_id"] for event in events_b} == {"parallel-b"}
+    assert [event["sequence"] for event in events_a] == list(range(1, 26))
+    assert [event["sequence"] for event in events_b] == list(range(1, 26))
+    assert {event["data"]["label"] for event in events_a} == {"A"}
+    assert {event["data"]["label"] for event in events_b} == {"B"}
