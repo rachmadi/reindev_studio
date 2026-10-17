@@ -11,8 +11,12 @@ Mengintegrasikan 6 End-Phase Quality Boundaries formal dengan penegakan mutlak:
 """
 
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 import ast
+import copy
+import time
+import uuid
+import traceback
 
 from langgraph.graph import StateGraph, START, END
 
@@ -24,7 +28,7 @@ try:
     from .agents.tester import tester_agent
     from .agents.reviewer import reviewer_agent
     from .executor_v2 import executor_node_v2 as executor_node
-    from .tracer import get_tracer, compute_dict_hashes
+    from .tracer import get_tracer, compute_dict_hashes, compute_object_hash
     from .contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
     from .phase_validators import (
         validate_pm_phase,
@@ -48,10 +52,11 @@ except (ImportError, ValueError):
     except ImportError:
         from executor import executor_node
     try:
-        from tracer import get_tracer, compute_dict_hashes
+        from tracer import get_tracer, compute_dict_hashes, compute_object_hash
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
+        def compute_object_hash(obj): return ""
     try:
         from contract import seal_and_freeze_contract, verify_contract_checkpoint, ContractStatus
     except ImportError:
@@ -852,6 +857,144 @@ def route_after_executor(state: SquadState) -> str:
     return "reviewer"
 
 
+def _trace_snapshot(value: Any) -> Any:
+    """Create a detached audit snapshot without allowing observability to affect execution."""
+    try:
+        return copy.deepcopy(value)
+    except Exception as exc:
+        if isinstance(value, dict):
+            return {
+                "_audit_snapshot_error": type(exc).__name__,
+                "_available_keys": sorted(str(key) for key in value.keys()),
+            }
+        return {"_audit_snapshot_error": type(exc).__name__, "_value_type": type(value).__name__}
+
+
+def _traced_node(node_name: str, node_fn: Callable) -> Callable:
+    """Wrap a graph node with input/output/exception evidence; preserve its return or exception."""
+    def run_with_trace(state: SquadState):
+        try:
+            tracer = get_tracer(state.get("run_id"))
+        except Exception:
+            tracer = None
+        if tracer is None:
+            return node_fn(state)
+
+        execution_id = uuid.uuid4().hex
+        iteration = state.get("iteration_count", 0)
+        input_snapshot = _trace_snapshot(dict(state))
+        model_context = {
+            key: state.get(key)
+            for key in (
+                "provider", "model_name", "squad_model", "developer_backend",
+                "developer_model", "target_language", "executor_mode",
+                "executor_intervention_enabled",
+            )
+            if key in state
+        }
+        try:
+            start_event_id = tracer.log_event(
+                stage="graph_node",
+                event_type="node_start",
+                iteration=iteration,
+                correlation_id=execution_id,
+                data={
+                    "node": node_name,
+                    "execution_id": execution_id,
+                    "input_state": input_snapshot,
+                    "input_state_sha256": compute_object_hash(input_snapshot),
+                    "configured_model_context": model_context,
+                    "input_status": state.get("status"),
+                },
+            )
+        except Exception:
+            start_event_id = None
+
+        started = time.perf_counter()
+        try:
+            result = node_fn(state)
+        except Exception as exc:
+            duration = round(time.perf_counter() - started, 6)
+            try:
+                tracer.log_event(
+                    stage="graph_node",
+                    event_type="node_error",
+                    iteration=iteration,
+                    correlation_id=execution_id,
+                    parent_event_id=start_event_id,
+                    data={
+                        "node": node_name,
+                        "execution_id": execution_id,
+                        "duration_sec": duration,
+                        "exception_type": type(exc).__name__,
+                        "exception_message": str(exc),
+                        "traceback": traceback.format_exc(),
+                        "input_state_sha256": compute_object_hash(input_snapshot),
+                    },
+                )
+            except Exception:
+                pass
+            raise
+
+        duration = round(time.perf_counter() - started, 6)
+        output_snapshot = _trace_snapshot(result)
+        try:
+            tracer.log_event(
+                stage="graph_node",
+                event_type="node_complete",
+                iteration=iteration,
+                correlation_id=execution_id,
+                parent_event_id=start_event_id,
+                data={
+                    "node": node_name,
+                    "execution_id": execution_id,
+                    "duration_sec": duration,
+                    "input_state_sha256": compute_object_hash(input_snapshot),
+                    "output": output_snapshot,
+                    "output_sha256": compute_object_hash(output_snapshot),
+                    "output_status": result.get("status") if isinstance(result, dict) else None,
+                    "output_keys": sorted(str(key) for key in result.keys()) if isinstance(result, dict) else [],
+                },
+            )
+        except Exception:
+            pass
+        return result
+    return run_with_trace
+
+
+def _traced_route(route_name: str, route_fn: Callable) -> Callable:
+    """Record the actual conditional-edge decision and the exact state used to decide it."""
+    def decide_with_trace(state: SquadState):
+        decision = route_fn(state)
+        try:
+            tracer = get_tracer(state.get("run_id"))
+        except Exception:
+            tracer = None
+        if tracer is not None:
+            snapshot = _trace_snapshot(dict(state))
+            try:
+                tracer.log_event(
+                    stage="routing",
+                    event_type="route_decision",
+                    iteration=state.get("iteration_count", 0),
+                    correlation_id=f"route-{uuid.uuid4().hex}",
+                    data={
+                        "route_function": route_name,
+                        "source_node": route_name.replace("route_after_", ""),
+                        "target_node": str(decision),
+                        "decision_state": snapshot,
+                        "decision_state_sha256": compute_object_hash(snapshot),
+                        "status": state.get("status"),
+                        "repair_attempt_counts": state.get("repair_attempt_counts", {}),
+                        "max_phase_repair_attempts": state.get("max_phase_repair_attempts"),
+                    },
+                )
+            except Exception:
+                pass
+        return decision
+    return decide_with_trace
+
+
 # ==============================================================================
 # Complete Authoritative StateGraph Builder
 # ==============================================================================
@@ -861,24 +1004,24 @@ def build_squad_graph():
     workflow = StateGraph(SquadState)
 
     # 1. Daftarkan seluruh Node Produser dan End-Phase Validator
-    workflow.add_node("pm", pm_agent)
-    workflow.add_node("pm_validator", pm_validator_node)
+    workflow.add_node("pm", _traced_node("pm", pm_agent))
+    workflow.add_node("pm_validator", _traced_node("pm_validator", pm_validator_node))
 
-    workflow.add_node("architect", architect_agent)
-    workflow.add_node("architect_validator", architect_validator_node)
+    workflow.add_node("architect", _traced_node("architect", architect_agent))
+    workflow.add_node("architect_validator", _traced_node("architect_validator", architect_validator_node))
 
-    workflow.add_node("developer", developer_agent)
-    workflow.add_node("developer_validator", developer_validator_node)
+    workflow.add_node("developer", _traced_node("developer", developer_agent))
+    workflow.add_node("developer_validator", _traced_node("developer_validator", developer_validator_node))
 
-    workflow.add_node("frozen_oracle", frozen_oracle_node)
-    workflow.add_node("tester", tester_agent)
-    workflow.add_node("test_suite_validator", test_suite_validator_node)
+    workflow.add_node("frozen_oracle", _traced_node("frozen_oracle", frozen_oracle_node))
+    workflow.add_node("tester", _traced_node("tester", tester_agent))
+    workflow.add_node("test_suite_validator", _traced_node("test_suite_validator", test_suite_validator_node))
 
-    workflow.add_node("executor", executor_node)
-    workflow.add_node("executor_validator", executor_validator_node)
+    workflow.add_node("executor", _traced_node("executor", executor_node))
+    workflow.add_node("executor_validator", _traced_node("executor_validator", executor_validator_node))
 
-    workflow.add_node("reviewer", reviewer_agent)
-    workflow.add_node("reviewer_validator", reviewer_validator_node)
+    workflow.add_node("reviewer", _traced_node("reviewer", reviewer_agent))
+    workflow.add_node("reviewer_validator", _traced_node("reviewer_validator", reviewer_validator_node))
 
     # 2. Rangkaikan Edges & Conditional Quality Boundaries
 
@@ -887,7 +1030,7 @@ def build_squad_graph():
     workflow.add_edge("pm", "pm_validator")
     workflow.add_conditional_edges(
         "pm_validator",
-        route_after_pm_validator,
+        _traced_route("route_after_pm_validator", route_after_pm_validator),
         {
             "architect": "architect",
             "pm": "pm",
@@ -899,7 +1042,7 @@ def build_squad_graph():
     workflow.add_edge("architect", "architect_validator")
     workflow.add_conditional_edges(
         "architect_validator",
-        route_after_architect_validator,
+        _traced_route("route_after_architect_validator", route_after_architect_validator),
         {
             "developer": "developer",
             "architect": "architect",
@@ -911,7 +1054,7 @@ def build_squad_graph():
     workflow.add_edge("developer", "developer_validator")
     workflow.add_conditional_edges(
         "developer_validator",
-        route_after_developer_validator,
+        _traced_route("route_after_developer_validator", route_after_developer_validator),
         {
             "frozen_oracle": "frozen_oracle",
             "tester": "tester",
@@ -925,7 +1068,7 @@ def build_squad_graph():
     workflow.add_edge("tester", "test_suite_validator")
     workflow.add_conditional_edges(
         "test_suite_validator",
-        route_after_test_suite_validator,
+        _traced_route("route_after_test_suite_validator", route_after_test_suite_validator),
         {
             "executor": "executor",
             "tester": "tester",
@@ -937,7 +1080,7 @@ def build_squad_graph():
     workflow.add_edge("executor", "executor_validator")
     workflow.add_conditional_edges(
         "executor_validator",
-        route_after_executor_validator,
+        _traced_route("route_after_executor_validator", route_after_executor_validator),
         {
             "reviewer": "reviewer",
             "developer": "developer",
@@ -950,7 +1093,7 @@ def build_squad_graph():
     workflow.add_edge("reviewer", "reviewer_validator")
     workflow.add_conditional_edges(
         "reviewer_validator",
-        route_after_reviewer_validator,
+        _traced_route("route_after_reviewer_validator", route_after_reviewer_validator),
         {
             "developer": "developer",
             END: END
