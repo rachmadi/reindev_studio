@@ -1,17 +1,18 @@
 import re
+import time
 from langchain_core.messages import SystemMessage, HumanMessage
 try:
     from ..state import SquadState
     from ..config import get_llm
     from .developer import clean_code_content, parse_code_blocks
-    from ..tracer import get_tracer, compute_dict_hashes
+    from ..tracer import get_tracer, compute_dict_hashes, log_model_interaction
     from ..contract import verify_contract_checkpoint
 except (ImportError, ValueError):
     from state import SquadState
     from config import get_llm
     from agents.developer import clean_code_content, parse_code_blocks
     try:
-        from tracer import get_tracer, compute_dict_hashes
+        from tracer import get_tracer, compute_dict_hashes, log_model_interaction
     except ImportError:
         def get_tracer(run_id=None): return None
         def compute_dict_hashes(f): return {}
@@ -173,8 +174,16 @@ Silakan tulis automated unit test suite lengkap sesuai aturan di atas dalam form
         HumanMessage(content=prompt)
     ]
     
+    model_call_started = time.perf_counter()
     response = llm.invoke(messages)
     raw_output = response.content if hasattr(response, "content") else str(response)
+    tracer = get_tracer(state.get("run_id"))
+    log_model_interaction(
+        tracer, role="tester", messages=messages, response=response, raw_output=raw_output,
+        duration_sec=time.perf_counter() - model_call_started,
+        iteration=state.get("iteration_count", 0), provider=state.get("provider"),
+        requested_model=state.get("model_name"), model_client=llm,
+    )
     test_files = parse_code_blocks(raw_output, target_lang=target_lang)
     
     # Format nama file test
