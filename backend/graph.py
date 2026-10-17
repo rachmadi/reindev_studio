@@ -1010,7 +1010,28 @@ def _traced_node(node_name: str, node_fn: Callable) -> Callable:
 def _traced_route(route_name: str, route_fn: Callable) -> Callable:
     """Record the actual conditional-edge decision and the exact state used to decide it."""
     def decide_with_trace(state: SquadState):
-        decision = route_fn(state)
+        try:
+            decision = route_fn(state)
+        except Exception as exc:
+            try:
+                tracer = get_tracer(state.get("run_id"))
+                if tracer is not None:
+                    snapshot = _trace_snapshot(dict(state))
+                    tracer.log_event(
+                        stage="routing",
+                        event_type="route_error",
+                        iteration=state.get("iteration_count", 0),
+                        data={
+                            "route_function": route_name,
+                            "decision_state_sha256": compute_object_hash(snapshot),
+                            "exception_type": type(exc).__name__,
+                            "exception_message": str(exc),
+                            "traceback": traceback.format_exc(),
+                        },
+                    )
+            except Exception:
+                pass
+            raise
         try:
             tracer = get_tracer(state.get("run_id"))
         except Exception:
