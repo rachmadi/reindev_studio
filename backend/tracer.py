@@ -145,7 +145,8 @@ class RunTracer:
                     trace.flush()
             return event_id
         except Exception as exc:
-            self._write_failures += 1
+            with self._file_lock:
+                self._write_failures += 1
             # Do not recursively write to a file whose append just failed.
             # Report the loss through process logging without stopping the pipeline.
             self._logger.error(
