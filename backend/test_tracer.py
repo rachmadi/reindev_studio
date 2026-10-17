@@ -154,6 +154,7 @@ def test_model_interaction_trace_contains_prompt_output_timing_and_metadata(tmp_
 
     class Client:
         model = "test-model"
+        temperature = 0.2
 
     class Response:
         content = "def add(a, b): return a + b"
@@ -174,6 +175,7 @@ def test_model_interaction_trace_contains_prompt_output_timing_and_metadata(tmp_
     assert event["data"]["raw_output"] == response.content
     assert event["data"]["duration_sec"] == 0.125
     assert event["data"]["resolved_model"] == "test-model"
+    assert event["data"]["model_client_config"]["temperature"] == 0.2
     assert event["data"]["usage_metadata"]["input_tokens"] == 12
     assert len(event["data"]["prompt_sha256"]) == 64
 
