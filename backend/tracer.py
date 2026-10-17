@@ -309,6 +309,16 @@ def log_model_interaction(
                 client_model = None
             if client_model:
                 break
+        client_config = {}
+        if model_client is not None:
+            for attr in ("base_url", "temperature", "num_ctx", "num_predict", "max_tokens", "max_retries", "top_p"):
+                try:
+                    value = getattr(model_client, attr, None)
+                except Exception:
+                    value = None
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    if value is not None:
+                        client_config[attr] = value
         response_metadata = {}
         usage_metadata = {}
         if response is not None:
@@ -326,6 +336,7 @@ def log_model_interaction(
             "requested_model": requested_model,
             "resolved_model": client_model,
             "model_client_type": type(model_client).__name__ if model_client is not None else None,
+            "model_client_config": client_config,
             "prompt_messages": message_snapshot,
             "prompt_sha256": compute_object_hash(message_snapshot),
             "raw_output": raw_text,
