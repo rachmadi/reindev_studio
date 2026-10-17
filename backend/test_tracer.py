@@ -2,7 +2,7 @@ import json
 import shutil
 from pathlib import Path
 import pytest
-from backend.tracer import RunTracer, get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash
+from backend.tracer import RunTracer, get_tracer, compute_sha256, compute_dict_hashes, compute_object_hash, log_model_interaction
 
 TEST_TRACE_DIR = Path(__file__).parent / "test_traces_temp"
 
@@ -140,3 +140,38 @@ def test_trace_write_failure_is_reported_without_raising(monkeypatch, caplog):
     assert result is None
     assert tracer.write_failures == 1
     assert "AUDIT_TRACE_WRITE_FAILURE" in caplog.text
+
+
+
+def test_model_interaction_trace_contains_prompt_output_timing_and_metadata(tmp_path):
+    run_id = "test_model_interaction"
+    tracer = RunTracer.register(run_id, tmp_path / run_id)
+
+    class Message:
+        type = "human"
+        content = "Build a calculator"
+
+    class Client:
+        model = "test-model"
+
+    class Response:
+        content = "def add(a, b): return a + b"
+        response_metadata = {"finish_reason": "stop"}
+        usage_metadata = {"input_tokens": 12, "output_tokens": 8}
+
+    response = Response()
+    log_model_interaction(
+        tracer, role="developer", messages=[Message()], response=response,
+        raw_output=response.content, duration_sec=0.125, iteration=1,
+        provider="test-provider", requested_model="test-model", model_client=Client(),
+        backend_metadata={"latency_s": 0.12},
+    )
+
+    event = json.loads((tmp_path / run_id / "run_trace.jsonl").read_text(encoding="utf-8"))
+    assert event["event_type"] == "model_call"
+    assert event["data"]["prompt_messages"][0]["content"] == "Build a calculator"
+    assert event["data"]["raw_output"] == response.content
+    assert event["data"]["duration_sec"] == 0.125
+    assert event["data"]["resolved_model"] == "test-model"
+    assert event["data"]["usage_metadata"]["input_tokens"] == 12
+    assert len(event["data"]["prompt_sha256"]) == 64
