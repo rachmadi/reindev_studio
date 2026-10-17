@@ -121,6 +121,7 @@ def test_explicit_unknown_run_id_never_falls_back_to_active_tracer():
     tracer = RunTracer.register(run_id, TEST_TRACE_DIR / run_id)
     assert get_tracer(run_id) is tracer
     assert get_tracer("unknown-run-id") is None
+    assert get_tracer(None) is None
 
 
 def test_trace_write_failure_is_reported_without_raising(monkeypatch, caplog):
